@@ -15,6 +15,7 @@ Later steps add stages here rather than creating new runners:
   Step 14        compose stage: the dedupe table, ordering, and a report per fixture (done)
   Step 15        validate stage: floor, superset, --final, 45 deliberately broken reports (done)
   Step 16        run_audit stage: the command end to end on every fixture, plus its guards (done)
+  Step 17        orchestrator hygiene and the finalize.py answers flow (done)
   Step 18         validate every report; assert no tracebacks anywhere
 
 Usage:
@@ -111,7 +112,8 @@ def stage_manifest(res):
     # documentation hygiene: a skill whose references/ exist must document every registered check of its prefix,
     # and its SKILL.md must point at a script that exists
     skill_prefix = {"crawl-render-audit": "cr.", "fact-extractability-audit": "fx.",
-                    "entity-freshness-corroboration-audit": "ef.", "engagement-audit": "en."}
+                    "entity-freshness-corroboration-audit": "ef.", "engagement-audit": "en.",
+                    "audit-orchestrator": "or."}
     for skill, prefix in skill_prefix.items():
         refdir = os.path.join(ROOT, "skills", skill, "references")
         mds = [f for f in os.listdir(refdir)] if os.path.isdir(refdir) else []
@@ -133,6 +135,15 @@ def stage_manifest(res):
         mentioned = set(re.findall(r"`((?:\.\./)*[\w./-]*references/[\w.-]+\.md)`", skill_md))
         dangling = sorted(m for m in mentioned if not os.path.exists(os.path.normpath(os.path.join(skill_dir, m))))
         res.check(not dangling, "%s: every references/*.md path named in SKILL.md exists" % skill, ", ".join(dangling))
+    orch = open(os.path.join(ROOT, "skills", "audit-orchestrator", "SKILL.md"), encoding="utf-8").read()
+    for needle in ("run_audit.py", "finalize.py", "compose.py", "validate.py", "references/simulation_rules.md",
+                   "offsite_spotcheck.md", "extracted_facts.json", "WebSearch", "--final"):
+        res.check(needle in orch, "audit-orchestrator: SKILL.md procedure mentions %s" % needle)
+    res.check(orch.index("offsite_spotcheck.md") < orch.index("finalize.py"),
+              "audit-orchestrator: the spot-check step precedes the answers step (compose rewrites report.json)")
+    rules = open(os.path.join(ROOT, "skills", "audit-orchestrator", "references", "simulation_rules.md"), encoding="utf-8").read()
+    for needle in ("verbatim", "20 characters", "answerable: false", "attribution", "invisible", "stale", "bouncing", "snapshots"):
+        res.check(needle in rules, "simulation_rules.md covers %s" % needle)
     for name in names:
         meta = load_fixture(name)
         for path, route in meta.get("routes", {}).items():
@@ -752,6 +763,10 @@ def stage_compose(res, farm):
         if name == "csr-shell":
             sim = [f for f in fnds if f["check_id"] == "or.simulation.question_unanswerable"]
             res.check(sim and sim[0]["severity"] == "info", "compose/csr-shell: unanswerable questions are reported as info")
+            open_qs = [q for q in report["ai_answer_simulation"]["questions"] if not q["answerable"] and not q.get("informational")]
+            res.check(open_qs and all(q.get("see_finding") in {f["id"] for f in fnds} for q in open_qs),
+                      "compose/csr-shell: every unanswerable question points at the finding that explains it",
+                      str([q.get("see_finding") for q in open_qs]))
             res.check(report["coverage"]["stages"]["extract"] in ("partial", "not_evaluated"),
                       "compose/csr-shell: the extract stage is not claimed as evaluated")
         if name == "one-page-portfolio":
@@ -910,6 +925,56 @@ def stage_validate(res, farm):
     broken("--final with an unanswered answerable question", lambda r: r["ai_answer_simulation"]["questions"][0].update(answer_from_facts=None),
            "has no answer", final=True, expect_floor=False)
     broken("missing top-level field", delf(["run"]), "missing top-level field run", expect_floor=False)
+    broken("see_finding naming no finding", lambda r: r["ai_answer_simulation"]["questions"][-1].update(see_finding="F-777"),
+           "see_finding", expect_floor=False)
+    # finalize.py: the agent writes a small answers file; the script merges, renders and validates --final
+    def _load_finalize():
+        import importlib.util
+        path = os.path.join(ROOT, "skills", "audit-orchestrator", "scripts", "finalize.py")
+        spec = importlib.util.spec_from_file_location("finalize", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    F = _load_finalize()
+    with tempfile.TemporaryDirectory() as td:
+        _build_workdir(farm.urls["weak-engagement"], td)
+        C.main(["--workdir", td, "--quiet"])
+        answers = {"answers": {q["id"]: {"answer_from_facts": " ".join('"%s"' % facts["facts"][fid]["value"] for fid in q["facts_used"])}
+                               for q in good["ai_answer_simulation"]["questions"] if q["answerable"]},
+                   "attribution_note": good["ai_answer_simulation"]["attribution_note"],
+                   "narrative_summary": good["narrative_summary"]}
+        apath = os.path.join(td, "answers.json")
+        with open(apath, "w", encoding="utf-8") as f:
+            json.dump(answers, f)
+        res.check(F.main(["--workdir", td, "--answers", apath, "--quiet"]) == 0, "finalize: merges a verbatim answers file into a final report")
+        res.check(V.main(["--workdir", td, "--final", "--quiet"]) == 0, "finalize: the report it wrote passes validate --final")
+        merged = json.load(open(os.path.join(td, "report.json"), encoding="utf-8"))
+        res.check(merged["narrative_summary"] == good["narrative_summary"] and all(
+            q["answer_from_facts"] for q in merged["ai_answer_simulation"]["questions"] if q["answerable"]),
+            "finalize: answers and narrative land on the right fields")
+        md = open(os.path.join(td, "report.md"), encoding="utf-8").read()
+        res.check("## What this means" in md and good["narrative_summary"][:40] in md, "finalize: the narrative is rendered into the Markdown")
+        bad = json.loads(json.dumps(answers))
+        first = next(q["id"] for q in good["ai_answer_simulation"]["questions"] if q["answerable"])
+        bad["answers"][first] = {"answer_from_facts": "It is an invoicing product for designers, roughly speaking."}
+        with open(apath, "w", encoding="utf-8") as f:
+            json.dump(bad, f)
+        res.check(F.main(["--workdir", td, "--answers", apath, "--quiet"]) == 1, "finalize: a paraphrased answer is rejected")
+        bad = json.loads(json.dumps(answers))
+        unanswerable = next(q["id"] for q in good["ai_answer_simulation"]["questions"] if not q["answerable"])
+        bad["answers"][unanswerable] = {"answer_from_facts": "Probably the best."}
+        with open(apath, "w", encoding="utf-8") as f:
+            json.dump(bad, f)
+        res.check(F.main(["--workdir", td, "--answers", apath, "--quiet"]) == 1, "finalize: an answer on an unanswerable question is refused")
+        bad = json.loads(json.dumps(answers))
+        bad["narrative_summary"] = ""
+        with open(apath, "w", encoding="utf-8") as f:
+            json.dump(bad, f)
+        res.check(F.main(["--workdir", td, "--answers", apath, "--quiet"]) == 1, "finalize: an empty narrative is not final")
+        with open(apath, "w") as f:
+            f.write("{oops")
+        res.check(F.main(["--workdir", td, "--answers", apath, "--quiet"]) == 1, "finalize: an unreadable answers file is a problem, not a crash")
+        res.check(F.main(["--workdir", os.path.join(td, "nowhere"), "--answers", apath, "--quiet"]) == 1, "finalize: a missing report is a problem, not a crash")
     # an answer that quotes verbatim passes even when the value was cut with an ellipsis
     r = json.loads(json.dumps(good))
     fid = r["ai_answer_simulation"]["questions"][0]["facts_used"][0]

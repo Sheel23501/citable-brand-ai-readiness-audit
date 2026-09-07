@@ -82,22 +82,22 @@ with the code, the handout and the code win. Several of their citations are
 | 0 Foundations | 1–3 | done: skeleton, 7 shared conventions, fixtures |
 | 1 Fetch layer | 4–5 | done: fetch helper + robots, sampler + categorizer |
 | 2 Probes | 6–13 | done |
-| 3 Orchestrator | 14–17 | Steps 14–16 done (compose.py, validate.py, run_audit.py). **Step 17 (orchestrator SKILL.md) is next** and finishes Phase 3 |
-| 4 Hardening | 18–20 | not started: test stages, live pass, source verification |
+| 3 Orchestrator | 14–17 | done: compose.py, validate.py, run_audit.py, finalize.py, the entrypoint SKILL.md and simulation_rules.md |
+| 4 Hardening | 18–20 | **Step 18 (test runner) is next**, then the live pass, then source verification |
 | 5 Packaging | 21–24 | not started: README, demo, sweep, dry-run judging |
 
-Suite: **2478 checks, 0 failures, GREEN.** All five skills pass the validator.
+Suite: **2513 checks, 0 failures, GREEN.** All five skills pass the validator.
 
-Code size: ~8,100 lines. Largest pieces: `engagement_probe.py` 1044, `compose.py` 790, `validate.py` 330, `run_audit.py` 210,
+Code size: ~8,100 lines. Largest pieces: `engagement_probe.py` 1044, `compose.py` 800, `validate.py` 335, `run_audit.py` 210, `finalize.py` 130,
 `entity_probe.py` 820, `extract.py` 702, `facts_probe.py` 624, `fetch.py` 528,
-`htmldoc.py` 522, `run_tests.py` 1450.
+`htmldoc.py` 522, `run_tests.py` 1520.
 
 Registry: 58 checks — 16 `cr.*`, 12 `fx.*`, 12 `ef.*`, 16 `en.*`, 2 `or.*`.
 
 Reference files written so far:
 
 - `audit-orchestrator/references/`: `report_schema.md`, `severity_confidence_rubric.md`,
-  `check_ids.md`, `coverage_map.md`, `site_categories.md`, `bot_tiers.md`, `fetch_policy.md`
+  `check_ids.md`, `coverage_map.md`, `site_categories.md`, `simulation_rules.md`, `bot_tiers.md`, `fetch_policy.md`
 - `crawl-render-audit/references/`: `checks.md`, `non_findings.md`
 - `fact-extractability-audit/references/`: `checks.md`, `extracted_facts.md`, `non_findings.md`
 - `entity-freshness-corroboration-audit/references/`: `checks.md`, `non_findings.md`, `entity_file.md`, `offsite_spotcheck.md`
@@ -382,20 +382,54 @@ three different inferred categories, no traceback anywhere.
 - The engagement probe is the slow one on live sites (7-14 s of the total), because of the
   15-link sample. That is within budget but it is where any future speed work belongs.
 
-## 11. Next step — Step 17 (orchestrator SKILL.md)
+## 11. Step 17 — done (orchestrator SKILL.md, simulation_rules.md, finalize.py)
 
-The last step of Phase 3, and the one judges read first: the procedure a fresh agent follows.
-Run `run_audit.py`; open `report.json`; for each simulation question with `answerable: true`
-write `answer_from_facts` quoting **only** verbatim `value` fields from
-`work/extracted_facts.json` and list them in `facts_used` (validate.py enforces a verbatim
-20-character run, so a paraphrase is rejected); for `answerable: false` leave the answer null
-and point at the finding id; write `attribution_note`; run the off-site spot-check from
-`entity-freshness-corroboration-audit/references/offsite_spotcheck.md` if a search tool
-exists, else leave the `not_evaluated` note; write the narrative (3-6 sentences, grouped
-invisible / stale / bouncing); re-render with `compose.py --render-only` and check with
-`validate.py --final`; emit both files.
+Phase 3 is complete. `skills/audit-orchestrator/SKILL.md` is now the procedure a fresh
+agent follows, in eight numbered steps: run `run_audit.py`; read `report.json`; the
+off-site spot-check if a search tool exists (and only then); the simulated answers; the
+attribution note; the narrative; `finalize.py`; emit both files. `allowed-tools` gained
+`WebSearch` for the spot-check.
 
-New reference to write: `references/simulation_rules.md` (the facts-only rule, the
-forbidden-knowledge rule, the wording rules), plus pointers to the schema, the rubric and the
-coverage map. Done when a fresh agent session given only the SKILL.md and a URL produces a
-report that passes `validate.py --final`.
+**`references/simulation_rules.md`** is the rulebook for the only three pieces of text
+the agent writes. Its two central rules: an answer's substance may be only the verbatim
+`value` strings of `present` facts, in quotation marks, framed by words that carry no
+facts (the validator demands a 20-character verbatim run of every fact named); and
+nothing outside the facts file goes in — not the model's knowledge, not the page
+snapshots, not anything fetched, not inference from absence, not correction of an odd
+value. Q4 is answered "for whom", never yes/no; Q5 is informational. The attribution note
+is the one place mention-without-citation is recorded. The narrative is 3–6 sentences,
+grouped invisible → stale → bouncing, every sentence traceable to an id, a passed check,
+a coverage line or the simulation, and it must open by saying so if the run was incomplete.
+
+**Ordering constraint that the SKILL.md enforces:** the spot-check re-runs the entity
+probe and compose, and compose rewrites `report.json`. So the spot-check is step 3 and
+the agent's text is written last, by `finalize.py`, which never recomposes.
+
+**One addition beyond the plan text:** `scripts/finalize.py`. The agent writes a small
+`answers.json` (answers keyed by question id, `attribution_note`, `narrative_summary`)
+and the script merges it, re-renders `report.md`, and runs `validate.py --final`. The
+alternative was an agent hand-editing a 2,000-line JSON with `Write`, which is where a
+report would get corrupted. It refuses an answer on an unanswerable question and reports
+the validator's problems so the agent can fix the file and re-run.
+
+Also: compose now fills `see_finding` on every unanswerable category question (the
+`fx.facts.key_fact_missing` id, else the `or.simulation.question_unanswerable` id) and
+the validator checks it names a real finding.
+
+**Verification.** Walked the procedure by hand on python.org: answers written from the
+facts file alone, `finalize.py` exit 0, `validate.py --final` zero problems, the narrative
+and quotations render. The orchestrator is now held to the same reference/script hygiene
+tests as the four probes. The literal "fresh agent session given only the SKILL.md" test
+belongs to Step 24's dry run.
+
+## 12. Next step — Step 18 (test runner)
+
+Read the plan's Step 18 text first. Most of what it lists already exists: stages
+`probe_en`, `compose`, `validate` and `run_audit` were added as each step landed, and the
+`run_audit` stage already asserts no traceback in the CLI's output. What is left is the
+plan's last clause: **a traceback grep over every script's stdout/stderr**, meaning every
+script in `skills/*/scripts/` invoked the way its SKILL.md says (including the wrong-usage
+paths: no arguments, a bad flag, a missing workdir), never emitting a Python traceback.
+Add that as a stage, keep everything green, and update the runner's docstring stage list.
+Do not re-implement stages that exist; extend them where the plan text asks for something
+they do not yet check.

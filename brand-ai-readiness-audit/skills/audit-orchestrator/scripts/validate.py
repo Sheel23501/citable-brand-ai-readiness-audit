@@ -338,7 +338,7 @@ def check_superset(r, problems, warnings, reg, facts=None, final=False):
     if not isinstance(run, dict) or not isinstance(run.get("probe_errors"), list):
         p("run.probe_errors must be a list")
 
-    check_simulation(r.get("ai_answer_simulation"), p, w, facts, final)
+    check_simulation(r.get("ai_answer_simulation"), p, w, facts, final, finding_ids=ids)
     if final:
         narrative = r.get("narrative_summary") or ""
         if not narrative.strip():
@@ -349,7 +349,7 @@ def check_superset(r, problems, warnings, reg, facts=None, final=False):
                 w("narrative_summary has about %d sentences; the orchestrator asks for 3-6" % n)
 
 
-def check_simulation(sim, p, w, facts, final):
+def check_simulation(sim, p, w, facts, final, finding_ids=()):
     if not isinstance(sim, dict):
         p("ai_answer_simulation missing")
         return
@@ -371,6 +371,8 @@ def check_simulation(sim, p, w, facts, final):
         if ans is not None and not isinstance(ans, str):
             p("%s: answer_from_facts must be null or a string" % tag)
             continue
+        if q.get("see_finding") is not None and q["see_finding"] not in finding_ids:
+            p("%s: see_finding %r is not a finding id" % (tag, q["see_finding"]))
         if not q["answerable"]:
             if ans:
                 p("%s: an unanswerable question carries an answer" % tag)

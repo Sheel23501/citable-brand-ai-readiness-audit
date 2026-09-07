@@ -731,6 +731,12 @@ def compose(workdir, wall_clock=None, input_url=None, category_override=None):
         f["rank"] = i
         add_derived_tags(f)
         f["quick_win"] = is_quick_win(f)
+    # an unanswerable question points at the finding that explains it, so the agent never looks up an id
+    explain = next((f["id"] for f in kept if f["check_id"] == "fx.facts.key_fact_missing"), None) or \
+        next((f["id"] for f in kept if f["check_id"] == "or.simulation.question_unanswerable"), None)
+    for q in simulation["questions"]:
+        if not q["answerable"] and not q.get("informational") and explain:
+            q["see_finding"] = explain
     by_key = {f["dedupe_key"]: f for f in kept}
     for f in folded:
         add_derived_tags(f)
