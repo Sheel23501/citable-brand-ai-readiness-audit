@@ -12,6 +12,7 @@ Later steps add stages here rather than creating new runners:
   Step 6          probe_cr stage (done)
   Step 8          extract + probe_fx stages (done)
   Step 6/8/10/12  run each probe against each fixture and compare `expected`
+  Step 14        compose stage: the dedupe table, ordering, and a report per fixture (done)
   Step 16         run run-audit end to end on each fixture
   Step 18         validate every report; assert no tracebacks anywhere
 
@@ -509,6 +510,267 @@ def run_probe_on_fixtures(res, farm, prefix, probe_mod, label):
     return results
 
 
+# ---------------------------------------------------------------- stage: compose (orchestrator report from a workdir)
+def _load_compose():
+    import importlib.util
+    path = os.path.join(ROOT, "skills", "audit-orchestrator", "scripts", "compose.py")
+    spec = importlib.util.spec_from_file_location("compose", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+PROBE_SCRIPTS = (("crawl-render-audit", "crawl_probe.py"), ("fact-extractability-audit", "facts_probe.py"),
+                 ("entity-freshness-corroboration-audit", "entity_probe.py"), ("engagement-audit", "engagement_probe.py"))
+
+
+def _build_workdir(base_url, workdir):
+    """Sample once, then run all four probes into <workdir>/probes/, exactly as run_audit.py will (Step 16)."""
+    from auditlib.context import AuditContext
+    AuditContext.from_url(base_url, workdir)
+    os.makedirs(os.path.join(workdir, "probes"), exist_ok=True)
+    for skill, script in PROBE_SCRIPTS:
+        mod = _load_probe(skill, script)
+        out = mod.run(AuditContext.from_workdir(workdir)).to_dict()
+        with open(os.path.join(workdir, "probes", skill + ".json"), "w", encoding="utf-8") as f:
+            json.dump(out, f, indent=2, ensure_ascii=False)
+
+
+def _mkf(check_id, severity="medium", pages=(), items=None, status="fail", confidence="high"):
+    """A finding shaped like a probe's, for the dedupe unit checks."""
+    return {"check_id": check_id, "title": check_id, "status": status, "severity": severity, "confidence": confidence,
+            "effort": "low", "mechanism": None, "affected_pages": list(pages), "evidence": "e",
+            "evidence_items": list(items or [{"page": "site", "kind": "computed", "value": "x"}]),
+            "why_it_matters": "w",
+            "suggested_action": {"summary": "S", "detail": "d", "impact": "medium", "effort": "low", "priority": "medium"},
+            "references": [], "dedupe_key": check_id + "|" + ",".join(sorted(pages)), "_max_severity": "critical"}
+
+
+def stage_compose_units(res, C):
+    """The parts that need no server: the dedupe table, ordering, derived tags, and the two mirrored tables."""
+    print("\n== stage: compose (dedupe table, ordering, derived tags)")
+    from auditlib.findings import Registry
+    reg = Registry()
+    HOME, P2 = "http://s/", "http://s/p2"
+    sample = {"site_category": {"value": "saas_software"},
+              "pages": [{"role": "home", "fetch": {"final_url": HOME, "status": 200, "is_html": True}},
+                        {"role": "about", "fetch": {"final_url": P2, "status": 200, "is_html": True}}]}
+
+    def fold(findings, smp=None):
+        kept, folded = C.dedupe(findings, smp or sample)
+        return {f["check_id"] for f in kept}, {f["check_id"] for f in folded}
+
+    # 1 challenge page hides every other per-page finding on that page, but not one on another page
+    k, f = fold([_mkf("cr.access.challenge_page", "info", [HOME], status="inconclusive"),
+                 _mkf("en.cta.missing", "medium", [HOME]), _mkf("en.cta.missing", "medium", [P2])])
+    res.check(f == {"en.cta.missing"} and "cr.access.challenge_page" in k, "dedupe 1: challenge page folds page findings", str((k, f)))
+    # an info primary that is inconclusive never inherits a higher severity (the rubric's hard rule wins)
+    kept, folded = C.dedupe([_mkf("cr.access.challenge_page", "info", [HOME], status="inconclusive"),
+                             _mkf("en.mobile.viewport_missing", "high", [HOME])], sample)
+    res.check(kept[0]["severity"] == "info", "dedupe: an inconclusive primary stays info", kept[0]["severity"])
+    # 2 blanket disallow folds every tiered robots finding and names the tiers
+    kept, folded = C.dedupe([_mkf("cr.robots.blanket_disallow", "critical"),
+                             _mkf("cr.robots.live_answer_bot_blocked", "high"),
+                             _mkf("cr.robots.index_bot_blocked", "high")], sample)
+    res.check({x["check_id"] for x in folded} == {"cr.robots.live_answer_bot_blocked", "cr.robots.index_bot_blocked"},
+              "dedupe 2: blanket disallow folds the tier findings")
+    res.check("live_answer" in json.dumps(kept[0]["evidence_items"]), "dedupe 2: the note names the affected tiers")
+    # 3 non-HTML home folds the per-page findings on home
+    k, f = fold([_mkf("cr.access.non_html_seed", "critical", [HOME]), _mkf("fx.identity.og_missing", "low", [HOME])])
+    res.check(f == {"fx.identity.og_missing"}, "dedupe 3: non-HTML home folds home findings", str(f))
+    # 4 a shell folds the content checks on the same page only
+    k, f = fold([_mkf("cr.render.csr_shell", "critical", [HOME]), _mkf("en.hero.value_prop_unclear", "medium", [HOME]),
+                 _mkf("en.nav.related_links_missing", "low", [HOME]), _mkf("en.mobile.viewport_missing", "high", [HOME]),
+                 _mkf("en.hero.value_prop_unclear", "medium", [P2])])
+    res.check(f == {"en.hero.value_prop_unclear", "en.nav.related_links_missing"} and "en.mobile.viewport_missing" in k,
+              "dedupe 4: a shell folds the content checks but not the head-level ones", str((k, f)))
+    # 5 every rendered page is a shell: the site-level key-fact finding folds too
+    k, f = fold([_mkf("cr.render.js_gate", "critical", [HOME, P2]), _mkf("fx.facts.key_fact_missing", "high")])
+    res.check("fx.facts.key_fact_missing" in f, "dedupe 5: nothing rendered folds the key-fact finding", str(f))
+    k, f = fold([_mkf("cr.render.js_gate", "critical", [HOME]), _mkf("fx.facts.key_fact_missing", "high")])
+    res.check("fx.facts.key_fact_missing" not in f, "dedupe 5: one shell among rendered pages keeps it", str(f))
+    # 6 no JSON-LD anywhere
+    k, f = fold([_mkf("fx.jsonld.missing", "medium"), _mkf("ef.entity.sameas_missing", "medium"),
+                 _mkf("fx.jsonld.no_organization", "low")])
+    res.check(f == {"ef.entity.sameas_missing", "fx.jsonld.no_organization"}, "dedupe 6: no JSON-LD folds the entity anchors", str(f))
+    # 7 same block only
+    same = [{"page": HOME, "kind": "jsonld_excerpt", "value": "v", "location": "script[type=application/ld+json][1]"}]
+    other = [{"page": HOME, "kind": "jsonld_excerpt", "value": "v", "location": "script[type=application/ld+json][2]"}]
+    k, f = fold([_mkf("fx.jsonld.malformed", "medium", [HOME], same), _mkf("fx.jsonld.required_props_missing", "medium", [HOME], same)])
+    res.check(f == {"fx.jsonld.required_props_missing"}, "dedupe 7: the same JSON-LD block folds", str(f))
+    k, f = fold([_mkf("fx.jsonld.malformed", "medium", [HOME], same), _mkf("fx.jsonld.required_props_missing", "medium", [HOME], other)])
+    res.check(not f, "dedupe 7: a different block does not fold", str(f))
+    # 8 NAP folds the key-fact finding only when it names nothing else
+    local = {"site_category": {"value": "local_business"}, "pages": sample["pages"]}
+    missing_np = [{"page": "site", "kind": "computed", "value": "pages_searched=3; key_facts=4; found=2; missing=address,phone"}]
+    missing_more = [{"page": "site", "kind": "computed", "value": "pages_searched=3; key_facts=4; found=1; missing=address,opening_hours"}]
+    k, f = fold([_mkf("ef.entity.nap_missing_plain_text", "high"), _mkf("fx.facts.key_fact_missing", "high", (), missing_np)], local)
+    res.check(f == {"fx.facts.key_fact_missing"}, "dedupe 8: NAP folds an address/phone-only key-fact finding", str(f))
+    k, f = fold([_mkf("ef.entity.nap_missing_plain_text", "high"), _mkf("fx.facts.key_fact_missing", "high", (), missing_more)], local)
+    res.check(not f, "dedupe 8: a wider key-fact finding stays", str(f))
+    # 9 blocked cluster reclassifies 403/429 only
+    blocked = [{"page": "site", "kind": "http_status", "value": "GET http://s/a -> 403"}]
+    broken = [{"page": "site", "kind": "http_status", "value": "GET http://s/a -> 404"}]
+    k, f = fold([_mkf("en.links.blocked_cluster", "info", status="inconclusive"), _mkf("en.links.broken_sampled", "medium", (), blocked)])
+    res.check(f == {"en.links.broken_sampled"}, "dedupe 9: a 403-only broken list is reclassified", str(f))
+    k, f = fold([_mkf("en.links.blocked_cluster", "info", status="inconclusive"), _mkf("en.links.broken_sampled", "medium", (), broken)])
+    res.check(not f, "dedupe 9: a real 404 is still broken", str(f))
+    # 10 no h1 folds continuity and the h1 leg of the hero check
+    noh1 = [{"page": HOME, "kind": "computed", "value": "h1_count=0"}]
+    twoh1 = [{"page": HOME, "kind": "computed", "value": "h1_count=2"}]
+    hero_h1 = [{"page": HOME, "kind": "computed", "value": "signals=h1_missing; category_noun=none"}]
+    hero_lead = [{"page": HOME, "kind": "computed", "value": "signals=lead_text_no_offer; category_noun=none"}]
+    k, f = fold([_mkf("fx.identity.h1_missing_or_multiple", "low", [HOME], noh1),
+                 _mkf("en.continuity.h1_title_mismatch", "low", [HOME]), _mkf("en.hero.value_prop_unclear", "medium", [HOME], hero_h1)])
+    res.check(f == {"en.continuity.h1_title_mismatch", "en.hero.value_prop_unclear"}, "dedupe 10: an absent h1 folds both", str(f))
+    k, f = fold([_mkf("fx.identity.h1_missing_or_multiple", "low", [HOME], noh1), _mkf("en.hero.value_prop_unclear", "medium", [HOME], hero_lead)])
+    res.check(not f, "dedupe 10: a hero failing on its lead text is not folded", str(f))
+    k, f = fold([_mkf("fx.identity.h1_missing_or_multiple", "low", [HOME], twoh1), _mkf("en.continuity.h1_title_mismatch", "low", [HOME])])
+    res.check(not f, "dedupe 10: two h1s do not fold continuity", str(f))
+    # 11 and 12
+    k, f = fold([_mkf("cr.index.sitemap_missing", "low"), _mkf("cr.index.sitemap_invalid", "medium")])
+    res.check(f == {"cr.index.sitemap_invalid"}, "dedupe 11: no sitemap folds invalid sitemap", str(f))
+    k, f = fold([_mkf("ef.entity.wikidata_unavailable", "info", status="not_evaluated"), _mkf("ef.entity.wikidata_not_found", "low")])
+    res.check(f == {"ef.entity.wikidata_not_found"}, "dedupe 12: an unavailable lookup folds its verdicts", str(f))
+    # severity inheritance raises a `fail` primary, capped by the registry maximum
+    kept, folded = C.dedupe([_mkf("cr.index.sitemap_missing", "low"), _mkf("cr.index.sitemap_invalid", "critical")], sample)
+    res.check(kept[0]["severity"] == "critical" and "severity_inherited_from" in json.dumps(kept[0]["evidence_items"]),
+              "dedupe: a fail primary inherits the higher severity", kept[0]["severity"])
+    res.check(kept[0]["suggested_action"]["impact"] == "high", "dedupe: inherited severity re-derives impact and priority")
+
+    # ordering: severity, then confidence, then page count, then check_id
+    order = C.sort_findings([_mkf("cr.b.x", "low"), _mkf("cr.a.x", "critical", confidence="medium"),
+                             _mkf("cr.c.x", "critical", confidence="high"), _mkf("cr.d.x", "critical", confidence="high", pages=[HOME, P2])])
+    res.check([f["check_id"] for f in order] == ["cr.d.x", "cr.c.x", "cr.a.x", "cr.b.x"],
+              "ordering: severity, confidence, page count, id", str([f["check_id"] for f in order]))
+    # derived tags come from the stage, never from the probe
+    tags = C.add_derived_tags({"check_id": "en.cta.missing", "mechanism": "engagement"})
+    res.check(tags["round2_mode"] == "bouncing" and tags["pipeline_stage"] == "post_click"
+              and tags["handout_concepts"] == [] and tags["opportunity_type"] == "content", "tags: engagement content check")
+    tags = C.add_derived_tags({"check_id": "en.mobile.viewport_missing", "mechanism": "engagement"})
+    res.check(tags["opportunity_type"] == "technical", "tags: engagement technical check")
+    tags = C.add_derived_tags({"check_id": "or.simulation.question_unanswerable", "mechanism": "extract"})
+    res.check(tags["pipeline_stage"] == "selection" and tags["handout_concepts"] == ["B"], "tags: simulation is a selection failure")
+    tags = C.add_derived_tags({"check_id": "cr.render.csr_shell", "mechanism": "render"})
+    res.check(tags["handout_concepts"] == ["A", "C"] and tags["round2_mode"] == "invisible", "tags: render is A/C, invisible")
+    res.check(C.is_quick_win(_mkf("cr.x.y", "medium")) and not C.is_quick_win(_mkf("cr.x.y", "info"))
+              and not C.is_quick_win(_mkf("cr.x.y", "medium", confidence="low")), "quick win rule matches the rubric")
+
+    # the tables compose owns must cover the registry exactly
+    ids = set(reg.ids())
+    res.check(set(C.POSITIVE_TITLES) == ids, "every registry check has a positive title",
+              str(sorted(ids ^ set(C.POSITIVE_TITLES))[:4]))
+    bad_titles = [t for t in C.POSITIVE_TITLES.values()
+                  if not t or t.endswith(".") or not (t[0].isupper() or t.split()[0] in ("robots.txt", "sameAs"))]
+    res.check(not bad_titles, "positive titles are statements, not sentences", str(bad_titles[:3]))
+    # the simulation questions mirror site_categories.md section 6
+    from auditlib.categories import SIMULATION_QUESTIONS, AUDIENCE_PHRASE, KEY_FACTS, CATEGORIES as CATS
+    sc = open(os.path.join(ROOT, "skills", "audit-orchestrator", "references", "site_categories.md"), encoding="utf-8").read()
+    section6 = sc.split("## 6.")[-1]
+    for cat in CATS:
+        res.check(cat in SIMULATION_QUESTIONS and cat in AUDIENCE_PHRASE, "%s: simulation tables cover the category" % cat)
+        for _, fact_ids, _ in SIMULATION_QUESTIONS[cat]:
+            for fid in fact_ids:
+                res.check("`%s`" % fid in section6, "%s: question fact %s is named in site_categories section 6" % (cat, fid))
+                res.check(fid in KEY_FACTS[cat], "%s: question fact %s is one of the category key facts" % (cat, fid))
+    res.check(C.non_coverage_lines(), "non-coverage lines are read from coverage_map.md section 5")
+    res.check(len(C.non_coverage_lines()) >= 10, "all of section 5 is carried into limitations (%d)" % len(C.non_coverage_lines()))
+
+
+def stage_compose(res, farm):
+    print("\n== stage: compose on every fixture")
+    import tempfile
+    C = _load_compose()
+    stage_compose_units(res, C)
+    print("\n== stage: compose (reports from real fixture workdirs)")
+    for name, base in farm.urls.items():
+        exp = farm.metas[name]["expected"]
+        with tempfile.TemporaryDirectory() as td:
+            _build_workdir(base, td)
+            report = C.compose(td, wall_clock=1.0)
+            md = C.render_markdown(report)
+        s = report["summary"]
+        fnds = report["findings"]
+        res.check(s["total_findings"] == len(fnds) == sum(s[k] for k in ("critical", "high", "medium", "low", "info")),
+                  "compose/%s: summary counts add up and match findings" % name, json.dumps(s))
+        res.check([f["id"] for f in fnds] == ["F-%03d" % i for i in range(1, len(fnds) + 1)],
+                  "compose/%s: ids are sequential after sorting" % name)
+        res.check([f["rank"] for f in fnds] == list(range(1, len(fnds) + 1)), "compose/%s: rank matches position" % name)
+        res.check(fnds == C.sort_findings(fnds), "compose/%s: findings are in schema order" % name)
+        # the fixture contract survives dedupe: nothing a fixture expects may silently disappear
+        seen_fail = {f["check_id"] for f in fnds + report["suppressed_findings"] if f["severity"] != "info"}
+        seen_info = {f["check_id"] for f in fnds + report["suppressed_findings"]
+                     if f["severity"] == "info" and not f["check_id"].startswith("or.")}
+        res.check(seen_fail == set(exp["fail"]), "compose/%s: kept and folded findings match the fixture's fail set" % name,
+                  "got %s expected %s" % (sorted(seen_fail), sorted(exp["fail"])))
+        res.check(seen_info == set(exp["info"]), "compose/%s: info notes match the fixture" % name,
+                  "got %s expected %s" % (sorted(seen_info), sorted(exp["info"])))
+        for f in fnds:
+            res.check(f.get("quick_win") == C.is_quick_win(f), "compose/%s: %s quick-win flag follows the rubric" % (name, f["id"]))
+            res.check(f.get("source_skill") and f.get("opportunity_type") in ("technical", "content"),
+                      "compose/%s: %s carries its source skill and opportunity type" % (name, f["id"]))
+            res.check("_suppressed" not in f and "_max_severity" not in f, "compose/%s: %s has no internal fields" % (name, f["id"]))
+        res.check(report["quick_wins"] == [f["id"] for f in fnds if f["quick_win"]], "compose/%s: quick_wins lists the flagged ids" % name)
+        res.check(all(f.get("merged_into") for f in report["suppressed_findings"]),
+                  "compose/%s: every folded finding names the finding it went into" % name)
+        res.check(report["ai_answer_simulation"]["basis"] == "extracted_facts_only", "compose/%s: simulation basis is fixed" % name)
+        res.check(all(q["answer_from_facts"] is None for q in report["ai_answer_simulation"]["questions"]),
+                  "compose/%s: the agent's answers are left empty" % name)
+        res.check(report["narrative_summary"] == "", "compose/%s: the narrative is left for the agent" % name)
+        res.check(len(report["passed_checks"]) == s["checks_passed"], "compose/%s: passed_checks matches the count" % name)
+        res.check(s["checks_run"] == 58, "compose/%s: every registered check has a verdict (%d)" % (name, s["checks_run"]))
+        res.check(report["limitations"] and report["limitations"][0].startswith("This report reflects a single point-in-time"),
+                  "compose/%s: limitations open with the point-in-time statement" % name)
+        # the Markdown carries nothing the JSON does not
+        for f in fnds:
+            res.check(f["id"] in md and f["title"][:40] in md, "compose/%s: %s appears in the Markdown" % (name, f["id"]))
+        stray = set(re.findall(r"\bF-\d{3}\b", md)) - {f["id"] for f in fnds}
+        res.check(not stray, "compose/%s: the Markdown invents no finding ids" % name, str(sorted(stray)))
+        res.check("Traceback" not in md and "Traceback" not in json.dumps(report), "compose/%s: no traceback in the output" % name)
+        res.check(md.startswith("# AI-readiness audit: "), "compose/%s: Markdown title line" % name)
+        for heading in ("## Summary", "## Coverage and limitations"):
+            res.check(heading in md, "compose/%s: Markdown has %s" % (name, heading))
+        if name == "clean-site":
+            res.check(not [f for f in fnds if f["severity"] != "info"], "compose/clean-site: no defect is reported",
+                      str([f["check_id"] for f in fnds if f["severity"] != "info"]))
+            res.check(len(report["proactive_recommendations"]) >= 3, "compose/clean-site: proactive recommendations are populated")
+            res.check(all(r["title"] not in md.split("## Findings")[0] for r in []), "compose/clean-site: recommendations are not findings")
+            res.check(s["checks_passed"] >= 50, "compose/clean-site: nearly every check passes (%d)" % s["checks_passed"])
+            res.check(report["coverage"]["stages"]["engagement"] == "evaluated", "compose/clean-site: engagement stage evaluated")
+            res.check(report["coverage"]["handout_concepts"]["A"] == "covered", "compose/clean-site: concept A covered")
+            res.check("## Quick wins" not in md, "compose/clean-site: no quick-wins section on a clean site")
+            res.check(not [q for q in report["ai_answer_simulation"]["questions"]
+                           if not q["answerable"] and not q.get("informational")],
+                      "compose/clean-site: every real question is answerable from the facts file")
+        if name == "csr-shell":
+            sim = [f for f in fnds if f["check_id"] == "or.simulation.question_unanswerable"]
+            res.check(sim and sim[0]["severity"] == "info", "compose/csr-shell: unanswerable questions are reported as info")
+            res.check(report["coverage"]["stages"]["extract"] in ("partial", "not_evaluated"),
+                      "compose/csr-shell: the extract stage is not claimed as evaluated")
+        if name == "one-page-portfolio":
+            res.check(any("home page alone" in l for l in report["limitations"]),
+                      "compose/one-page-portfolio: the home-only limitation is stated", str(report["limitations"][:2]))
+        if name == "challenge-page":
+            res.check(any("Challenge page served" in l for l in report["limitations"]),
+                      "compose/challenge-page: the challenge limitation is stated")
+    # a broken workdir still produces a valid report that says so
+    with tempfile.TemporaryDirectory() as td:
+        report = C.compose(td)
+        res.check(report["summary"]["total_findings"] >= 1 and report["findings"][0]["check_id"] == "or.run.probe_error",
+                  "compose: an empty workdir reports a run error rather than a clean site")
+        res.check(C.render_markdown(report).startswith("# AI-readiness audit:"), "compose: a broken run still renders")
+    # --render-only re-renders the same Markdown from the JSON alone
+    with tempfile.TemporaryDirectory() as td:
+        _build_workdir(farm.urls["weak-engagement"], td)
+        C.main(["--workdir", td, "--quiet"])
+        first = open(os.path.join(td, "report.md"), encoding="utf-8").read()
+        os.remove(os.path.join(td, "report.md"))
+        C.main(["--workdir", td, "--render-only", "--quiet"])
+        again = open(os.path.join(td, "report.md"), encoding="utf-8").read()
+        res.check(first == again, "compose --render-only reproduces the Markdown from report.json alone")
+        res.check(os.path.exists(os.path.join(td, "report.json")), "compose writes report.json into the workdir")
+
+
 # ---------------------------------------------------------------- stage: probe_cr (crawl-render probe on fixtures)
 def stage_probe_cr(res, farm):
     print("\n== stage: crawl-render probe on every fixture")
@@ -852,7 +1114,7 @@ def stage_probe_en(res, farm):
         res.check(work["link_summary"]["requested"] <= 15 and work["requests_made"] <= 16, "en/clean-site: at most 15 link requests plus the 404 probe (%s)" % work["requests_made"])
 
 
-STAGES = {"manifest": None, "serve": None, "variants": None, "robots": None, "htmldoc": None, "extract": None, "fetch": None, "sample": None, "probe_cr": None, "probe_fx": None, "probe_ef": None, "probe_en": None, "live": None}
+STAGES = {"manifest": None, "serve": None, "variants": None, "robots": None, "htmldoc": None, "extract": None, "fetch": None, "sample": None, "probe_cr": None, "probe_fx": None, "probe_ef": None, "probe_en": None, "compose": None, "live": None}
 
 
 def main(argv=None):
@@ -863,7 +1125,7 @@ def main(argv=None):
     ap.add_argument("--live", nargs="*", metavar="URL", help="also run the live stage against these sites")
     args = ap.parse_args(argv)
     os.environ["BRAND_AUDIT_EXTERNAL"] = "0"  # the suite never contacts Wikipedia/Wikidata; the entity lookup is unit-tested on canned responses
-    stages = args.stage or ["manifest", "serve", "variants", "robots", "htmldoc", "extract", "fetch", "sample", "probe_cr", "probe_fx", "probe_ef", "probe_en"]
+    stages = args.stage or ["manifest", "serve", "variants", "robots", "htmldoc", "extract", "fetch", "sample", "probe_cr", "probe_fx", "probe_ef", "probe_en", "compose"]
     if args.live:
         stages.append("live")
     res = Results()
@@ -877,7 +1139,7 @@ def main(argv=None):
             stage_htmldoc(res)
         if "extract" in stages:
             stage_extract(res)
-        if any(st in stages for st in ("serve", "variants", "fetch", "sample", "probe_cr", "probe_fx", "probe_ef", "probe_en")):
+        if any(st in stages for st in ("serve", "variants", "fetch", "sample", "probe_cr", "probe_fx", "probe_ef", "probe_en", "compose")):
             farm = FixtureFarm(base_port=args.base_port)
             farm.start()
             print("\nfixtures:")
@@ -899,6 +1161,8 @@ def main(argv=None):
                 stage_probe_ef(res, farm)
             if "probe_en" in stages:
                 stage_probe_en(res, farm)
+            if "compose" in stages:
+                stage_compose(res, farm)
         if "live" in stages:
             stage_live(res, args.live or ["https://example.com/", "https://www.python.org/"])
     except Exception:  # noqa: BLE001

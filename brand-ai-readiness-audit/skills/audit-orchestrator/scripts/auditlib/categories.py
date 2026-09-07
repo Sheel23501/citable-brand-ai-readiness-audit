@@ -149,3 +149,68 @@ TRUST_SIGNALS = {
 }
 TRUST_SIGNALS_DEFAULT = {"required": ["terms_privacy_links"], "any_of": ["address", "named_people", "testimonials_or_logos"]}
 
+
+# ---------------------------------------------------------------- simulation questions (site_categories.md section 6)
+# The markdown owns the questions and the fact mapping; this table is the machine-readable copy the orchestrator's
+# AI-answer simulation reads. Each row is (question template with {brand}, fact ids that must all be present).
+# Q4 (fit) and Q5 (comparison) are appended by compose for every category; Q5 is informational only.
+SIMULATION_QUESTIONS = {
+    "ecommerce": [
+        ("What does {brand} sell?", ["what_it_sells"], False),
+        ("How much does a typical product cost, and what is the shipping or return policy?",
+         ["sample_product_price", "shipping_or_returns"], False),
+        ("How do I contact {brand}?", ["contact_method"], False),
+    ],
+    "saas_software": [
+        ("What does {brand} do and who is it for?", ["what_it_does", "who_it_is_for"], False),
+        ("How much does {brand} cost, and is there a free trial?", ["pricing_or_trial"], False),
+        ("How do I get started or contact sales?", ["contact_or_signup_method"], False),
+    ],
+    "local_business": [
+        ("What does {brand} offer?", ["services_or_menu"], False),
+        ("Where is {brand} and when is it open?", ["address", "opening_hours"], False),
+        ("How do I reach {brand}?", ["phone"], False),
+    ],
+    "professional_services": [
+        ("What services does {brand} provide?", ["services_offered"], False),
+        ("Who does {brand} work with, and where?", ["who_it_serves", "location_or_service_area"], False),
+        ("How do I contact {brand}?", ["contact_method"], False),
+    ],
+    "publisher_media": [
+        ("What does {brand} cover?", ["topics_covered"], False),
+        ("Who publishes {brand}, and is it current?", ["publisher_identity", "recency_evidence"], False),
+        ("How do I contact {brand}?", ["contact_method"], False),
+    ],
+    "portfolio_personal": [
+        ("Who is {brand} and what do they do?", ["who", "what_they_do"], False),
+        ("How do I contact them?", ["contact_or_profile_link"], False),
+    ],
+    "nonprofit_institution": [
+        ("What is {brand}'s mission?", ["mission"], False),
+        ("What programs does {brand} run, and where?", ["programs_or_services", "location"], False),
+        ("How do I donate, apply, or join?", ["how_to_participate"], False),
+    ],
+    "corporate_enterprise": [
+        ("What does {brand} do?", ["what_company_does"], False),
+        ("Where is {brand} headquartered and who leads it?", ["headquarters", "leadership_or_size"], False),
+        ("How do I contact {brand} or its press office?", ["contact_or_press_method"], False),
+    ],
+    "unknown": [
+        ("What does {brand} do?", ["what_it_does"], False),
+        ("How do I contact {brand}?", ["location_or_contact"], False),
+    ],
+}
+
+# The {audience} placeholder of Q4, phrased the way a person asks an assistant. The answer comes from the
+# category's AUDIENCE_FACT; this table only supplies the wording of the question.
+AUDIENCE_PHRASE = {
+    "ecommerce": "a shopper like me",
+    "saas_software": "a team like mine",
+    "local_business": "someone in the area",
+    "professional_services": "a client like me",
+    "publisher_media": "a reader like me",
+    "portfolio_personal": "a client like me",
+    "nonprofit_institution": "a supporter like me",
+    "corporate_enterprise": "a customer like me",
+    "unknown": "someone like me",
+}

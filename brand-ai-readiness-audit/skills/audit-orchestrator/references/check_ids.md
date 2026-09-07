@@ -19,6 +19,7 @@ README's coverage table is generated from this file.
 - One check ⇒ one id. A check that fails on several pages emits **one** finding with several `affected_pages`, not several findings. Exception: checks marked `per-page` below emit one finding per page because the evidence and action differ per page.
 - Ids are never renamed or reused. A retired id stays in section 3 marked `retired`.
 - Adding a check = adding a row here first, then implementing it, then adding a fixture assertion.
+- Every row also has a **positive title**: the same condition said as a fact about a site that passed it. Those titles live in `audit-orchestrator/scripts/compose.py` as `POSITIVE_TITLES`, one per row, and are what the report's "What is working" section prints. The test suite asserts the two sets match.
 
 ---
 

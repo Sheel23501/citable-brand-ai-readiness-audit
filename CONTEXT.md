@@ -82,15 +82,15 @@ with the code, the handout and the code win. Several of their citations are
 | 0 Foundations | 1–3 | done: skeleton, 7 shared conventions, fixtures |
 | 1 Fetch layer | 4–5 | done: fetch helper + robots, sampler + categorizer |
 | 2 Probes | 6–13 | done |
-| 3 Orchestrator | 14–17 | **Step 14 (compose script) is next**: compose, validate, run_audit, entrypoint SKILL.md |
+| 3 Orchestrator | 14–17 | Step 14 done (compose.py). **Step 15 (validate.py) is next**, then run_audit.py, then the entrypoint SKILL.md |
 | 4 Hardening | 18–20 | not started: test stages, live pass, source verification |
 | 5 Packaging | 21–24 | not started: README, demo, sweep, dry-run judging |
 
-Suite: **1425 checks, 0 failures, GREEN.** All five skills pass the validator.
+Suite: **2176 checks, 0 failures, GREEN.** All five skills pass the validator.
 
-Code size: ~7,300 lines. Largest pieces: `engagement_probe.py` 1044,
+Code size: ~8,100 lines. Largest pieces: `engagement_probe.py` 1044, `compose.py` 780,
 `entity_probe.py` 820, `extract.py` 702, `facts_probe.py` 624, `fetch.py` 528,
-`htmldoc.py` 522, `run_tests.py` 928.
+`htmldoc.py` 522, `run_tests.py` 1150.
 
 Registry: 58 checks — 16 `cr.*`, 12 `fx.*`, 12 `ef.*`, 16 `en.*`, 2 `or.*`.
 
@@ -150,6 +150,7 @@ Dedupe keeps the finding closest to the root cause, in that order.
   `.check/.fail/.inconclusive/.not_evaluated/.policy_note/.fill_unreported`,
   `adjust_severity`, `validate_probe_output`.
 - `render.py` — the shared thin-page rule: `render_state(doc)` → ok/gate/shell.
+- `categories.py` also owns `SIMULATION_QUESTIONS` and `AUDIENCE_PHRASE` (site_categories.md section 6).
 - `cli.py` — `probe_main`: the common `--url` / `--workdir` / `--out` /
   `--offline` / `--category` CLI that never emits a traceback.
 - `extract.py` — fact detectors, JSON-LD helpers, `GENERIC_TITLES`,
@@ -280,29 +281,58 @@ resolve this with a **documented tiebreak rule, not a special case**.
 
 ---
 
-## 8. Step 13 — done (engagement SKILL.md + references)
+## 8. Steps 13 and 14 — done
 
-Wrote `skills/engagement-audit/SKILL.md` (8-step procedure, the two-tier page
-rule, the full reason vocabulary) and `references/checks.md`,
-`non_findings.md`, `engagement_file.md`. No code changed. 1425 tests green.
+**Step 13** wrote `skills/engagement-audit/SKILL.md` (8-step procedure, the two-tier page
+rule, the full reason vocabulary) and `references/checks.md`, `non_findings.md`,
+`engagement_file.md`. No code changed.
 
-## 9. Next step — Step 14 (compose script)
+**Step 14** built `skills/audit-orchestrator/scripts/compose.py` (780 lines), the first
+piece of Phase 3. `compose(workdir)` returns the whole report dict and
+`render_markdown(report)` renders it; `--render-only` re-renders from an existing
+report.json, which is what the orchestrator agent (Step 17) will call after writing the
+narrative and the simulation answers.
 
-Phase 3 begins. Read `BUILD_PLAN.md` Steps 14–17 in full; they are specified
-in detail there. In short, `skills/audit-orchestrator/scripts/compose.py`:
-reads `sample.json` + `probes/*.json` from a workdir, merges every finding,
-applies the 12-row dedupe table in `coverage_map.md` section 4 (with severity
-inheritance), sorts per `report_schema.md` section 4, assigns `F-###` ids,
-computes counts and quick wins, adds the derived tags (`handout_concepts`,
-`pipeline_stage`, `opportunity_type`, `round2_mode`), builds `passed_checks`,
-`coverage`, `limitations`, `proactive_recommendations`, pre-fills the
-`ai_answer_simulation` block deterministically from `work/extracted_facts.json`
-(questions from `site_categories.md` section 6; `answerable` and
-`missing_facts` computed; `answer_from_facts` left null for the agent), emits
-`or.simulation.question_unanswerable` and `or.run.probe_error`, and renders
-`report.md` from the same JSON. Done when the clean-site fixture yields a
-positive report with empty findings and every broken fixture yields the counts
-its `_fixture.json` implies after dedupe.
+Notable decisions, each recorded in the plan's done-note:
 
-Read `report_schema.md` sections 3–6 and `coverage_map.md` sections 4–7 before
-writing a line; every field name and rule is already decided there.
+- **Positive titles.** `passed_checks` needs each check's pass condition said as a fact.
+  Those 58 titles live in `compose.py` as `POSITIVE_TITLES`, following the existing rule
+  that word lists code must match exactly live in code; `check_ids.md` now says so and the
+  suite asserts the two sets are equal.
+- **Simulation tables.** `SIMULATION_QUESTIONS` and `AUDIENCE_PHRASE` were added to
+  `categories.py` mirroring `site_categories.md` section 6; the suite checks every question's
+  fact ids appear both in that section and in the category's key facts. Q4's `{audience}`
+  placeholder is a per-category phrase ("a team like mine"), so the question reads the way a
+  person asks it while the answer still comes from the audience fact.
+- **Severity inheritance has a limit.** A folded finding can raise its primary, but only up to
+  that check's registered maximum, and never when the primary's own status is `inconclusive`
+  or `not_evaluated` (the rubric's hard rule that those are always `info` outranks it).
+  `coverage_map.md` section 4 now states this, and the same rules paragraph now says rows 8
+  and 9 fold a finding only when every entry it reports is covered by the primary.
+- **Limitations are read from the reference.** The section-5 non-coverage lines are parsed out
+  of `coverage_map.md` at run time rather than copied, so the two cannot drift.
+- **No dedupe row fires on any fixture**, because the probes already gate themselves (a
+  challenged page yields no downstream findings at all). That is the design working, but it
+  means the table needed its own proof: the compose stage has 12 synthetic dedupe cases, one
+  per row, plus the negative cases (a different JSON-LD block, two h1s rather than none, a
+  real 404 inside a blocked cluster, a hero that fails on its lead text).
+- `findings.py` now snaps titles longer than 90 characters to a word boundary instead of
+  cutting mid-word.
+
+Clean-site composes to a report with **zero defects**, 54 passing checks, six proactive
+recommendations and every simulation question answerable except the comparison one, which is
+informational by rule.
+
+## 9. Next step — Step 15 (validate.py)
+
+`skills/audit-orchestrator/scripts/validate.py`. Check the handout's required floor first
+(site, audited_at, summary counts that add up and match `findings` length, and each finding's
+id/title/severity/evidence/suggested_action.summary+priority), then the superset: enum values,
+unique ids, every id in the registry, dedupe integrity (every `suppressed_findings` entry names
+a `merged_into` that exists, and no id appears in both lists), `basis == extracted_facts_only`,
+no simulation answer citing a fact absent from the facts file, and a non-empty narrative when
+`--final`. Exit 0 or 1 with a list of problems.
+
+Done when it rejects each of a set of deliberately broken reports and accepts every fixture
+report. Read `report_schema.md` sections 3a and 3b before writing it; the floor is exactly
+what the handout requires and must not be relaxed.

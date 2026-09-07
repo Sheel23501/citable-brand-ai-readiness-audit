@@ -180,6 +180,10 @@ Every category also asks two further questions, mirroring how generative
 engines fan a query out into angled sub-questions:
 
 - **Q4 (fit):** "Is {brand} a good fit for {audience}?" → the category's audience fact (`who_it_is_for`, `who_it_serves`, `topics_covered`, `services_or_menu`, `what_it_sells`, `programs_or_services`, `what_they_do`, or `what_company_does`), answered as "for whom" rather than yes/no.
+- The `{audience}` placeholder is filled from the `AUDIENCE_PHRASE` table in
+  `auditlib/categories.py` ("a team like mine", "someone in the area", …), so the question reads the way a
+  person asks it; the answer still comes from the audience fact above. The question templates themselves are
+  mirrored in the same module as `SIMULATION_QUESTIONS`.
 - **Q5 (comparison):** "What sets {brand} apart from alternatives?" → optional fact `differentiator`. Unanswerable Q5 is recorded as informational only and never becomes a finding.
 
 | Category | Q1 (what) | Q2 (category-specific) | Q3 (how to proceed) |

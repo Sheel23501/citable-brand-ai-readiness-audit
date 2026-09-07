@@ -85,7 +85,8 @@ Nothing is deleted.
 
 Rules:
 
-- Suppression never lowers the primary's severity. If a suppressed finding had a **higher** severity than the primary, the primary is raised to match and the evidence note records `severity_inherited_from: <check_id>`.
+- Suppression never lowers the primary's severity. If a suppressed finding had a **higher** severity than the primary, the primary is raised to match and the evidence note records `severity_inherited_from: <check_id>`, up to that check's registered maximum. A primary whose own status is `inconclusive` or `not_evaluated` is never raised: the rubric's hard rule (those are always `info`) outranks inheritance, and the folded findings stay listed under it.
+- Rows that fold *entries* rather than whole findings (8, 9) fold the finding only when every entry it reports is covered by the primary; on a partial overlap both findings stay and the note is still appended.
 - Suppressed findings still appear in the Markdown under "Folded into other findings" with one line each, so the reader loses nothing.
 - Design-level dedupe (no table row needed): `fx.facts.key_fact_missing` does not evaluate `address`/`phone` except for `local_business` (row 8 covers that case); `en.*` never grades robots or JSON-LD.
 

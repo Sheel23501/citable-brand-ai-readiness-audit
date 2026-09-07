@@ -110,6 +110,17 @@ def priority_for(severity, confidence):
     return imp
 
 
+def _title(text, limit=90):
+    """Titles are capped at 90 chars (report_schema.md section 2); cut on a word boundary, never mid-word."""
+    text = re.sub(r"\s+", " ", text or "").strip()
+    if len(text) <= limit:
+        return text
+    cut = text[:limit - 1]
+    if " " in cut[limit // 2:]:
+        cut = cut[:cut.rstrip().rfind(" ")]
+    return cut.rstrip(" ,;:-") + "\u2026"
+
+
 def evidence_item(page, kind, value, location=None, note=None):
     value = re.sub(r"\s+", " ", str(value)).strip()
     if len(value) > 300:
@@ -183,7 +194,7 @@ class ProbeOutput:
         if adj:
             items.append(evidence_item(pages[0] if pages else "site", "computed", "adjustments=" + ",".join(adj)))
         f = {
-            "check_id": check_id, "title": title[:90], "status": "fail", "severity": sev, "confidence": conf, "effort": eff,
+            "check_id": check_id, "title": _title(title), "status": "fail", "severity": sev, "confidence": conf, "effort": eff,
             "mechanism": row["stage"], "affected_pages": list(pages or []), "evidence": evidence[:300], "evidence_items": items,
             "why_it_matters": why,
             "suggested_action": {"summary": action, "detail": detail, "impact": impact_for(sev), "effort": eff,
@@ -198,7 +209,7 @@ class ProbeOutput:
     def _info(self, check_id, status, reason, title, evidence, evidence_items, why, action, detail, pages=None):
         row = self.registry[check_id]
         f = {
-            "check_id": check_id, "title": title[:90], "status": status, "severity": "info", "confidence": row["confidence"],
+            "check_id": check_id, "title": _title(title), "status": status, "severity": "info", "confidence": row["confidence"],
             "effort": "n/a", "mechanism": row["stage"], "affected_pages": list(pages or []), "evidence": evidence[:300],
             "evidence_items": list(evidence_items), "why_it_matters": why,
             "suggested_action": {"summary": action, "detail": detail, "impact": "low", "effort": "n/a", "priority": "low"},
@@ -214,7 +225,7 @@ class ProbeOutput:
         row = self.registry[check_id]
         assert row["severity"] == "info", "policy_note only for info-registered checks: %s" % check_id
         f = {
-            "check_id": check_id, "title": title[:90], "status": "fail", "severity": "info", "confidence": row["confidence"],
+            "check_id": check_id, "title": _title(title), "status": "fail", "severity": "info", "confidence": row["confidence"],
             "effort": "n/a", "mechanism": row["stage"], "affected_pages": list(pages or []), "evidence": evidence[:300],
             "evidence_items": list(evidence_items), "why_it_matters": why,
             "suggested_action": {"summary": action, "detail": detail, "impact": "low", "effort": "n/a", "priority": "low"},
