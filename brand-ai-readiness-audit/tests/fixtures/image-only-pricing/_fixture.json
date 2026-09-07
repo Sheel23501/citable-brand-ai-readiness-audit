@@ -1,0 +1,23 @@
+{
+  "name": "image-only-pricing",
+  "description": "Clean site whose pricing page shows plans and prices only inside a PNG; no price text anywhere on the site.",
+  "base": "clean-site",
+  "category": "saas_software",
+  "routes": {},
+  "expected": {
+    "fail": [
+      "fx.facts.image_only",
+      "fx.facts.key_fact_missing"
+    ],
+    "info": [
+      "ef.entity.wikidata_unavailable",
+      "ef.corroboration.offsite_spotcheck"
+    ],
+    "pass_required": [
+      "fx.media.alt_text_missing",
+      "cr.render.csr_shell",
+      "en.cta.missing"
+    ],
+    "notes": "image_only on /pricing (high; low confidence by default, medium if the filename and alt both signal pricing). key_fact_missing lists exactly pricing_or_trial (partial: the site only mentions a free trial). The image has alt text, so alt_text_missing must pass: alt presence is not the same as extractable price text. The pricing page keeps a price-free FAQ and the product JSON-LD keeps aggregateRating in place of offers, so faq_absent and required_props_missing stay green and the fixture isolates the image-only defect."
+  }
+}

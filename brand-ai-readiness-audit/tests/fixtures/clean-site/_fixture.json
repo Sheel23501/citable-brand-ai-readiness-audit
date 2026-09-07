@@ -1,0 +1,27 @@
+{
+  "name": "clean-site",
+  "description": "Well-built fictional SaaS site (Ledgerly). Must trigger zero fail findings in every probe; this is the false-positive guard.",
+  "base": null,
+  "category": "saas_software",
+  "routes": {},
+  "expected": {
+    "fail": [],
+    "info": ["ef.entity.wikidata_unavailable", "ef.corroboration.offsite_spotcheck"],
+    "pass_required": [
+      "cr.robots.blanket_disallow", "cr.robots.live_answer_bot_blocked", "cr.robots.index_bot_blocked",
+      "cr.render.js_gate", "cr.render.csr_shell", "cr.index.sitemap_missing", "cr.index.sitemap_invalid",
+      "cr.index.noindex_on_key_page", "cr.index.canonical_offsite",
+      "fx.facts.key_fact_missing", "fx.facts.image_only", "fx.jsonld.missing", "fx.jsonld.malformed",
+      "fx.jsonld.required_props_missing", "fx.identity.title_missing_or_generic", "fx.identity.h1_missing_or_multiple",
+      "fx.identity.meta_description_missing", "fx.identity.og_missing", "fx.media.alt_text_missing", "fx.content.faq_absent",
+      "ef.entity.sameas_missing", "ef.entity.sameas_no_authority", "ef.entity.nap_missing_plain_text", "ef.entity.name_inconsistent",
+      "ef.freshness.no_visible_dates", "ef.freshness.stale_copyright_year", "ef.freshness.date_modified_mismatch",
+      "ef.corroboration.press_page_missing",
+      "en.hero.value_prop_unclear", "en.cta.missing", "en.nav.landmark_missing", "en.links.broken_sampled",
+      "en.mobile.viewport_missing", "en.perf.page_weight_heavy", "en.trust.signals_missing", "en.continuity.h1_title_mismatch",
+      "en.nav.breadcrumbs_missing", "en.nav.related_links_missing", "en.nav.site_search_missing", "en.interstitial.blocking",
+      "en.lang.attribute_missing", "en.errors.soft_404", "en.errors.unhelpful_404"
+    ],
+    "notes": "The two info entries only appear when the test runs offline (Wikidata) or without a search tool. Pages: /, /about, /contact, /pricing, /product, /blog, /blog/quarterly-close-checklist, /404 behaviour via 404.html. Dates and years are templated by the server so freshness checks stay green over time."
+  }
+}

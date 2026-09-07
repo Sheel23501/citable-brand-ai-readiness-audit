@@ -1,0 +1,20 @@
+{
+  "name": "challenge-page",
+  "description": "Every HTML page answers 403 with a Cloudflare-style JavaScript challenge (cf-mitigated header, 'Just a moment...' title). robots.txt is normal.",
+  "base": "clean-site",
+  "category": "unknown",
+  "routes": {
+    "/":        {"status": 403, "content_type": "text/html", "file": "challenge.html", "headers": {"cf-mitigated": "challenge", "Server": "cloudflare"}},
+    "/about":   {"status": 403, "content_type": "text/html", "file": "challenge.html", "headers": {"cf-mitigated": "challenge", "Server": "cloudflare"}},
+    "/contact": {"status": 403, "content_type": "text/html", "file": "challenge.html", "headers": {"cf-mitigated": "challenge", "Server": "cloudflare"}},
+    "/pricing": {"status": 403, "content_type": "text/html", "file": "challenge.html", "headers": {"cf-mitigated": "challenge", "Server": "cloudflare"}},
+    "/product": {"status": 403, "content_type": "text/html", "file": "challenge.html", "headers": {"cf-mitigated": "challenge", "Server": "cloudflare"}},
+    "/blog":    {"status": 403, "content_type": "text/html", "file": "challenge.html", "headers": {"cf-mitigated": "challenge", "Server": "cloudflare"}}
+  },
+  "expected": {
+    "fail": [],
+    "info": ["cr.access.challenge_page", "ef.entity.wikidata_unavailable", "ef.corroboration.offsite_spotcheck"],
+    "pass_required": ["cr.robots.blanket_disallow", "cr.robots.unreachable"],
+    "notes": "The fetcher must set challenge=true, challenge_vendor=cloudflare, blocked=false on every page. cr.access.challenge_page is info + inconclusive and is never a defect. Per dedupe row 1 every other per-page check is inconclusive; cr.access.http_error must NOT fire for these 403s. robots.txt and sitemap.xml are served normally."
+  }
+}

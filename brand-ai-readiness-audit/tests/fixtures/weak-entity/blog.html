@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ledgerly newsroom — News and guides</title>
+<meta name="description" content="News, product updates, and guides from Ledgerly for freelance designers.">
+<link rel="canonical" href="{{BASE}}/blog">
+<meta property="og:title" content="Ledgerly newsroom — News and guides">
+<meta property="og:description" content="News, product updates, and guides from Ledgerly for freelance designers.">
+<meta property="og:site_name" content="Ledgerly">
+<meta property="og:url" content="{{BASE}}/blog">
+<meta property="og:type" content="website">
+<style>body{font-family:system-ui,sans-serif;max-width:960px;margin:0 auto;padding:1rem;color:#222}header,footer{display:flex;flex-wrap:wrap;gap:1rem;align-items:center}nav ul{display:flex;gap:1rem;list-style:none;padding:0}.button{background:#0a5;color:#fff;padding:.5rem 1rem;border-radius:4px;text-decoration:none}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:.4rem .8rem}</style>
+
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebPage","name":"Ledgerly newsroom","url":"{{BASE}}/blog","dateModified":"{{DATE_MINUS_400}}"}
+</script>
+</head>
+<body>
+<header>
+  <a href="/" class="logo"><img src="/logo.png" alt="Ledgerly logo" width="120" height="32"></a>
+  <nav aria-label="Main">
+    <ul>
+      <li><a href="/product">Product</a></li>
+      <li><a href="/pricing">Pricing</a></li>
+      <li><a href="/blog">News</a></li>
+      <li><a href="/about">About</a></li>
+      <li><a href="/contact">Contact</a></li>
+    </ul>
+  </nav>
+  <form role="search" action="/search" method="get" class="site-search"><label for="q">Search</label><input type="search" id="q" name="q" placeholder="Search Ledgerly"><button type="submit">Search</button></form>
+  <a class="button" href="/pricing">Start free trial</a>
+</header>
+<nav aria-label="Breadcrumb" class="breadcrumb"><ol><li><a href="/">Home</a></li><li aria-current="page">Newsroom</li></ol></nav>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"{{BASE}}/"},{"@type":"ListItem","position":2,"name":"Newsroom","item":"{{BASE}}/blog"}]}
+</script><main>
+  <h1>Ledgerly newsroom</h1>
+  <p>Product updates, press releases, and guides. Media enquiries: <a href="mailto:press@ledgerly.example">press@ledgerly.example</a>.</p>
+  <article>
+    <h2><a href="/blog/quarterly-close-checklist">The freelance quarterly close checklist</a></h2>
+    <p><time datetime="{{DATE}}">{{DATE}}</time> · by Amara Okafor</p>
+    <p>Everything a freelance designer needs to do before sending figures to the accountant.</p>
+  </article>
+  <article>
+    <h2>Ledgerly adds bank-transfer payment links</h2>
+    <p><time datetime="{{DATE_MINUS_10}}">{{DATE_MINUS_10}}</time> · press release</p>
+    <p>Clients can now pay invoices by instant bank transfer as well as by card.</p>
+  </article>
+</main>
+<footer>
+  <p><strong>Ledgerly Software Ltd</strong><br>Email: <a href="mailto:hello@ledgerly.example">hello@ledgerly.example</a></p>
+  <p><a href="/about">About</a> · <a href="/blog">Newsroom</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/security">Security</a></p>
+  <p>Last updated <time datetime="{{DATE}}">{{DATE}}</time>. © {{STALE_YEAR}} Ledgerly Software Ltd.</p>
+</footer>
+</body>
+</html>

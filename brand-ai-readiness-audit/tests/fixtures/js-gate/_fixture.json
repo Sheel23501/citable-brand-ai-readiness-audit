@@ -1,0 +1,13 @@
+{
+  "name": "js-gate",
+  "description": "Every page is an interstitial demanding JavaScript (noscript warning, 'enable JavaScript' text, meta refresh). Distinct from a CSR shell: the gate is the content.",
+  "base": "clean-site",
+  "category": "unknown",
+  "routes": {},
+  "expected": {
+    "fail": ["cr.render.js_gate"],
+    "info": ["ef.entity.wikidata_unavailable", "ef.corroboration.offsite_spotcheck"],
+    "pass_required": ["cr.robots.blanket_disallow", "cr.render.csr_shell", "cr.access.non_html_seed"],
+    "notes": "js_gate must fire, csr_shell must NOT (the two-signal rule requires an empty framework root or a script-heavy body; this page has neither). Critical on home. Dedupe row 4 folds content findings."
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "name": "brand-ai-readiness-audit",
+  "version": "0.1.0",
+  "description": "Audit a website for AI-discoverability and on-site-engagement problems and produce a prioritized, evidence-backed report of findings and suggested actions. Read-only; recommends, never modifies.",
+  "license": "MIT",
+  "skills": [
+    {
+      "id": "audit-orchestrator",
+      "path": "skills/audit-orchestrator",
+      "entrypoint": true,
+      "summary": "Entrypoint. Runs the full audit, composes sub-skill outputs into the single final report."
+    },
+    {
+      "id": "crawl-render-audit",
+      "path": "skills/crawl-render-audit",
+      "summary": "Reachability and readability: robots.txt bot access, JS-required gates, client-rendered shells, sitemap, noindex, canonical."
+    },
+    {
+      "id": "fact-extractability-audit",
+      "path": "skills/fact-extractability-audit",
+      "summary": "Can a machine pick out the specific facts: plain-text key facts, image-only facts, JSON-LD validity, page self-identification."
+    },
+    {
+      "id": "entity-freshness-corroboration-audit",
+      "path": "skills/entity-freshness-corroboration-audit",
+      "summary": "Trust and identity: entity disambiguation anchors, freshness signals, plain-text identity facts, off-site corroboration surface."
+    },
+    {
+      "id": "engagement-audit",
+      "path": "skills/engagement-audit",
+      "summary": "On-site engagement: first-viewport clarity, calls to action, orientation, context retention, mobile readiness, link health."
+    }
+  ]
+}

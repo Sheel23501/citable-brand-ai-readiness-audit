@@ -1,0 +1,13 @@
+{
+  "name": "blanket-disallow",
+  "description": "Clean site whose robots.txt disallows everything for every crawler. The audit obeys robots, so only robots.txt is fetched.",
+  "base": "clean-site",
+  "category": "unknown",
+  "routes": {},
+  "expected": {
+    "fail": ["cr.robots.blanket_disallow"],
+    "info": ["ef.entity.wikidata_unavailable", "ef.corroboration.offsite_spotcheck"],
+    "pass_required": [],
+    "notes": "blanket_disallow critical. Per dedupe row 2 the per-tier robots findings fold into it. Every page-level check must be not_evaluated with reason robots_disallow (no finding except where the schema says an info note is worth emitting). This fixture verifies the audit never fetches a disallowed page."
+  }
+}

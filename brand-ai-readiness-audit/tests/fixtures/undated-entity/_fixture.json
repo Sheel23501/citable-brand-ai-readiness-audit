@@ -1,0 +1,27 @@
+{
+  "name": "undated-entity",
+  "description": "Clean site with the Organization JSON-LD stripped of sameAs, every visible date removed (no time elements, no dates in text, a copyright line without a year), and no newsroom: the News link, footer Newsroom link, home 'Latest news' section, in-copy newsroom links and the blog's sitemap entries are gone.",
+  "base": "clean-site",
+  "category": "saas_software",
+  "routes": {},
+  "expected": {
+    "fail": [
+      "ef.entity.sameas_missing",
+      "ef.freshness.no_visible_dates",
+      "ef.corroboration.press_page_missing"
+    ],
+    "info": [
+      "ef.entity.wikidata_unavailable",
+      "ef.corroboration.offsite_spotcheck"
+    ],
+    "pass_required": [
+      "ef.entity.nap_missing_plain_text",
+      "ef.entity.name_inconsistent",
+      "ef.freshness.stale_copyright_year",
+      "ef.freshness.date_modified_mismatch",
+      "fx.facts.key_fact_missing",
+      "cr.index.sitemap_missing"
+    ],
+    "notes": "sameas_missing is medium (Organization present, no sameAs); sameas_no_authority is then not_evaluated (dependency_failed), no finding. no_visible_dates is low for saas (medium only for publishers). The contact page keeps a press@ mailto link: mailto links never count as a press surface, so press_page_missing (low) fires because no page has the blog role and no internal link is labelled press/news/blog. Five roles are sampled; blog is a missing role."
+  }
+}

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home</title>
+<link rel="canonical" href="{{BASE}}/">
+<style>body{font-family:system-ui,sans-serif;max-width:960px;margin:0 auto;padding:1rem;color:#222}header,footer{display:flex;flex-wrap:wrap;gap:1rem;align-items:center}nav ul{display:flex;gap:1rem;list-style:none;padding:0}.button{background:#0a5;color:#fff;padding:.5rem 1rem;border-radius:4px;text-decoration:none}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:.4rem .8rem}</style>
+</head>
+<body>
+<header>
+  <a href="/" class="logo"><img src="/logo.png" alt="Ledgerly logo" width="120" height="32"></a>
+  <nav aria-label="Main">
+    <ul>
+      <li><a href="/product">Product</a></li>
+      <li><a href="/pricing">Pricing</a></li>
+      <li><a href="/blog">News</a></li>
+      <li><a href="/about">About</a></li>
+      <li><a href="/contact">Contact</a></li>
+    </ul>
+  </nav>
+  <form role="search" action="/search" method="get" class="site-search"><label for="q">Search</label><input type="search" id="q" name="q" placeholder="Search Ledgerly"><button type="submit">Search</button></form>
+  <a class="button" href="/pricing">Start free trial</a>
+</header>
+<main>
+  <section class="hero">
+    <h1>Invoicing and expense software built for freelance designers</h1>
+    <h1>Get paid faster</h1>
+    <p>Ledgerly helps freelance designers and small studios send professional invoices, track expenses, and get paid on time. Set up in five minutes, no accountant required.</p>
+    <p><a class="button" href="/pricing">Start free trial</a> <a href="/product">See how it works</a></p>
+  </section>
+  <section>
+    <h2>What Ledgerly does</h2>
+    <ul>
+      <li><strong>Invoices</strong> that match your brand, sent from your own domain, with card and bank payment links.</li>
+      <li><strong>Expense tracking</strong> by photographing receipts; Ledgerly reads the amount, date, and supplier.</li>
+      <li><strong>Quarterly reports</strong> your accountant can import directly.</li>
+    </ul>
+  </section>
+  <section>
+    <h2>Who it is for</h2>
+    <p>Ledgerly is built for freelance designers, illustrators, and studios of up to ten people who bill by project or by the hour.</p>
+  </section>
+  <section>
+    <h2>Trusted by independent studios</h2>
+    <blockquote><p>“Ledgerly cut my month-end admin from a day to an hour.”</p><footer>— Priya Raman, brand designer, Leeds</footer></blockquote>
+    <blockquote><p>“Our clients pay faster because the invoice has a pay button.”</p><footer>— Tomás Herrera, Studio Norte</footer></blockquote>
+    <p>Read our <a href="/security">security overview</a> and <a href="/about">who we are</a>.</p>
+  </section>
+  <section>
+    <h2>Latest news</h2>
+    <ul>
+      <li><time datetime="{{DATE}}">{{DATE}}</time> — <a href="/blog/quarterly-close-checklist">The freelance quarterly close checklist</a></li>
+    </ul>
+  </section>
+</main>
+<footer>
+  <p><strong>Ledgerly Software Ltd</strong><br>12 Harbour Street, Bristol BS1 4QA, United Kingdom<br>Phone: <a href="tel:+441174960123">+44 117 496 0123</a> · Email: <a href="mailto:hello@ledgerly.example">hello@ledgerly.example</a></p>
+  <p><a href="/about">About</a> · <a href="/blog">Newsroom</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/security">Security</a></p>
+  <p>Last updated <time datetime="{{DATE}}">{{DATE}}</time>. © {{YEAR}} Ledgerly Software Ltd.</p>
+</footer>
+</body>
+</html>

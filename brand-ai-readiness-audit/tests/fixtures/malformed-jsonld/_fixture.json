@@ -1,0 +1,13 @@
+{
+  "name": "malformed-jsonld",
+  "description": "Clean site where the home Organization JSON-LD has a trailing comma (unparseable) and the product SoftwareApplication block lacks required properties.",
+  "base": "clean-site",
+  "category": "saas_software",
+  "routes": {},
+  "expected": {
+    "fail": ["fx.jsonld.malformed", "fx.jsonld.required_props_missing"],
+    "info": ["ef.entity.wikidata_unavailable", "ef.corroboration.offsite_spotcheck"],
+    "pass_required": ["fx.jsonld.missing", "ef.entity.sameas_missing", "fx.facts.key_fact_missing", "fx.jsonld.no_organization"],
+    "notes": "Home block malformed (medium, high confidence, affected_pages=[home]). Product block parses but has no name and no offers (medium). About page still carries a valid Organization with sameAs, so entity checks pass. Key facts remain in plain text, so key_fact_missing passes."
+  }
+}

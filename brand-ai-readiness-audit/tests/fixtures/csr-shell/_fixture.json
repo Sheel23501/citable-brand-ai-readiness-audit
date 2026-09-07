@@ -1,0 +1,13 @@
+{
+  "name": "csr-shell",
+  "description": "Every page is a client-rendered shell: empty #root plus a large bundle. Nothing is readable without JavaScript.",
+  "base": "clean-site",
+  "category": "unknown",
+  "routes": {},
+  "expected": {
+    "fail": ["cr.render.csr_shell"],
+    "info": ["ef.entity.wikidata_unavailable", "ef.corroboration.offsite_spotcheck"],
+    "pass_required": ["cr.robots.blanket_disallow", "cr.render.js_gate", "cr.index.sitemap_missing", "cr.access.non_html_seed"],
+    "notes": "csr_shell must be critical (home) with affected_pages covering every sampled page. Per dedupe rows 4 and 5, fx.* and en.* content findings on shell pages are folded, not counted. Category falls to unknown because no nav or JSON-LD is visible; that is correct behaviour, not a defect."
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "name": "bare-metadata",
+  "description": "Clean site with every page stripped of JSON-LD, meta description and Open Graph tags; the home page is titled 'Home' and carries two h1s; three of four product screenshots lack alt text; the pricing FAQ is removed. All key facts remain present as plain text.",
+  "base": "clean-site",
+  "category": "saas_software",
+  "routes": {},
+  "expected": {
+    "fail": [
+      "fx.jsonld.missing",
+      "fx.identity.title_missing_or_generic",
+      "fx.identity.h1_missing_or_multiple",
+      "fx.identity.meta_description_missing",
+      "fx.identity.og_missing",
+      "fx.media.alt_text_missing",
+      "fx.content.faq_absent"
+    ],
+    "info": [
+      "ef.entity.wikidata_unavailable",
+      "ef.corroboration.offsite_spotcheck"
+    ],
+    "pass_required": [
+      "fx.facts.key_fact_missing",
+      "fx.facts.image_only",
+      "cr.render.csr_shell",
+      "en.cta.missing"
+    ],
+    "notes": "Metadata defects only: the facts themselves are extractable from text, so key_fact_missing and image_only pass. jsonld.missing fires once for the whole site and the three dependent JSON-LD checks are not_evaluated (dependency_failed) with no finding. title generic on home only ('Home'); h1 multiple on home only (2); meta_description and og missing on all six pages; alt_text_missing on product (3 of 4 content images; the 32px logo is too small to count). The four screenshots carry no fact signal in alt or filename, so image_only stays quiet."
+  }
+}

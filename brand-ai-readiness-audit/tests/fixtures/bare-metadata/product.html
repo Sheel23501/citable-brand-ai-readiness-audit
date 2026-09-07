@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ledgerly product — Invoices, expenses and reports for designers</title>
+<link rel="canonical" href="{{BASE}}/product">
+<style>body{font-family:system-ui,sans-serif;max-width:960px;margin:0 auto;padding:1rem;color:#222}header,footer{display:flex;flex-wrap:wrap;gap:1rem;align-items:center}nav ul{display:flex;gap:1rem;list-style:none;padding:0}.button{background:#0a5;color:#fff;padding:.5rem 1rem;border-radius:4px;text-decoration:none}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:.4rem .8rem}</style>
+</head>
+<body>
+<header>
+  <a href="/" class="logo"><img src="/logo.png" alt="Ledgerly logo" width="120" height="32"></a>
+  <nav aria-label="Main">
+    <ul>
+      <li><a href="/product">Product</a></li>
+      <li><a href="/pricing">Pricing</a></li>
+      <li><a href="/blog">News</a></li>
+      <li><a href="/about">About</a></li>
+      <li><a href="/contact">Contact</a></li>
+    </ul>
+  </nav>
+  <form role="search" action="/search" method="get" class="site-search"><label for="q">Search</label><input type="search" id="q" name="q" placeholder="Search Ledgerly"><button type="submit">Search</button></form>
+  <a class="button" href="/pricing">Start free trial</a>
+</header>
+<nav aria-label="Breadcrumb" class="breadcrumb"><ol><li><a href="/">Home</a></li><li aria-current="page">Product</li></ol></nav>
+<main>
+  <h1>How Ledgerly works</h1>
+  <p>Ledgerly is web-based invoicing and expense software. It runs in any modern browser and on iOS and Android.</p>
+  <h2>Invoices</h2><p>Create an invoice from a project, add your logo and colours, and send it from your own domain. Clients pay by card or bank transfer from a button on the invoice.</p>
+  <h2>Expenses</h2><p>Photograph a receipt and Ledgerly reads the supplier, date, and amount. Attach it to a project so it can be billed on.</p>
+  <h2>Reports</h2><p>Export a quarterly summary in the format most UK accountants import directly.</p>
+  <p><a class="button" href="/pricing">Start free trial</a></p>
+  <section aria-labelledby="related"><h2 id="related">Related</h2>
+    <ul><li><a href="/pricing">Pricing and plans</a></li><li><a href="/blog/quarterly-close-checklist">The freelance quarterly close checklist</a></li><li><a href="/security">Security overview</a></li></ul>
+  </section>
+  <section id="screens">
+    <h2>Screens</h2>
+    <p><img src="/shot-1.png" width="600" height="400"> <img src="/shot-2.png" width="600" height="400"> <img src="/shot-3.png" width="600" height="400"> <img src="/shot-4.png" alt="Ledgerly dashboard showing outstanding invoices" width="600" height="400"></p>
+  </section>
+</main>
+<footer>
+  <p><strong>Ledgerly Software Ltd</strong><br>12 Harbour Street, Bristol BS1 4QA, United Kingdom<br>Phone: <a href="tel:+441174960123">+44 117 496 0123</a> · Email: <a href="mailto:hello@ledgerly.example">hello@ledgerly.example</a></p>
+  <p><a href="/about">About</a> · <a href="/blog">Newsroom</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/security">Security</a></p>
+  <p>Last updated <time datetime="{{DATE}}">{{DATE}}</time>. © {{YEAR}} Ledgerly Software Ltd.</p>
+</footer>
+</body>
+</html>

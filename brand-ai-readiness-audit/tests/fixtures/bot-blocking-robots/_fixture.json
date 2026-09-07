@@ -1,0 +1,13 @@
+{
+  "name": "bot-blocking-robots",
+  "description": "Clean site whose robots.txt blocks one live-answer bot, one index bot, one training-only bot, and disallows /pricing for a second live-answer bot. '*' stays allowed.",
+  "base": "clean-site",
+  "category": "saas_software",
+  "routes": {},
+  "expected": {
+    "fail": ["cr.robots.live_answer_bot_blocked", "cr.robots.index_bot_blocked", "cr.robots.key_page_disallowed"],
+    "info": ["cr.robots.training_bot_blocked", "ef.entity.wikidata_unavailable", "ef.corroboration.offsite_spotcheck"],
+    "pass_required": ["cr.robots.blanket_disallow", "cr.robots.unreachable", "cr.render.csr_shell", "fx.facts.key_fact_missing"],
+    "notes": "Severities: live_answer high (only ChatGPT-User blocked on /, not all), index high, key_page_disallowed medium (Claude-User on /pricing), training info. The audit's own UA is under '*' so every page is still fetched and all other checks pass."
+  }
+}

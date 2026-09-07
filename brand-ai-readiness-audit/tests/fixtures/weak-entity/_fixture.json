@@ -1,0 +1,29 @@
+{
+  "name": "weak-entity",
+  "description": "Clean site whose identity signals are weak: JSON-LD names the organisation 'LedgerPro Software' while every page says 'Ledgerly'; sameAs lists only Facebook and Twitter; the footer has an email but no address or phone and a copyright year three years old; the newsroom page's JSON-LD dateModified is 400 days behind the dates shown on it.",
+  "base": "clean-site",
+  "category": "saas_software",
+  "routes": {},
+  "expected": {
+    "fail": [
+      "ef.entity.sameas_no_authority",
+      "ef.entity.name_inconsistent",
+      "ef.entity.nap_missing_plain_text",
+      "ef.freshness.stale_copyright_year",
+      "ef.freshness.date_modified_mismatch"
+    ],
+    "info": [
+      "ef.entity.wikidata_unavailable",
+      "ef.corroboration.offsite_spotcheck"
+    ],
+    "pass_required": [
+      "ef.entity.sameas_missing",
+      "ef.freshness.no_visible_dates",
+      "ef.corroboration.press_page_missing",
+      "fx.facts.key_fact_missing",
+      "fx.jsonld.no_organization",
+      "cr.render.csr_shell"
+    ],
+    "notes": "All five entity/freshness fails are low for a saas_software site (nap is medium by default, low by category override). sameAs is present, so sameas_missing passes and sameas_no_authority fires (facebook/twitter are not authorities). name_inconsistent: 'LedgerPro Software' (JSON-LD) versus 'Ledgerly' (og:site_name, titles). nap: contact page keeps the email; address and phone appear only in JSON-LD, which does not count as visible text. stale_copyright_year: footer year is {{STALE_YEAR}} (three years back); the 'Last updated' time element keeps no_visible_dates green. date_modified_mismatch: only the blog page, WebPage.dateModified {{DATE_MINUS_400}} against visible {{DATE}}/{{DATE_MINUS_10}}."
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "non-html-seed",
+  "description": "The home URL returns a PDF brochure (application/pdf). Other pages exist but nothing links to them from an HTML home.",
+  "base": "clean-site",
+  "category": "saas_software",
+  "routes": {
+    "/": {
+      "status": 200,
+      "content_type": "application/pdf",
+      "file": "brochure.pdf"
+    }
+  },
+  "expected": {
+    "fail": [
+      "cr.access.non_html_seed"
+    ],
+    "info": [
+      "ef.entity.wikidata_unavailable",
+      "ef.corroboration.offsite_spotcheck"
+    ],
+    "pass_required": [
+      "cr.robots.blanket_disallow"
+    ],
+    "notes": "non_html_seed critical. Per dedupe row 3 every per-page finding on home folds into it. The sampler still discovers /about, /pricing, /product etc. via the sitemap, so the category is inferred from those pages (saas_software, medium) and findings on them are allowed; the home finding must be the top-ranked one."
+  }
+}

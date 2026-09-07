@@ -1,0 +1,13 @@
+{
+  "name": "one-page-portfolio",
+  "description": "A single-page personal portfolio done well. Verifies that category caps prevent false positives (no nav, breadcrumbs, search, press page, FAQ, or trust badges expected).",
+  "base": null,
+  "category": "portfolio_personal",
+  "routes": {},
+  "expected": {
+    "fail": [],
+    "info": ["ef.entity.wikidata_unavailable", "ef.corroboration.offsite_spotcheck"],
+    "pass_required": ["fx.facts.key_fact_missing", "ef.entity.sameas_missing", "ef.entity.nap_missing_plain_text", "en.cta.missing", "en.hero.value_prop_unclear", "cr.index.sitemap_missing"],
+    "notes": "Checks that must be not_evaluated (not_applicable_for_category): en.nav.landmark_missing (<=3 pages), en.nav.breadcrumbs_missing, en.nav.site_search_missing, en.nav.related_links_missing, en.trust.signals_missing, ef.corroboration.press_page_missing, fx.content.faq_absent. nap_missing_plain_text is low for portfolios and passes anyway because name and city are present; phone is not required for a Person."
+  }
+}
