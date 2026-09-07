@@ -445,8 +445,10 @@ def check_nap(ctx, out, pages, brand):
     texts = [(p, p.doc.body_text or "") for p in anchor]
     found = {}
     name = (brand or {}).get("value")
+    # The name component is graded only when the site itself states a name (JSON-LD, og:site_name, a repeated
+    # title segment). A name guessed from the host label is not evidence (check_ids.md: nap_missing_plain_text).
     weak_name = (brand or {}).get("source") == "host"
-    if name and not (weak_name and not re.search(r"[A-Za-z]{2}", name)):
+    if name and not weak_name and re.search(r"[A-Za-z]{2}", name):
         nn = _norm_name(name)
         core = re.sub(r"[^a-z0-9]+", "", (name.split()[0] if name else "").lower())
         for p, t in texts:

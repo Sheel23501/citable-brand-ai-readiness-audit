@@ -116,6 +116,14 @@ def stage_manifest(res):
         res.check(scripts and all(os.path.exists(os.path.join(ROOT, "skills", skill, "scripts", sc)) for sc in scripts),
                   "%s: SKILL.md names an existing script (%s)" % (skill, ",".join(sorted(set(scripts)))))
         res.check("## Procedure" in skill_md and re.search(r"^1\. ", skill_md, re.M) is not None, "%s: SKILL.md has a numbered Procedure" % skill)
+        # every reference file is named in SKILL.md, and every reference SKILL.md names exists (no orphans either way)
+        ref_files = sorted(f for f in mds if f.endswith(".md"))
+        unnamed = [f for f in ref_files if "references/%s" % f not in skill_md]
+        res.check(not unnamed, "%s: SKILL.md names every references/*.md file" % skill, ", ".join(unnamed))
+        skill_dir = os.path.join(ROOT, "skills", skill)
+        mentioned = set(re.findall(r"`((?:\.\./)*[\w./-]*references/[\w.-]+\.md)`", skill_md))
+        dangling = sorted(m for m in mentioned if not os.path.exists(os.path.normpath(os.path.join(skill_dir, m))))
+        res.check(not dangling, "%s: every references/*.md path named in SKILL.md exists" % skill, ", ".join(dangling))
     for name in names:
         meta = load_fixture(name)
         for path, route in meta.get("routes", {}).items():
@@ -672,6 +680,25 @@ def stage_probe_ef(res, farm):
         res.check({f["check_id"] for f in out["findings"]} == {"ef.entity.wikidata_unavailable", "ef.corroboration.offsite_spotcheck"} and all(f["severity"] == "info" for f in out["findings"]),
                   "ef: offline run emits exactly the two info notes")
         res.check(os.path.exists(os.path.join(td, "work", "entity.json")), "ef: offline run still writes work/entity.json")
+    # NAP: a brand name guessed from the host is not graded; a name the site states is
+    from auditlib.findings import ProbeOutput as _PO
+    import types as _types
+    def _pg(html, role="home", url="https://acme.example/"):
+        return Page({"role": role, "url": url, "final_url": url, "fetch": {"status": 200}}, Document(html, base_url=url))
+    nameless = [_pg("<p>Call us: +44 117 496 0123 for a quote.</p>", "home"), _pg("<p>Write to 12 Harbour Street, Bristol BS1 4QA.</p>", "contact", "https://acme.example/contact")]
+    o1 = _PO("entity-freshness-corroboration-audit", "https://acme.example", "professional_services", [], total_sampled_pages=2)
+    ep.check_nap(_types.SimpleNamespace(category="professional_services"), o1, nameless, {"value": "Acme", "source": "host", "page": None})
+    res.check(o1.status_of("ef.entity.nap_missing_plain_text") == "pass", "ef: nap ignores a host-guessed name when address or phone is present", str(o1.checks))
+    o2 = _PO("entity-freshness-corroboration-audit", "https://acme.example", "professional_services", [], total_sampled_pages=2)
+    ep.check_nap(_types.SimpleNamespace(category="professional_services"), o2, nameless, {"value": "Acme", "source": "meta:og:site_name", "page": "https://acme.example/"})
+    f = next((x for x in o2.findings if x["check_id"] == "ef.entity.nap_missing_plain_text"), None)
+    res.check(f is not None and "Missing: name" in f["evidence"] and f["severity"] == "medium" and f["confidence"] == "high",
+              "ef: nap grades a stated name that the text never shows (medium, high confidence)", f["evidence"] if f else str(o2.checks))
+    o3 = _PO("entity-freshness-corroboration-audit", "https://acme.example", "professional_services", [], total_sampled_pages=1)
+    ep.check_nap(_types.SimpleNamespace(category="professional_services"), o3, [nameless[0]], {"value": "Acme", "source": "meta:og:site_name", "page": "https://acme.example/"})
+    f = next((x for x in o3.findings if x["check_id"] == "ef.entity.nap_missing_plain_text"), None)
+    res.check(f is not None and f["confidence"] == "medium" and any("contact_and_about_not_sampled" in i["value"] for i in f["evidence_items"]),
+              "ef: nap drops to medium confidence when neither contact nor about was usable", str(f["evidence_items"]) if f else "no finding")
     # entity lookup decisions on canned responses
     S = '/private/tmp/claude-501/-Users-sheelgautam-adobe-hackathon/ec556381-cade-44e9-8891-c1754b44e2fc/scratchpad'
     disamb = '<html><head><title>Mint - Wikipedia</title><script>"wgWikibaseItemId":"Q369531"</script></head><body><div class="mw-parser-output"><div class="dmbox dmbox-disambig">x</div><ul><li>a</li><li>b</li><li>c</li></ul></div><div id="catlinks">Category:Disambiguation_pages</div></body></html>'

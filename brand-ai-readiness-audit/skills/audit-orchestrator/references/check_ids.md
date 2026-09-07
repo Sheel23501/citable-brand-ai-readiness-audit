@@ -78,7 +78,7 @@ Columns: stage (`coverage_map.md` section 2), default severity, maximum severity
 | `ef.freshness.no_visible_dates` | freshness | low | medium | medium | low | site | No visible date on any sampled page (blog dates, "updated" lines, copyright year). |
 | `ef.freshness.stale_copyright_year` | freshness | low | low | high | low | site | Footer copyright year ≤ current year − 2. |
 | `ef.freshness.date_modified_mismatch` | freshness | low | low | medium | low | per-page | JSON-LD `dateModified`/`datePublished` differs from the visible date on the same page by > 30 days, or `dateModified` is in the future. |
-| `ef.corroboration.press_page_missing` | corroboration | low | medium | medium | medium | site | No page role `blog`/newsroom and no nav link matching press/news/media. Category overrides apply. |
+| `ef.corroboration.press_page_missing` | corroboration | low | medium | medium | medium | site | No sampled page has the `blog` role, no internal link on a usable page has text matching press/news/newsroom/media/blog/updates/announcements/stories/insights/journal (or a first path segment among those), and no RSS/Atom feed is advertised. `mailto:` links never count. Category overrides apply. |
 | `ef.corroboration.offsite_spotcheck` | corroboration | info | info | high | n/a | site | Agent step. When `work/offsite_mentions.json` exists the probe reports the count and kind of mentions as an `inconclusive` info finding (reason `bounded_spotcheck`); otherwise `not_evaluated` with reason `tool_unavailable` and the suggested queries. Never affects counts. |
 
 ### engagement-audit (`en.*`)
