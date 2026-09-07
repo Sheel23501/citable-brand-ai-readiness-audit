@@ -753,7 +753,7 @@ def compose(workdir, wall_clock=None, input_url=None):
               for cid in sorted(checks) if checks[cid]["status"] == "pass"]
 
     report = {
-        "site": _host(site_url) or site_url,
+        "site": _host(site_url) or site_url or "unknown",
         "site_url": site_url,
         "audited_at": _now(),
         "tool": {"name": TOOL_NAME, "version": __version__},
@@ -971,7 +971,7 @@ def _fallback_report(workdir, error):
                     detail="Each probe can also be run alone with --workdir to see its own error.")
     f = add_derived_tags(out.findings[0])
     f.update({"id": "F-001", "rank": 1, "source_skill": "audit-orchestrator", "quick_win": False})
-    return {"site": "", "site_url": "", "audited_at": _now(), "tool": {"name": TOOL_NAME, "version": __version__},
+    return {"site": "unknown", "site_url": "", "audited_at": _now(), "tool": {"name": TOOL_NAME, "version": __version__},
             "input_url": workdir, "site_category": {"value": "unknown", "confidence": "low", "signals": []},
             "pages_sampled": [],
             "summary": {"total_findings": 1, "critical": 0, "high": 0, "medium": 0, "low": 0, "info": 1,

@@ -82,15 +82,15 @@ with the code, the handout and the code win. Several of their citations are
 | 0 Foundations | 1–3 | done: skeleton, 7 shared conventions, fixtures |
 | 1 Fetch layer | 4–5 | done: fetch helper + robots, sampler + categorizer |
 | 2 Probes | 6–13 | done |
-| 3 Orchestrator | 14–17 | Step 14 done (compose.py). **Step 15 (validate.py) is next**, then run_audit.py, then the entrypoint SKILL.md |
+| 3 Orchestrator | 14–17 | Steps 14–15 done (compose.py, validate.py). **Step 16 (run_audit.py) is next**, then the entrypoint SKILL.md |
 | 4 Hardening | 18–20 | not started: test stages, live pass, source verification |
 | 5 Packaging | 21–24 | not started: README, demo, sweep, dry-run judging |
 
-Suite: **2176 checks, 0 failures, GREEN.** All five skills pass the validator.
+Suite: **2296 checks, 0 failures, GREEN.** All five skills pass the validator.
 
-Code size: ~8,100 lines. Largest pieces: `engagement_probe.py` 1044, `compose.py` 780,
+Code size: ~8,100 lines. Largest pieces: `engagement_probe.py` 1044, `compose.py` 780, `validate.py` 330,
 `entity_probe.py` 820, `extract.py` 702, `facts_probe.py` 624, `fetch.py` 528,
-`htmldoc.py` 522, `run_tests.py` 1150.
+`htmldoc.py` 522, `run_tests.py` 1300.
 
 Registry: 58 checks — 16 `cr.*`, 12 `fx.*`, 12 `ef.*`, 16 `en.*`, 2 `or.*`.
 
@@ -323,16 +323,36 @@ Clean-site composes to a report with **zero defects**, 54 passing checks, six pr
 recommendations and every simulation question answerable except the comparison one, which is
 informational by rule.
 
-## 9. Next step — Step 15 (validate.py)
+## 9. Step 15 — done (validate.py)
 
-`skills/audit-orchestrator/scripts/validate.py`. Check the handout's required floor first
-(site, audited_at, summary counts that add up and match `findings` length, and each finding's
-id/title/severity/evidence/suggested_action.summary+priority), then the superset: enum values,
-unique ids, every id in the registry, dedupe integrity (every `suppressed_findings` entry names
-a `merged_into` that exists, and no id appears in both lists), `basis == extracted_facts_only`,
-no simulation answer citing a fact absent from the facts file, and a non-empty narrative when
-`--final`. Exit 0 or 1 with a list of problems.
+`skills/audit-orchestrator/scripts/validate.py`. `validate_report(report, facts=None,
+final=False)` returns `(problems, warnings)`; the CLI takes `--workdir` or `--report`,
+finds the facts file from the report's own `ai_answer_simulation.facts_file`, and exits
+0/1. Problems are prefixed `floor:` (the handout's required shape, never relaxed) or
+`superset:` (our conventions), so the two tiers stay distinguishable in output.
 
-Done when it rejects each of a set of deliberately broken reports and accepts every fixture
-report. Read `report_schema.md` sections 3a and 3b before writing it; the floor is exactly
-what the handout requires and must not be relaxed.
+The one rule that goes beyond the plan text: an answer must carry a **verbatim
+20-character run** of every fact it lists in `facts_used` (`quotes_fact`). That is how
+"the simulation may use only the facts file" becomes checkable rather than a promise.
+`--final` additionally requires a narrative and an answer for every answerable question;
+sentence count (3–6) and an empty `attribution_note` are warnings, not failures, so the
+agent is never blocked by a counting heuristic.
+
+Two small fixes made while proving it: compose now writes `site: "unknown"` (never an empty
+string) when a workdir has no sample, so even the run-error fallback passes the floor; and
+`site_url` may be empty only in that case.
+
+## 10. Next step — Step 16 (run_audit.py)
+
+One command: sample the site once (`AuditContext.from_url`), run the four probes on the
+workdir in stage order (`crawl_probe`, `facts_probe`, `entity_probe`, `engagement_probe`),
+compose, validate (non-final), write `report.json` + `report.md`, print the path. Enforce the
+300-second wall clock through the Fetcher's time budget plus a per-probe 60-second limit;
+a top-level guard must emit a valid one-finding "site unreachable" report on any failure.
+`--offline`, `--category`, `--workdir` pass through. The test stage `_build_workdir` in
+`tests/run_tests.py` already does the sample-then-probe sequence in-process; run_audit.py
+should be the subprocess-safe version of that, and Step 18's end-to-end stage will call it.
+
+Done when it completes on every fixture and on three live sites of different categories in
+under 5 minutes each with no traceback in any output. Check `fetch.py` for the existing time
+budget before adding another timer.

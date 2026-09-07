@@ -13,6 +13,7 @@ Later steps add stages here rather than creating new runners:
   Step 8          extract + probe_fx stages (done)
   Step 6/8/10/12  run each probe against each fixture and compare `expected`
   Step 14        compose stage: the dedupe table, ordering, and a report per fixture (done)
+  Step 15        validate stage: floor, superset, --final, 45 deliberately broken reports (done)
   Step 16         run run-audit end to end on each fixture
   Step 18         validate every report; assert no tracebacks anywhere
 
@@ -689,6 +690,12 @@ def stage_compose(res, farm):
             _build_workdir(base, td)
             report = C.compose(td, wall_clock=1.0)
             md = C.render_markdown(report)
+            try:
+                facts = json.load(open(os.path.join(td, "work", "extracted_facts.json"), encoding="utf-8"))
+            except OSError:
+                facts = None
+            probs, _ = _load_validate().validate_report(report, facts)
+            res.check(not probs, "compose/%s: report passes validate.py" % name, "; ".join(probs[:3]))
         s = report["summary"]
         fnds = report["findings"]
         res.check(s["total_findings"] == len(fnds) == sum(s[k] for k in ("critical", "high", "medium", "low", "info")),
@@ -769,6 +776,157 @@ def stage_compose(res, farm):
         again = open(os.path.join(td, "report.md"), encoding="utf-8").read()
         res.check(first == again, "compose --render-only reproduces the Markdown from report.json alone")
         res.check(os.path.exists(os.path.join(td, "report.json")), "compose writes report.json into the workdir")
+
+
+# ---------------------------------------------------------------- stage: validate (the report validator)
+def _load_validate():
+    import importlib.util
+    path = os.path.join(ROOT, "skills", "audit-orchestrator", "scripts", "validate.py")
+    spec = importlib.util.spec_from_file_location("validate", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _finalise(report, facts):
+    """What the orchestrator agent does in Step 17, done mechanically: quote the verbatim values, write a narrative."""
+    r = json.loads(json.dumps(report))
+    for q in r["ai_answer_simulation"]["questions"]:
+        if q["answerable"]:
+            q["answer_from_facts"] = " ".join('"%s"' % facts["facts"][fid]["value"] for fid in q["facts_used"])
+    r["ai_answer_simulation"]["attribution_note"] = "Every answer above quotes the facts file verbatim."
+    r["narrative_summary"] = "The site is reachable and readable. Its facts are stated plainly. Nothing here is invisible."
+    return r
+
+
+def stage_validate(res, farm):
+    print("\n== stage: validate (floor, superset, --final, and a set of deliberately broken reports)")
+    import tempfile
+    C, V = _load_compose(), _load_validate()
+    with tempfile.TemporaryDirectory() as td:
+        _build_workdir(farm.urls["weak-engagement"], td)
+        C.main(["--workdir", td, "--quiet"])
+        base = json.load(open(os.path.join(td, "report.json"), encoding="utf-8"))
+        facts = json.load(open(os.path.join(td, "work", "extracted_facts.json"), encoding="utf-8"))
+        res.check(V.main(["--workdir", td, "--quiet"]) == 0, "validate: CLI accepts a composed workdir")
+        res.check(V.main(["--workdir", td, "--final", "--quiet"]) == 1, "validate: CLI rejects an unfinished report with --final")
+        good = _finalise(base, facts)
+        with open(os.path.join(td, "report.json"), "w", encoding="utf-8") as f:
+            json.dump(good, f)
+        res.check(V.main(["--workdir", td, "--final", "--quiet"]) == 0, "validate: CLI accepts a finalised report with --final")
+        res.check(V.main(["--report", os.path.join(td, "nope.json"), "--quiet"]) == 1, "validate: a missing file is a problem, not a crash")
+        with open(os.path.join(td, "bad.json"), "w") as f:
+            f.write("{not json")
+        res.check(V.main(["--report", os.path.join(td, "bad.json"), "--quiet"]) == 1, "validate: unparseable JSON is a problem, not a crash")
+    probs, warns = V.validate_report(base, facts)
+    res.check(not probs, "validate: the composed report is valid", "; ".join(probs[:3]))
+    probs, warns = V.validate_report(good, facts, final=True)
+    res.check(not probs, "validate: the finalised report is valid under --final", "; ".join(probs[:3]))
+    res.check(not any("narrative" in x for x in warns), "validate: a three-sentence narrative raises no warning", str(warns))
+
+    def broken(name, mutate, needle, final=False, expect_floor=None):
+        r = json.loads(json.dumps(good if final else base))
+        mutate(r)
+        probs, _ = V.validate_report(r, facts, final=final)
+        hit = [x for x in probs if needle in x]
+        res.check(bool(hit), "validate rejects: %s" % name, "problems=%s" % probs[:3])
+        if expect_floor is not None and hit:
+            res.check(hit[0].startswith("floor:" if expect_floor else "superset:"),
+                      "validate: %s is a %s problem" % (name, "floor" if expect_floor else "superset"), hit[0])
+
+    def setf(path, value):
+        def m(r):
+            cur = r
+            for k in path[:-1]:
+                cur = cur[k]
+            cur[path[-1]] = value
+        return m
+
+    def delf(path):
+        def m(r):
+            cur = r
+            for k in path[:-1]:
+                cur = cur[k]
+            del cur[path[-1]]
+        return m
+
+    # the handout floor
+    broken("site missing", delf(["site"]), "site missing", expect_floor=True)
+    broken("audited_at not ISO", setf(["audited_at"], "yesterday"), "audited_at", expect_floor=True)
+    broken("summary total off by one", setf(["summary", "total_findings"], base["summary"]["total_findings"] + 1), "total_findings", expect_floor=True)
+    broken("severity count wrong", setf(["summary", "high"], base["summary"]["high"] + 1), "summary", expect_floor=True)
+    broken("finding without evidence", setf(["findings", 0, "evidence"], ""), "evidence missing", expect_floor=True)
+    broken("finding without title", setf(["findings", 0, "title"], ""), "title missing", expect_floor=True)
+    broken("duplicate id", setf(["findings", 1, "id"], base["findings"][0]["id"]), "duplicate id", expect_floor=True)
+    broken("id not F-###", setf(["findings", 0, "id"], "1"), "not F-###", expect_floor=True)
+    broken("action without summary", setf(["findings", 0, "suggested_action", "summary"], ""), "suggested_action.summary", expect_floor=True)
+    broken("action without priority", delf(["findings", 0, "suggested_action", "priority"]), "priority", expect_floor=True)
+    broken("severity out of range", setf(["findings", 0, "severity"], "urgent"), "severity", expect_floor=True)
+    broken("findings not a list", setf(["findings"], {}), "findings missing", expect_floor=True)
+    # the superset
+    broken("unknown check_id", setf(["findings", 0, "check_id"], "en.made.up"), "not in the registry", expect_floor=False)
+    broken("status pass on a finding", setf(["findings", 0, "status"], "pass"), "status must be", expect_floor=False)
+    broken("inconclusive with severity high", lambda r: r["findings"][0].update(status="inconclusive"), "always info", expect_floor=False)
+    broken("low confidence critical", lambda r: r["findings"][0].update(confidence="low", severity="critical", quick_win=False)
+           or r["summary"].update(critical=1, high=base["summary"]["high"] - 1), "low confidence caps", expect_floor=False)
+    broken("severity above registered maximum", lambda r: [f.update(severity="critical") for f in r["findings"] if f["check_id"] == "en.lang.attribute_missing"]
+           or r["summary"].update(critical=1, low=base["summary"]["low"] - 1), "exceeds the registered maximum", expect_floor=False)
+    broken("mechanism contradicts the registry", setf(["findings", 0, "mechanism"], "access"), "does not match the registry stage", expect_floor=False)
+    broken("out of order", lambda r: r["findings"].reverse() or [f.update(id="F-%03d" % (i + 1), rank=i + 1) for i, f in enumerate(r["findings"])],
+           "not in schema order", expect_floor=False)
+    broken("ids not sequential", lambda r: r["findings"][-1].update(id="F-099"), "must be F-", expect_floor=False)
+    broken("rank wrong", setf(["findings", 0, "rank"], 7), "rank must be", expect_floor=False)
+    broken("quick_win flag contradicts the rubric", setf(["findings", 0, "quick_win"], not base["findings"][0]["quick_win"]), "quick_win", expect_floor=False)
+    broken("quick_wins list wrong", setf(["quick_wins"], []), "quick_wins", expect_floor=False)
+    broken("impact not derived from severity", setf(["findings", 0, "suggested_action", "impact"], "low"), "impact must be derived", expect_floor=False)
+    broken("dedupe_key wrong", setf(["findings", 0, "dedupe_key"], "x|y"), "dedupe_key", expect_floor=False)
+    broken("no evidence items", setf(["findings", 0, "evidence_items"], []), "evidence_items", expect_floor=False)
+    broken("evidence item of unknown kind", setf(["findings", 0, "evidence_items", 0, "kind"], "guess"), "known kind", expect_floor=False)
+    broken("title over 90 chars", setf(["findings", 0, "title"], "x" * 91), "longer than 90", expect_floor=False)
+    broken("checks_run not the sum", setf(["summary", "checks_run"], 1), "checks_run", expect_floor=False)
+    broken("passed check that is also a finding", lambda r: r["passed_checks"].append(
+        {"check_id": base["findings"][0]["check_id"], "title": "t", "source_skill": "s"}) or r["summary"].update(checks_passed=base["summary"]["checks_passed"] + 1),
+        "is also a finding", expect_floor=False)
+    broken("passed_checks length mismatch", setf(["summary", "checks_passed"], 0), "checks_passed", expect_floor=False)
+    broken("suppressed finding with dangling merged_into", lambda r: r["suppressed_findings"].append(
+        dict(json.loads(json.dumps(base["findings"][0])), merged_into="F-999", dedupe_key="cr.x.y|")), "merged_into", expect_floor=False)
+    broken("suppressed key also kept", lambda r: r["suppressed_findings"].append(
+        dict(json.loads(json.dumps(base["findings"][0])), merged_into="F-001")), "both kept and folded", expect_floor=False)
+    broken("coverage letter missing", delf(["coverage", "handout_concepts", "E"]), "handout_concepts", expect_floor=False)
+    broken("coverage stage unknown value", setf(["coverage", "stages", "access"], "done"), "coverage.stages", expect_floor=False)
+    broken("recommendation restates a finding", lambda r: r["proactive_recommendations"].append(
+        {"title": base["findings"][0]["title"], "rationale": "r", "mechanism": "extract", "effort": "low", "priority": "low"}), "restates", expect_floor=False)
+    broken("limitations empty", setf(["limitations"], []), "limitations", expect_floor=False)
+    broken("limitations without the point-in-time line", setf(["limitations"], ["Nothing to see."]), "point-in-time", expect_floor=False)
+    broken("basis not extracted_facts_only", setf(["ai_answer_simulation", "basis"], "model_knowledge"), "basis", expect_floor=False)
+    broken("answer on an unanswerable question", lambda r: [q.update(answer_from_facts="Yes.") for q in r["ai_answer_simulation"]["questions"] if not q["answerable"]],
+           "unanswerable question carries an answer", expect_floor=False)
+    broken("answer cites a fact the file does not hold", lambda r: r["ai_answer_simulation"]["questions"][0].update(
+        answer_from_facts="Ledgerly is great", facts_used=["not_a_fact"]), "does not hold as present", expect_floor=False)
+    broken("answer that does not quote the fact", lambda r: r["ai_answer_simulation"]["questions"][0].update(
+        answer_from_facts="It is an accounting product, probably."), "does not quote the value", final=True, expect_floor=False)
+    broken("answer without facts_used", lambda r: r["ai_answer_simulation"]["questions"][0].update(facts_used=[]), "must list the facts", final=True, expect_floor=False)
+    broken("--final with empty narrative", setf(["narrative_summary"], ""), "narrative_summary is empty", final=True, expect_floor=False)
+    broken("--final with an unanswered answerable question", lambda r: r["ai_answer_simulation"]["questions"][0].update(answer_from_facts=None),
+           "has no answer", final=True, expect_floor=False)
+    broken("missing top-level field", delf(["run"]), "missing top-level field run", expect_floor=False)
+    # an answer that quotes verbatim passes even when the value was cut with an ellipsis
+    r = json.loads(json.dumps(good))
+    fid = r["ai_answer_simulation"]["questions"][0]["facts_used"][0]
+    value = facts["facts"][fid]["value"].strip("…").strip()
+    r["ai_answer_simulation"]["questions"][0]["answer_from_facts"] = "According to the site, %s." % value[:60]
+    r["ai_answer_simulation"]["questions"][0]["facts_used"] = [fid]
+    probs, _ = V.validate_report(r, facts, final=True)
+    res.check(not [x for x in probs if "quote" in x], "validate: a partial verbatim quote of a long value is accepted", str(probs[:2]))
+    # the validator itself never raises
+    probs, _ = V.validate_report("not even a dict", None)
+    res.check(probs and not any("validator error" in x for x in probs), "validate: a non-object report is rejected without crashing", str(probs[:2]))
+    probs, _ = V.validate_report({"site": "x", "findings": [None, 3], "summary": None}, None)
+    res.check(probs and not any("validator error" in x for x in probs), "validate: garbage findings are rejected without crashing", str(probs[:2]))
+    # a report composed from an empty workdir (the fallback) is still valid
+    with tempfile.TemporaryDirectory() as td:
+        probs, _ = V.validate_report(C.compose(td), None)
+        res.check(not probs, "validate: the run-error fallback report is valid", "; ".join(probs[:3]))
 
 
 # ---------------------------------------------------------------- stage: probe_cr (crawl-render probe on fixtures)
@@ -1114,7 +1272,7 @@ def stage_probe_en(res, farm):
         res.check(work["link_summary"]["requested"] <= 15 and work["requests_made"] <= 16, "en/clean-site: at most 15 link requests plus the 404 probe (%s)" % work["requests_made"])
 
 
-STAGES = {"manifest": None, "serve": None, "variants": None, "robots": None, "htmldoc": None, "extract": None, "fetch": None, "sample": None, "probe_cr": None, "probe_fx": None, "probe_ef": None, "probe_en": None, "compose": None, "live": None}
+STAGES = {"manifest": None, "serve": None, "variants": None, "robots": None, "htmldoc": None, "extract": None, "fetch": None, "sample": None, "probe_cr": None, "probe_fx": None, "probe_ef": None, "probe_en": None, "compose": None, "validate": None, "live": None}
 
 
 def main(argv=None):
@@ -1125,7 +1283,7 @@ def main(argv=None):
     ap.add_argument("--live", nargs="*", metavar="URL", help="also run the live stage against these sites")
     args = ap.parse_args(argv)
     os.environ["BRAND_AUDIT_EXTERNAL"] = "0"  # the suite never contacts Wikipedia/Wikidata; the entity lookup is unit-tested on canned responses
-    stages = args.stage or ["manifest", "serve", "variants", "robots", "htmldoc", "extract", "fetch", "sample", "probe_cr", "probe_fx", "probe_ef", "probe_en", "compose"]
+    stages = args.stage or ["manifest", "serve", "variants", "robots", "htmldoc", "extract", "fetch", "sample", "probe_cr", "probe_fx", "probe_ef", "probe_en", "compose", "validate"]
     if args.live:
         stages.append("live")
     res = Results()
@@ -1139,7 +1297,7 @@ def main(argv=None):
             stage_htmldoc(res)
         if "extract" in stages:
             stage_extract(res)
-        if any(st in stages for st in ("serve", "variants", "fetch", "sample", "probe_cr", "probe_fx", "probe_ef", "probe_en", "compose")):
+        if any(st in stages for st in ("serve", "variants", "fetch", "sample", "probe_cr", "probe_fx", "probe_ef", "probe_en", "compose", "validate")):
             farm = FixtureFarm(base_port=args.base_port)
             farm.start()
             print("\nfixtures:")
@@ -1163,6 +1321,8 @@ def main(argv=None):
                 stage_probe_en(res, farm)
             if "compose" in stages:
                 stage_compose(res, farm)
+            if "validate" in stages:
+                stage_validate(res, farm)
         if "live" in stages:
             stage_live(res, args.live or ["https://example.com/", "https://www.python.org/"])
     except Exception:  # noqa: BLE001
