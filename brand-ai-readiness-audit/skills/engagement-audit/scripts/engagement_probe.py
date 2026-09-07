@@ -120,7 +120,9 @@ def _cta_re(category):
 
 
 def _network_enabled(ctx, args):
-    if args is not None and getattr(args, "no_network", False):
+    # --offline must hold in workdir mode too, where ctx.fetcher is None and this probe would otherwise
+    # build its own online one; the flag, not the context, is the authority.
+    if args is not None and (getattr(args, "no_network", False) or getattr(args, "offline", False)):
         return False
     if os.environ.get(NETWORK_ENV, "1").strip().lower() in ("0", "false", "no", "off"):
         return False

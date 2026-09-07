@@ -78,11 +78,12 @@ class AuditContext:
         return ctx
 
     @classmethod
-    def from_url(cls, url, workdir, offline=False, category_override=None, obey_robots=True):
+    def from_url(cls, url, workdir, offline=False, category_override=None, obey_robots=True, time_budget=None):
         ctx = cls(workdir)
         try:
             os.makedirs(workdir, exist_ok=True)
-            ctx.fetcher = Fetcher(workdir=workdir, site=url, offline=offline, obey_robots=obey_robots)
+            ctx.fetcher = Fetcher(workdir=workdir, site=url, offline=offline, obey_robots=obey_robots,
+                                  time_budget=time_budget)
             ctx.manifest = sample_site(ctx.fetcher, url, category_override=category_override, save=True)
         except Exception as e:  # noqa: BLE001
             ctx.error = "sampler failed: %s" % e

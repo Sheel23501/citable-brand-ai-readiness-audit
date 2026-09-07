@@ -243,7 +243,7 @@ def _fold(primary, victim, note):
             sa["priority"] = priority_for(raised, primary.get("confidence", "high"))
 
 
-def dedupe(findings, sample):
+def dedupe(findings, sample, category=None):
     """The 12 rows of coverage_map.md section 4, applied in order. Nothing is deleted; folded findings
     are marked and returned separately with `merged_into` filled in once ids exist."""
     home_url = None
@@ -318,7 +318,7 @@ def dedupe(findings, sample):
                 _fold(primary, f, "")
 
     # 8. NAP for a local business: the key-fact finding when it names only address and phone
-    if (sample.get("site_category") or {}).get("value") == "local_business":
+    if (category or (sample.get("site_category") or {}).get("value")) == "local_business":
         for primary in _by_id(findings, "ef.entity.nap_missing_plain_text"):
             for f in _by_id(findings, "fx.facts.key_fact_missing"):
                 missing = _computed(f, "missing=") or ""
@@ -694,12 +694,13 @@ def orchestrator_findings(site, category, pages_examined, simulation, probes, lo
 
 
 # ---------------------------------------------------------------- compose
-def compose(workdir, wall_clock=None, input_url=None):
+def compose(workdir, wall_clock=None, input_url=None, category_override=None):
     registry = Registry()
     data = load_workdir(workdir)
     sample, probes, facts = data["sample"], data["probes"], data["facts"]
     site_url = sample.get("site") or input_url or ""
-    category = (sample.get("site_category") or {}).get("value") or "unknown"
+    # an explicit override is what the probes were told to grade against, so it is what the report states
+    category = category_override or (sample.get("site_category") or {}).get("value") or "unknown"
     pages = sample.get("pages") or []
     pages_examined = [(p.get("fetch") or {}).get("final_url") or p.get("url") for p in pages]
 
@@ -723,7 +724,7 @@ def compose(workdir, wall_clock=None, input_url=None):
         f["_max_severity"] = "info"
         findings.append(f)
 
-    kept, folded = dedupe(findings, sample)
+    kept, folded = dedupe(findings, sample, category)
     kept = sort_findings(kept)
     for i, f in enumerate(kept, start=1):
         f["id"] = "F-%03d" % i
@@ -759,8 +760,9 @@ def compose(workdir, wall_clock=None, input_url=None):
         "tool": {"name": TOOL_NAME, "version": __version__},
         "input_url": input_url or sample.get("input_url") or site_url,
         "site_category": {"value": category,
-                          "confidence": (sample.get("site_category") or {}).get("confidence", "low"),
-                          "signals": (sample.get("site_category") or {}).get("signals", [])},
+                          "confidence": "high" if category_override else (sample.get("site_category") or {}).get("confidence", "low"),
+                          "signals": ["override:command_line"] if category_override
+                                     else (sample.get("site_category") or {}).get("signals", [])},
         "pages_sampled": [{"role": p.get("role"), "url": (p.get("fetch") or {}).get("final_url") or p.get("url"),
                            "status": (p.get("fetch") or {}).get("status"),
                            "snapshot": (p.get("fetch") or {}).get("body_path"),
@@ -929,6 +931,7 @@ def main(argv=None):
     ap.add_argument("--render-only", action="store_true", help="re-render the Markdown from an existing report.json")
     ap.add_argument("--wall-clock-seconds", type=float, default=None)
     ap.add_argument("--input-url", help="the URL the user asked for, when it differs from the sampled origin")
+    ap.add_argument("--category", help="state (and grade against) this category instead of the inferred one")
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args(argv)
     out_path = args.out or os.path.join(args.workdir, "report.json")
@@ -938,7 +941,8 @@ def main(argv=None):
             with open(out_path, encoding="utf-8") as f:
                 report = json.load(f)
         else:
-            report = compose(args.workdir, wall_clock=args.wall_clock_seconds, input_url=args.input_url)
+            report = compose(args.workdir, wall_clock=args.wall_clock_seconds, input_url=args.input_url,
+                             category_override=args.category)
     except Exception as e:  # noqa: BLE001  -- the never-crash guarantee
         report = _fallback_report(args.workdir, "%s: %s" % (type(e).__name__, e))
     try:
@@ -958,21 +962,23 @@ def main(argv=None):
     return 0
 
 
-def _fallback_report(workdir, error):
-    """A valid report whose only finding is the run error: an incomplete run is never read as a clean one."""
+def _fallback_report(workdir, error, site_url=None, title=None, action=None):
+    """A valid report whose only finding is the run error: an incomplete run is never read as a clean one.
+    run_audit.py passes its own title when the site itself could not be reached."""
     reg = Registry()
-    out = ProbeOutput("audit-orchestrator", workdir, "unknown", [], registry=reg)
-    out.policy_note("or.run.probe_error", title="The audit could not be composed",
-                    evidence="compose failed: %s" % error,
+    out = ProbeOutput("audit-orchestrator", site_url or workdir, "unknown", [], registry=reg)
+    out.policy_note("or.run.probe_error", title=title or "The audit could not be composed",
+                    evidence=("%s: %s" % ("the audit did not complete" if title else "compose failed", error))[:300],
                     evidence_items=[evidence_item("site", "computed", error[:280])],
                     why="Nothing about the site can be concluded from this run: the report is empty because the "
                         "tool failed, not because the site is clean.",
-                    action="Re-run the audit and check that the workdir holds sample.json and probes/*.json.",
+                    action=action or "Re-run the audit and check that the workdir holds sample.json and probes/*.json.",
                     detail="Each probe can also be run alone with --workdir to see its own error.")
     f = add_derived_tags(out.findings[0])
     f.update({"id": "F-001", "rank": 1, "source_skill": "audit-orchestrator", "quick_win": False})
-    return {"site": "unknown", "site_url": "", "audited_at": _now(), "tool": {"name": TOOL_NAME, "version": __version__},
-            "input_url": workdir, "site_category": {"value": "unknown", "confidence": "low", "signals": []},
+    return {"site": _host(site_url or "") or "unknown", "site_url": site_url or "",
+            "audited_at": _now(), "tool": {"name": TOOL_NAME, "version": __version__},
+            "input_url": site_url or workdir, "site_category": {"value": "unknown", "confidence": "low", "signals": []},
             "pages_sampled": [],
             "summary": {"total_findings": 1, "critical": 0, "high": 0, "medium": 0, "low": 0, "info": 1,
                         "checks_run": 1, "checks_passed": 0, "checks_failed": 1, "checks_inconclusive": 0,

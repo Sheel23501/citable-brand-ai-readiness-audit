@@ -82,15 +82,15 @@ with the code, the handout and the code win. Several of their citations are
 | 0 Foundations | 1–3 | done: skeleton, 7 shared conventions, fixtures |
 | 1 Fetch layer | 4–5 | done: fetch helper + robots, sampler + categorizer |
 | 2 Probes | 6–13 | done |
-| 3 Orchestrator | 14–17 | Steps 14–15 done (compose.py, validate.py). **Step 16 (run_audit.py) is next**, then the entrypoint SKILL.md |
+| 3 Orchestrator | 14–17 | Steps 14–16 done (compose.py, validate.py, run_audit.py). **Step 17 (orchestrator SKILL.md) is next** and finishes Phase 3 |
 | 4 Hardening | 18–20 | not started: test stages, live pass, source verification |
 | 5 Packaging | 21–24 | not started: README, demo, sweep, dry-run judging |
 
-Suite: **2296 checks, 0 failures, GREEN.** All five skills pass the validator.
+Suite: **2478 checks, 0 failures, GREEN.** All five skills pass the validator.
 
-Code size: ~8,100 lines. Largest pieces: `engagement_probe.py` 1044, `compose.py` 780, `validate.py` 330,
+Code size: ~8,100 lines. Largest pieces: `engagement_probe.py` 1044, `compose.py` 790, `validate.py` 330, `run_audit.py` 210,
 `entity_probe.py` 820, `extract.py` 702, `facts_probe.py` 624, `fetch.py` 528,
-`htmldoc.py` 522, `run_tests.py` 1300.
+`htmldoc.py` 522, `run_tests.py` 1450.
 
 Registry: 58 checks — 16 `cr.*`, 12 `fx.*`, 12 `ef.*`, 16 `en.*`, 2 `or.*`.
 
@@ -342,17 +342,60 @@ Two small fixes made while proving it: compose now writes `site: "unknown"` (nev
 string) when a workdir has no sample, so even the run-error fallback passes the floor; and
 `site_url` may be empty only in that case.
 
-## 10. Next step — Step 16 (run_audit.py)
+## 10. Step 16 — done (run_audit.py)
 
-One command: sample the site once (`AuditContext.from_url`), run the four probes on the
-workdir in stage order (`crawl_probe`, `facts_probe`, `entity_probe`, `engagement_probe`),
-compose, validate (non-final), write `report.json` + `report.md`, print the path. Enforce the
-300-second wall clock through the Fetcher's time budget plus a per-probe 60-second limit;
-a top-level guard must emit a valid one-finding "site unreachable" report on any failure.
-`--offline`, `--category`, `--workdir` pass through. The test stage `_build_workdir` in
-`tests/run_tests.py` already does the sample-then-probe sequence in-process; run_audit.py
-should be the subprocess-safe version of that, and Step 18's end-to-end stage will call it.
+`run_audit.py <url> [--workdir DIR] [--category C] [--offline] [--no-network]
+[--time-budget S]` is the one command: sample once, run the four probes in stage order,
+compose, validate non-final, write `report.json` and `report.md`, print the paths.
+`--workdir` with no URL re-grades an existing sample without fetching anything.
 
-Done when it completes on every fixture and on three live sites of different categories in
-under 5 minutes each with no traceback in any output. Check `fetch.py` for the existing time
-budget before adding another timer.
+**Each probe runs as its own subprocess.** That is the only way a 60-second per-probe
+limit is actually enforceable, and it means a probe that crashes, hangs, exits non-zero
+or merely prints a traceback cannot take the run down: it is replaced by a stub output
+carrying the reason, and `or.run.probe_error` names it in the report. The 300-second
+wall clock is split — 55 % to the sampler through the Fetcher's existing `time_budget`
+(`AuditContext.from_url` gained a `time_budget` argument), then `min(60, remaining - 5)`
+per probe, with anything under 8 seconds left skipped rather than started and killed.
+
+**Two real bugs surfaced by running the whole thing as a command**, both fixed:
+
+- `--offline` was ignored in **workdir mode**. The engagement and entity probes decided
+  whether to use the network by looking at `ctx.fetcher.offline`, but in workdir mode
+  `ctx.fetcher` is None, so they built their own online fetcher and went to the network.
+  Replaying a saved workdir with `--offline` therefore counted every unreachable link as a
+  broken one: a false positive of exactly the kind the audit is judged on. The flag, not the
+  context, is now the authority in both probes.
+- `--category` was passed to every probe but the report still printed the *inferred*
+  category, so a report could be graded as one category and labelled another. `compose()`
+  now takes `category_override` and states it with confidence `high` and the signal
+  `override:command_line`.
+
+Live timings after the fixes: example.com 4.3 s, python.org 13.3 s, gutenberg.org 21.4 s,
+three different inferred categories, no traceback anywhere.
+
+### Carried to Step 19 (live generalization)
+
+- **python.org ties `publisher_media` / `nonprofit_institution` 4-4** and resolves by table
+  order. Needs a documented tiebreak rule, not a special case.
+- **djangoproject.com infers `unknown` with low confidence.** A large, obvious software
+  project falling through to `unknown` is a scoring gap worth a rule.
+- The engagement probe is the slow one on live sites (7-14 s of the total), because of the
+  15-link sample. That is within budget but it is where any future speed work belongs.
+
+## 11. Next step — Step 17 (orchestrator SKILL.md)
+
+The last step of Phase 3, and the one judges read first: the procedure a fresh agent follows.
+Run `run_audit.py`; open `report.json`; for each simulation question with `answerable: true`
+write `answer_from_facts` quoting **only** verbatim `value` fields from
+`work/extracted_facts.json` and list them in `facts_used` (validate.py enforces a verbatim
+20-character run, so a paraphrase is rejected); for `answerable: false` leave the answer null
+and point at the finding id; write `attribution_note`; run the off-site spot-check from
+`entity-freshness-corroboration-audit/references/offsite_spotcheck.md` if a search tool
+exists, else leave the `not_evaluated` note; write the narrative (3-6 sentences, grouped
+invisible / stale / bouncing); re-render with `compose.py --render-only` and check with
+`validate.py --final`; emit both files.
+
+New reference to write: `references/simulation_rules.md` (the facts-only rule, the
+forbidden-knowledge rule, the wording rules), plus pointers to the schema, the rubric and the
+coverage map. Done when a fresh agent session given only the SKILL.md and a URL produces a
+report that passes `validate.py --final`.

@@ -14,7 +14,7 @@ Later steps add stages here rather than creating new runners:
   Step 6/8/10/12  run each probe against each fixture and compare `expected`
   Step 14        compose stage: the dedupe table, ordering, and a report per fixture (done)
   Step 15        validate stage: floor, superset, --final, 45 deliberately broken reports (done)
-  Step 16         run run-audit end to end on each fixture
+  Step 16        run_audit stage: the command end to end on every fixture, plus its guards (done)
   Step 18         validate every report; assert no tracebacks anywhere
 
 Usage:
@@ -929,6 +929,139 @@ def stage_validate(res, farm):
         res.check(not probs, "validate: the run-error fallback report is valid", "; ".join(probs[:3]))
 
 
+# ---------------------------------------------------------------- stage: run_audit (the whole pipeline, as a command)
+def _load_run_audit():
+    import importlib.util
+    path = os.path.join(ROOT, "skills", "audit-orchestrator", "scripts", "run_audit.py")
+    spec = importlib.util.spec_from_file_location("run_audit", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+RUN_AUDIT = os.path.join(ROOT, "skills", "audit-orchestrator", "scripts", "run_audit.py")
+
+
+def _run_cli(args, timeout=180):
+    import subprocess
+    proc = subprocess.run([sys.executable, RUN_AUDIT] + args, capture_output=True, text=True, timeout=timeout)
+    return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
+
+
+def stage_run_audit(res, farm):
+    print("\n== stage: run_audit end to end on every fixture")
+    import tempfile
+    import time as _time
+    V = _load_validate()
+    R = _load_run_audit()
+    for name, base in farm.urls.items():
+        exp = farm.metas[name]["expected"]
+        with tempfile.TemporaryDirectory() as td:
+            wd = os.path.join(td, "run")
+            t0 = _time.time()
+            code, blob = _run_cli([base, "--workdir", wd, "--quiet"])
+            elapsed = _time.time() - t0
+            res.check(code == 0, "run_audit/%s: exits 0" % name, blob.strip()[-200:])
+            res.check("Traceback" not in blob, "run_audit/%s: no traceback in any output" % name, blob.strip()[-200:])
+            res.check(elapsed < 60, "run_audit/%s: finishes well inside the 5 minute limit (%.1fs)" % (name, elapsed))
+            ok = os.path.exists(os.path.join(wd, "report.json")) and os.path.exists(os.path.join(wd, "report.md"))
+            res.check(ok, "run_audit/%s: writes report.json and report.md" % name)
+            if not ok:
+                continue
+            report = json.load(open(os.path.join(wd, "report.json"), encoding="utf-8"))
+            facts_rel = (report.get("ai_answer_simulation") or {}).get("facts_file")
+            facts = None
+            if facts_rel and os.path.exists(os.path.join(wd, facts_rel)):
+                facts = json.load(open(os.path.join(wd, facts_rel), encoding="utf-8"))
+            probs, _ = V.validate_report(report, facts)
+            res.check(not probs, "run_audit/%s: the report it wrote is valid" % name, "; ".join(probs[:3]))
+            run = report.get("run") or {}
+            res.check(len(run.get("probes") or []) == 4 and not [p for p in run["probes"] if p["error"]],
+                      "run_audit/%s: all four probes completed" % name,
+                      str([(p["probe"], p["error"]) for p in (run.get("probes") or []) if p["error"]]))
+            res.check(report["summary"]["checks_run"] == 58, "run_audit/%s: every registered check has a verdict" % name)
+            res.check(isinstance(run.get("wall_clock_seconds"), float), "run_audit/%s: records its wall clock" % name)
+            seen = {f["check_id"] for f in report["findings"] + report["suppressed_findings"] if f["severity"] != "info"}
+            res.check(seen == set(exp["fail"]), "run_audit/%s: the whole pipeline reproduces the fixture's fail set" % name,
+                      "got %s expected %s" % (sorted(seen), sorted(exp["fail"])))
+            md = open(os.path.join(wd, "report.md"), encoding="utf-8").read()
+            res.check(md.startswith("# AI-readiness audit: "), "run_audit/%s: the Markdown is rendered" % name)
+
+    print("\n== stage: run_audit (budget, reuse, offline, and the guards)")
+    with tempfile.TemporaryDirectory() as td:
+        wd = os.path.join(td, "run")
+        code, _ = _run_cli([farm.urls["clean-site"], "--workdir", wd, "--quiet"])
+        res.check(code == 0, "run_audit: first pass over clean-site")
+        sample = json.load(open(os.path.join(wd, "sample.json"), encoding="utf-8"))
+        code, blob = _run_cli(["--workdir", wd, "--quiet"])
+        res.check(code == 0, "run_audit: --workdir alone re-runs the probes", blob[-200:])
+        again = json.load(open(os.path.join(wd, "sample.json"), encoding="utf-8"))
+        res.check(again["sampled_at"] == sample["sampled_at"] and again["requests_made"] == sample["requests_made"],
+                  "run_audit: --workdir alone does not re-sample the site")
+        code, blob = _run_cli(["--workdir", wd, "--offline", "--quiet"])
+        res.check(code == 0, "run_audit: --offline completes", blob[-200:])
+        report = json.load(open(os.path.join(wd, "report.json"), encoding="utf-8"))
+        reasons = {e["check_id"]: e["reason"] for e in report["coverage"]["not_evaluated"]}
+        res.check(reasons.get("en.links.broken_sampled") == "network_disabled",
+                  "run_audit: --offline marks the network checks not_evaluated", str(reasons)[:160])
+        probs, _ = V.validate_report(report, None)
+        res.check(not probs, "run_audit: the offline report is still valid", "; ".join(probs[:3]))
+        code, _ = _run_cli(["--workdir", wd, "--no-network", "--quiet"])
+        report = json.load(open(os.path.join(wd, "report.json"), encoding="utf-8"))
+        res.check(code == 0 and any(e["check_id"].startswith("en.links") for e in report["coverage"]["not_evaluated"]),
+                  "run_audit: --no-network skips only the engagement network checks")
+        code, blob = _run_cli(["--workdir", wd, "--time-budget", "9"])
+        report = json.load(open(os.path.join(wd, "report.json"), encoding="utf-8"))
+        probs, _ = V.validate_report(report, None)
+        res.check(not probs, "run_audit: a starved run still writes a valid report", "; ".join(probs[:3]))
+        res.check(any(f["check_id"] == "or.run.probe_error" for f in report["findings"]),
+                  "run_audit: a starved run reports or.run.probe_error")
+        res.check(all(p["error"] for p in report["run"]["probes"]),
+                  "run_audit: a starved run skips the probes rather than killing them")
+        res.check("did not finish" in blob, "run_audit: a starved run says so on stdout", blob[-160:])
+        code, _ = _run_cli(["--workdir", wd, "--category", "local_business", "--quiet"])
+        report = json.load(open(os.path.join(wd, "report.json"), encoding="utf-8"))
+        res.check(code == 0 and report["site_category"]["value"] == "local_business",
+                  "run_audit: --category overrides the inferred category everywhere")
+    import socket
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    dead_port = sock.getsockname()[1]
+    sock.close()
+    with tempfile.TemporaryDirectory() as td:
+        code, blob = _run_cli(["http://127.0.0.1:%d/" % dead_port, "--workdir", os.path.join(td, "run"), "--quiet"])
+        res.check("Traceback" not in blob, "run_audit/unreachable: no traceback", blob[-200:])
+        report = json.load(open(os.path.join(td, "run", "report.json"), encoding="utf-8"))
+        probs, _ = V.validate_report(report, None)
+        res.check(not probs, "run_audit/unreachable: the report is valid", "; ".join(probs[:3]))
+        top = report["findings"][0] if report["findings"] else {}
+        res.check(top.get("check_id") == "cr.access.http_error" and top.get("severity") == "critical",
+                  "run_audit/unreachable: the first finding is the unreachable home page", str(top.get("check_id")))
+        res.check(not [f for f in report["findings"] if f["check_id"].startswith(("en.", "fx.")) and f["severity"] != "info"],
+                  "run_audit/unreachable: nothing downstream is graded as a defect")
+    with tempfile.TemporaryDirectory() as td:
+        fake = os.path.join(td, "crawl-render-audit", "scripts")
+        os.makedirs(fake)
+        with open(os.path.join(fake, "boom.py"), "w") as f:
+            f.write("raise SystemError('probe exploded')\n")
+        with open(os.path.join(fake, "sleep.py"), "w") as f:
+            f.write("import time\ntime.sleep(30)\n")
+        real_dir, R.SKILLS_DIR = R.SKILLS_DIR, td
+        try:
+            wd = os.path.join(td, "wd")
+            os.makedirs(os.path.join(wd, "probes"))
+            seconds, error = R.run_probe("crawl-render-audit", "boom.py", wd, 30)
+            res.check(error and "crashed" in error, "run_audit: a crashing probe is reported, not raised", str(error))
+            seconds, error = R.run_probe("crawl-render-audit", "sleep.py", wd, 2)
+            res.check(error and "timed out" in error and seconds < 10,
+                      "run_audit: a hanging probe is killed at its timeout", "%s after %.1fs" % (error, seconds))
+        finally:
+            R.SKILLS_DIR = real_dir
+    res.check(R.default_workdir("https://example.com/x").startswith("audit-example.com-"),
+              "run_audit: the default workdir follows report_schema section 5", R.default_workdir("https://example.com/"))
+    res.check(_run_cli(["--quiet"])[0] != 0, "run_audit: no URL and no workdir is an error, not a crash")
+
+
 # ---------------------------------------------------------------- stage: probe_cr (crawl-render probe on fixtures)
 def stage_probe_cr(res, farm):
     print("\n== stage: crawl-render probe on every fixture")
@@ -1246,6 +1379,16 @@ def stage_probe_en(res, farm):
     import tempfile, types
     out = ep.run(AuditContext.from_workdir("/nonexistent/dir")).to_dict()
     res.check(out["error"] and not out["findings"] and all(c["status"] == "not_evaluated" for c in out["checks"]), "en: broken workdir yields valid degraded output")
+    # --offline must hold in workdir mode, where this probe builds its own fetcher: replaying a saved
+    # workdir with the network off once counted every unreachable link as a broken one
+    with tempfile.TemporaryDirectory() as td:
+        AuditContext.from_url(farm.urls["clean-site"], td)
+        out = ep.run(AuditContext.from_workdir(td), types.SimpleNamespace(offline=True, no_network=False)).to_dict()
+        net = {c["check_id"]: c.get("reason") for c in out["checks"] if c["check_id"].startswith(("en.links", "en.errors"))}
+        res.check(all(r == "network_disabled" for r in net.values()) and len(net) == 4,
+                  "en: --offline is honoured in workdir mode, not just from the context", str(net))
+        res.check(not [f for f in out["findings"] if f["severity"] != "info"],
+                  "en: an offline replay reports no defect it could not have observed")
     with tempfile.TemporaryDirectory() as td:
         out = ep.run(AuditContext.from_url("https://example.com", td, offline=True)).to_dict()
         res.check(out["error"] is None and len(out["checks"]) == 16 and all(c["status"] == "not_evaluated" for c in out["checks"]), "en: offline run degrades cleanly, all 16 not_evaluated, no error", str(out["error"]))
@@ -1272,7 +1415,7 @@ def stage_probe_en(res, farm):
         res.check(work["link_summary"]["requested"] <= 15 and work["requests_made"] <= 16, "en/clean-site: at most 15 link requests plus the 404 probe (%s)" % work["requests_made"])
 
 
-STAGES = {"manifest": None, "serve": None, "variants": None, "robots": None, "htmldoc": None, "extract": None, "fetch": None, "sample": None, "probe_cr": None, "probe_fx": None, "probe_ef": None, "probe_en": None, "compose": None, "validate": None, "live": None}
+STAGES = {"manifest": None, "serve": None, "variants": None, "robots": None, "htmldoc": None, "extract": None, "fetch": None, "sample": None, "probe_cr": None, "probe_fx": None, "probe_ef": None, "probe_en": None, "compose": None, "validate": None, "run_audit": None, "live": None}
 
 
 def main(argv=None):
@@ -1283,7 +1426,7 @@ def main(argv=None):
     ap.add_argument("--live", nargs="*", metavar="URL", help="also run the live stage against these sites")
     args = ap.parse_args(argv)
     os.environ["BRAND_AUDIT_EXTERNAL"] = "0"  # the suite never contacts Wikipedia/Wikidata; the entity lookup is unit-tested on canned responses
-    stages = args.stage or ["manifest", "serve", "variants", "robots", "htmldoc", "extract", "fetch", "sample", "probe_cr", "probe_fx", "probe_ef", "probe_en", "compose", "validate"]
+    stages = args.stage or ["manifest", "serve", "variants", "robots", "htmldoc", "extract", "fetch", "sample", "probe_cr", "probe_fx", "probe_ef", "probe_en", "compose", "validate", "run_audit"]
     if args.live:
         stages.append("live")
     res = Results()
@@ -1297,7 +1440,7 @@ def main(argv=None):
             stage_htmldoc(res)
         if "extract" in stages:
             stage_extract(res)
-        if any(st in stages for st in ("serve", "variants", "fetch", "sample", "probe_cr", "probe_fx", "probe_ef", "probe_en", "compose", "validate")):
+        if any(st in stages for st in ("serve", "variants", "fetch", "sample", "probe_cr", "probe_fx", "probe_ef", "probe_en", "compose", "validate", "run_audit")):
             farm = FixtureFarm(base_port=args.base_port)
             farm.start()
             print("\nfixtures:")
@@ -1323,6 +1466,8 @@ def main(argv=None):
                 stage_compose(res, farm)
             if "validate" in stages:
                 stage_validate(res, farm)
+            if "run_audit" in stages:
+                stage_run_audit(res, farm)
         if "live" in stages:
             stage_live(res, args.live or ["https://example.com/", "https://www.python.org/"])
     except Exception:  # noqa: BLE001

@@ -712,7 +712,8 @@ def _all_not_evaluated(out, reason):
 
 def run(ctx, args=None):
     out = ProbeOutput(PROBE, ctx.site, ctx.category, [], total_sampled_pages=len(ctx.pages))
-    external = _external_enabled(args) and not (ctx.fetcher is not None and getattr(ctx.fetcher, "offline", False))
+    external = (_external_enabled(args) and not getattr(args, "offline", False)
+                and not (ctx.fetcher is not None and getattr(ctx.fetcher, "offline", False)))
     domain = _domain(ctx)
     entity = {"site": ctx.site, "domain": domain, "site_category": ctx.category, "extracted_at": _now(), "external_lookups": external}
     if ctx.error:
