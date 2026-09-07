@@ -60,7 +60,7 @@ with the code, the handout and the code win. Several of their citations are
       crawl-render-audit/                     16 cr.* checks   — done
       fact-extractability-audit/              12 fx.* checks   — done
       entity-freshness-corroboration-audit/   12 ef.* checks   — done
-      engagement-audit/                       16 en.* checks   — probe done, references pending (Step 13)
+      engagement-audit/                       16 en.* checks   — done
     tests/
       serve_fixtures.py                       one local HTTP server per fixture, 127.0.0.1:8100+
       run_tests.py                            the whole suite, staged
@@ -69,7 +69,7 @@ with the code, the handout and the code win. Several of their citations are
 
 - Git remote: `https://github.com/Sheel23501/potential-winner.git`, branch `main`.
   `gh` is authenticated as Sheel23501. Commits so far: `e25fdfd` initial,
-  `4214fa1` Step 11, `aff6ca2` Step 12. Working tree clean, everything pushed.
+  `4214fa1` Step 11, `aff6ca2` Step 12, `6bb7ca1` CONTEXT.md, then Step 13. Working tree clean, everything pushed.
 - Skill validator: `~/.local/bin/agentskills validate <skill-dir>` (not on PATH).
 - **macOS has no `timeout` command.** Run the suite plainly; it takes a few minutes.
 
@@ -81,12 +81,12 @@ with the code, the handout and the code win. Several of their citations are
 |---|---|---|
 | 0 Foundations | 1–3 | done: skeleton, 7 shared conventions, fixtures |
 | 1 Fetch layer | 4–5 | done: fetch helper + robots, sampler + categorizer |
-| 2 Probes | 6–13 | 6–12 done; **Step 13 (engagement references) is next** |
-| 3 Orchestrator | 14–17 | not started: compose, validate, run_audit, entrypoint SKILL.md |
+| 2 Probes | 6–13 | done |
+| 3 Orchestrator | 14–17 | **Step 14 (compose script) is next**: compose, validate, run_audit, entrypoint SKILL.md |
 | 4 Hardening | 18–20 | not started: test stages, live pass, source verification |
 | 5 Packaging | 21–24 | not started: README, demo, sweep, dry-run judging |
 
-Suite: **1420 checks, 0 failures, GREEN.** All five skills pass the validator.
+Suite: **1425 checks, 0 failures, GREEN.** All five skills pass the validator.
 
 Code size: ~7,300 lines. Largest pieces: `engagement_probe.py` 1044,
 `entity_probe.py` 820, `extract.py` 702, `facts_probe.py` 624, `fetch.py` 528,
@@ -101,7 +101,7 @@ Reference files written so far:
 - `crawl-render-audit/references/`: `checks.md`, `non_findings.md`
 - `fact-extractability-audit/references/`: `checks.md`, `extracted_facts.md`, `non_findings.md`
 - `entity-freshness-corroboration-audit/references/`: `checks.md`, `non_findings.md`, `entity_file.md`, `offsite_spotcheck.md`
-- `engagement-audit/references/`: **empty — this is Step 13.**
+- `engagement-audit/references/`: `checks.md`, `non_findings.md`, `engagement_file.md`
 
 ---
 
@@ -280,33 +280,29 @@ resolve this with a **documented tiebreak rule, not a special case**.
 
 ---
 
-## 8. Next step — Step 13 (engagement SKILL.md + references)
+## 8. Step 13 — done (engagement SKILL.md + references)
 
-Same shape as Steps 9 and 11. Read `engagement_probe.py` in full first so the
-docs describe what the code actually does.
+Wrote `skills/engagement-audit/SKILL.md` (8-step procedure, the two-tier page
+rule, the full reason vocabulary) and `references/checks.md`,
+`non_findings.md`, `engagement_file.md`. No code changed. 1425 tests green.
 
-Deliverables:
+## 9. Next step — Step 14 (compose script)
 
-- `skills/engagement-audit/SKILL.md` — replace the placeholder Procedure with a
-  numbered one (run probe, read `error`, read `site_category`/`pages_examined`,
-  read `checks` with the reason vocabulary, read `findings`, open
-  `work/engagement.json`, apply the references, hand JSON to the orchestrator
-  unchanged). Note the `--no-network` / `--offline` behaviour and that the probe
-  spends at most 15 link requests plus one 404 probe.
-- `references/checks.md` — all 16 `en.*` checks: rule, evidence, why the
-  severity and confidence are what they are. Include the category caps table and
-  the CTA / trust-signal vocabularies by category.
-- `references/non_findings.md` — a one-page site is not disoriented; icon-only
-  or non-English CTAs are a stated limit; page weight is a proxy, not a timing
-  test; lazy-loaded embeds; a 403 cluster is not broken links; a listing page
-  needs no related links; a search form never counts as a call to action.
-- Possibly `references/engagement_file.md` documenting `work/engagement.json`
-  (mirroring `entity_file.md`), since the probe writes it and the hygiene test
-  will want SKILL.md to name every reference file.
+Phase 3 begins. Read `BUILD_PLAN.md` Steps 14–17 in full; they are specified
+in detail there. In short, `skills/audit-orchestrator/scripts/compose.py`:
+reads `sample.json` + `probes/*.json` from a workdir, merges every finding,
+applies the 12-row dedupe table in `coverage_map.md` section 4 (with severity
+inheritance), sorts per `report_schema.md` section 4, assigns `F-###` ids,
+computes counts and quick wins, adds the derived tags (`handout_concepts`,
+`pipeline_stage`, `opportunity_type`, `round2_mode`), builds `passed_checks`,
+`coverage`, `limitations`, `proactive_recommendations`, pre-fills the
+`ai_answer_simulation` block deterministically from `work/extracted_facts.json`
+(questions from `site_categories.md` section 6; `answerable` and
+`missing_facts` computed; `answer_from_facts` left null for the agent), emits
+`or.simulation.question_unanswerable` and `or.run.probe_error`, and renders
+`report.md` from the same JSON. Done when the clean-site fixture yields a
+positive report with empty findings and every broken fixture yields the counts
+its `_fixture.json` implies after dedupe.
 
-"Done when": the validator passes on the skill, the hygiene stage is green
-(it cross-checks references against SKILL.md in both directions and requires
-every `en.*` id to appear in some reference file), and the full suite is green.
-
-After Step 13 the remaining large piece is Phase 3 (Steps 14–17): the compose,
-validate and run-audit scripts plus the entrypoint SKILL.md.
+Read `report_schema.md` sections 3–6 and `coverage_map.md` sections 4–7 before
+writing a line; every field name and rule is already decided there.
