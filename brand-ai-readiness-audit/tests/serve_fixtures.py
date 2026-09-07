@@ -35,7 +35,10 @@ FIXTURE_SCHEMA = {
     "description": "one line",
     "base": "name of a fixture whose files are used as fallback, or null",
     "category": "site category id the sampler should infer (site_categories.md)",
-    "routes": {"/path": {"status": 200, "content_type": "text/html", "file": "relative/file", "headers": {}}},
+    "routes": {"/path": {"status": 200, "content_type": "text/html", "file": "relative/file", "headers": {}},
+               "*": "optional catch-all applied to any path that matches no route and no static file (a soft-404 site)"},
+    "serve_expectations": {"real_404": "false when the fixture deliberately answers 200 for unknown paths (default true)",
+                           "404_links_home": "false when the fixture's 404 page deliberately has no home link (default true)"},
     "expected": {
         "fail": ["check_id ... real defects: findings whose severity is above info"],
         "info": ["check_id ... info-severity findings: inconclusive, not_evaluated notes, and policy notes"],
@@ -164,6 +167,19 @@ def make_handler(meta, base_url):
                     with open(p, "rb") as f:
                         self._send(200, ctype, f.read())
                     return
+            # 3. catch-all route (a deliberate soft-404 fixture)
+            star = meta["routes"].get("*")
+            if star:
+                body = b""
+                if star.get("file"):
+                    p = _resolve(meta, star["file"])
+                    if p:
+                        with open(p, "rb") as f:
+                            body = f.read()
+                elif star.get("body") is not None:
+                    body = star["body"].encode("utf-8")
+                self._send(star.get("status", 200), star.get("content_type", "text/html"), body, star.get("headers"))
+                return
             self._not_found()
 
     return FixtureHandler

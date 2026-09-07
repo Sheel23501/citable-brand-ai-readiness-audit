@@ -92,3 +92,60 @@ def key_pages(category):
 
 def is_key_page(role, category):
     return role in key_pages(category)
+
+
+# ---------------------------------------------------------------- engagement vocabularies (site_categories.md section 4)
+# The markdown owns the rule ("category noun", "verb of offer", "expected trust signals"); this module owns the word
+# lists so the engagement probe and the documentation cannot drift. Nouns match with an optional s/es/ing/ed suffix.
+
+OFFER_VERBS = (
+    "help", "helps", "build", "builds", "make", "makes", "create", "creates", "get", "send", "sends", "track", "tracks",
+    "manage", "manages", "find", "book", "order", "design", "designs", "deliver", "delivers", "grow", "save", "learn",
+    "discover", "shop", "buy", "start", "sell", "sells", "provide", "provides", "offer", "offers", "serve", "serves",
+    "run", "runs", "plan", "automate", "automates", "simplify", "simplifies", "connect", "connects", "protect", "protects",
+    "teach", "teaches", "support", "supports", "draw", "draws", "write", "writes", "photograph", "publish", "publishes",
+    "cover", "covers", "bring", "brings", "turn", "turns", "power", "powers", "ship", "ships", "craft", "crafts",
+    "handcraft", "bake", "bakes", "cook", "cooks", "repair", "repairs", "fix", "fixes", "treat", "treats", "train",
+    "trains", "hire", "explore", "browse", "compare", "donate", "volunteer", "join", "apply", "subscribe", "read",
+    "let", "lets", "allow", "allows", "enable", "enables", "give", "gives", "integrate", "integrates", "work", "works",
+)
+
+CATEGORY_NOUNS = {
+    "ecommerce": ["shop", "store", "product", "collection", "range", "gear", "goods", "apparel", "furniture", "jewellery", "jewelry",
+                  "clothing", "shoes", "bag", "beauty", "skincare", "accessory", "accessories", "homeware", "desk", "order", "delivery",
+                  "handmade", "sale", "brand", "boutique", "catalogue", "catalog"],
+    "saas_software": ["software", "platform", "app", "application", "tool", "api", "service", "solution", "analytics", "dashboard",
+                      "automation", "workflow", "saas", "cloud", "data", "integration", "invoicing", "billing", "crm", "suite", "product",
+                      "system", "engine", "infrastructure", "security", "monitoring", "hosting", "database"],
+    "local_business": ["restaurant", "cafe", "café", "bar", "bakery", "salon", "barber", "clinic", "dentist", "gym", "studio", "hotel",
+                       "shop", "store", "garage", "pharmacy", "florist", "spa", "kitchen", "menu", "booking", "appointment", "visit",
+                       "location", "hour", "table", "class", "treatment", "service"],
+    "professional_services": ["service", "consulting", "consultancy", "agency", "firm", "law", "legal", "accounting", "accountant",
+                              "advisory", "adviser", "advisor", "architect", "engineering", "design", "marketing", "client", "expertise",
+                              "practice", "advice", "solicitor", "attorney", "partner", "project", "strategy", "audit"],
+    "publisher_media": ["news", "magazine", "journal", "story", "stories", "article", "coverage", "reporting", "analysis", "podcast",
+                        "newsletter", "editorial", "feature", "opinion", "guide", "review", "issue", "edition", "journalism"],
+    "portfolio_personal": ["designer", "illustrator", "developer", "photographer", "writer", "artist", "engineer", "consultant",
+                           "freelance", "portfolio", "work", "project", "illustration", "photography", "commission", "book", "cover",
+                           "brand", "film", "music", "author", "maker"],
+    "nonprofit_institution": ["mission", "community", "charity", "nonprofit", "non-profit", "foundation", "university", "school",
+                              "college", "student", "program", "programme", "research", "education", "support", "donation", "volunteer",
+                              "member", "cause", "campaign", "grant", "fund", "course", "faculty"],
+    "corporate_enterprise": ["company", "group", "solution", "industry", "industries", "customer", "product", "global", "enterprise",
+                             "innovation", "technology", "energy", "manufacturing", "service", "business", "brand", "market",
+                             "operation", "leader", "partner"],
+    "unknown": ["service", "product", "software", "shop", "store", "company", "business", "platform", "app", "studio", "agency",
+                "restaurant", "school", "community", "project", "work", "solution", "tool", "brand", "team", "help", "guide"],
+}
+
+# expected trust signals (site_categories.md section 4). At least one present passes for a listed category; every other
+# category needs terms/privacy links plus at least one of address, named people, testimonials.
+TRUST_SIGNALS = {
+    "ecommerce": ["returns_policy_link", "payment_or_security_badge", "review_markup_or_count", "address"],
+    "saas_software": ["testimonials_or_logos", "security_or_compliance_link", "pricing_transparency", "terms_privacy_links"],
+    "local_business": ["address", "phone", "opening_hours", "review_markup_or_count", "premises_photos"],
+    "professional_services": ["team_named_people", "clients_or_case_studies", "credentials", "address"],
+    "nonprofit_institution": ["registration_number", "financial_report_link", "named_leadership", "address"],
+}
+TRUST_SIGNALS_DEFAULT = {"required": ["terms_privacy_links"], "any_of": ["address", "named_people", "testimonials_or_logos"]}
+

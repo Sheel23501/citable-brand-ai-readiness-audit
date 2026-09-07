@@ -71,6 +71,7 @@ AUTHORITY_HOSTS = ("wikidata.org", "wikipedia.org", "linkedin.com", "crunchbase.
 GENERIC_HEADINGS = ("contact", "about", "faq", "frequently asked", "related", "latest", "news", "newsletter", "follow", "footer", "menu",
                     "navigation", "search", "log in", "login", "sign in", "legal", "privacy", "terms", "cookie", "subscribe", "share", "leadership",
                     "where we are", "press", "security", "who it is for", "who we are", "what we do", "trusted by")
+GENERIC_TITLES = {"home", "home page", "homepage", "untitled", "untitled document", "welcome", "index", "new page", "default", "page", "site", "website", "document"}
 FAQ_HEADING_RE = re.compile(r"\bfaqs?\b|frequently\s+asked|common\s+questions|questions\s*(and|&)\s*answers|\bq\s*&\s*a\b|got\s+questions|your\s+questions", re.I)
 
 # ------------------------------------------------------------------ schema.org type tables

@@ -99,6 +99,13 @@ def stage_manifest(res):
         res.check(not overlap, "%s: no id both expected to fail and required to pass" % n, ", ".join(sorted(overlap)))
         for path, route in meta.get("routes", {}).items():
             pass
+    # every engagement check is exercised by at least one fixture that expects it to fail (or, for info checks, to emit a note)
+    exercised = set()
+    for n in names:
+        exp = load_fixture(n).get("expected", {})
+        exercised |= set(exp.get("fail", [])) | set(exp.get("info", []))
+    unexercised = sorted(c for c in ids if c.startswith("en.") and c not in exercised)
+    res.check(not unexercised, "fixtures exercise every en.* check as a failure or note", ", ".join(unexercised))
     # documentation hygiene: a skill whose references/ exist must document every registered check of its prefix,
     # and its SKILL.md must point at a script that exists
     skill_prefix = {"crawl-render-audit": "cr.", "fact-extractability-audit": "fx.",
@@ -154,8 +161,15 @@ def stage_serve(res, farm):
             res.check(st == 200 and "xml" in ct, "%s: /sitemap.xml is 200 xml" % name, "%s %s" % (st, ct))
             res.check(sm.count(b"<loc>") >= 1 and base.encode() in sm, "%s: sitemap <loc> entries use this port" % name)
         st, ct, body = http_get(base + "/definitely-not-a-page-3f9a")
-        res.check(st == 404, "%s: unknown path returns real 404" % name, str(st))
-        res.check(b'href="/"' in body, "%s: 404 page links home" % name)
+        se = meta.get("serve_expectations", {})
+        if se.get("real_404", True):
+            res.check(st == 404, "%s: unknown path returns real 404" % name, str(st))
+        else:
+            res.check(st == 200, "%s: unknown path deliberately answers 200 (soft-404 fixture)" % name, str(st))
+        if se.get("404_links_home", True):
+            res.check(b'href="/"' in body, "%s: 404 page links home" % name)
+        else:
+            res.check(st == 404 and b'href="/"' not in body, "%s: 404 page deliberately has no home link" % name)
         # every page in the sitemap of an HTML fixture must resolve (link health baseline)
         if not home_route and b"Sitemap:" in http_get(base + "/robots.txt")[2]:
             sm = http_get(base + "/sitemap.xml")[2].decode("utf-8", "replace")
@@ -224,6 +238,17 @@ def stage_variants(res, farm):
     if "one-page-portfolio" in u:
         body = http_get(u["one-page-portfolio"] + "/")[2]
         res.check(b'"@type":"Person"' in body and b"<nav" not in body, "one-page-portfolio: Person JSON-LD, no nav")
+    if "weak-engagement" in u:
+        body = http_get(u["weak-engagement"] + "/")[2]
+        res.check(b'name="viewport"' not in body and b"<nav" not in body and b'<html>' in body and b"modal-overlay" in body, "weak-engagement: no viewport, no nav, no lang, overlay present")
+        res.check(http_get(u["weak-engagement"] + "/old-pricing")[0] == 404 and http_get(u["weak-engagement"] + "/no-such-page-x1")[0] == 200, "weak-engagement: /old-pricing is 404, unknown paths are 200")
+    if "weak-ecommerce" in u:
+        body = http_get(u["weak-ecommerce"] + "/")[2]
+        res.check(body.count(b"<script src=") == 41 and b"breadcrumb" not in body.lower() and b'role="search"' not in body, "weak-ecommerce: 41 script tags, no breadcrumbs, no search")
+        st, _, b404 = http_get(u["weak-ecommerce"] + "/nope")
+        res.check(st == 404 and b"<nav" not in b404 and b'href="/"' not in b404, "weak-ecommerce: bare 404 page")
+    if "blocked-links" in u:
+        res.check(http_get(u["blocked-links"] + "/terms")[0] == 403 and http_get(u["blocked-links"] + "/pricing")[0] == 200, "blocked-links: /terms 403, /pricing 200")
 
 
 # ---------------------------------------------------------------- stage: robots (pure unit tests)
@@ -729,7 +754,105 @@ def stage_probe_ef(res, farm):
         res.check(not validate_probe_output(out), "ef: offsite note validates against the schema")
 
 
-STAGES = {"manifest": None, "serve": None, "variants": None, "robots": None, "htmldoc": None, "extract": None, "fetch": None, "sample": None, "probe_cr": None, "probe_fx": None, "probe_ef": None, "live": None}
+# ---------------------------------------------------------------- stage: probe_en (engagement probe on fixtures)
+def stage_probe_en(res, farm):
+    print("\n== stage: engagement probe on every fixture")
+    ep = _load_probe("engagement-audit", "engagement_probe.py")
+    R = run_probe_on_fixtures(res, farm, "en.", ep, "en")
+    sev = lambda name, cid: next((f["severity"] for f in R[name]["findings"] if f["check_id"] == cid), None)
+    conf = lambda name, cid: next((f["confidence"] for f in R[name]["findings"] if f["check_id"] == cid), None)
+    finding = lambda name, cid: next((f for f in R[name]["findings"] if f["check_id"] == cid), None)
+    status = lambda name, cid: next((c for c in R[name]["checks"] if c["check_id"] == cid), {})
+    # clean-site: every check passes, nothing to say
+    cs = R["clean-site"]
+    res.check(not cs["findings"] and all(c["status"] == "pass" for c in cs["checks"]), "en/clean-site: zero findings, 16 passes", str([(c["check_id"], c["status"]) for c in cs["checks"] if c["status"] != "pass"]))
+    # weak-engagement: severities and evidence
+    we = "weak-engagement"
+    res.check(sev(we, "en.mobile.viewport_missing") == "high" and conf(we, "en.mobile.viewport_missing") == "high" and len(finding(we, "en.mobile.viewport_missing")["affected_pages"]) == 6,
+              "en/weak-engagement: viewport_missing high on all six pages")
+    f = finding(we, "en.hero.value_prop_unclear")
+    res.check(f is not None and f["severity"] == "medium" and f["confidence"] == "medium" and "Welcome friends" in f["evidence"] and "h1_too_short" in json.dumps(f["evidence_items"]) and "lead_text_no_offer" in json.dumps(f["evidence_items"]),
+              "en/weak-engagement: hero unclear with two signals => medium confidence", f["evidence"] if f else None)
+    f = finding(we, "en.cta.missing")
+    res.check(f is not None and f["severity"] == "medium" and len(f["affected_pages"]) == 5 and "search" not in json.dumps(f["evidence_items"]).lower().split("matched=0")[0][-40:],
+              "en/weak-engagement: cta_missing on all five key pages (search form never counts)", str(f and f["affected_pages"]))
+    res.check(sev(we, "en.nav.landmark_missing") == "low" and conf(we, "en.nav.landmark_missing") == "high", "en/weak-engagement: landmark_missing low/high")
+    f = finding(we, "en.links.broken_sampled")
+    res.check(f is not None and f["severity"] == "medium" and f["confidence"] == "high" and "/old-pricing" in json.dumps(f["evidence_items"]) and "404" in f["evidence"],
+              "en/weak-engagement: broken_sampled names /old-pricing with its 404")
+    res.check(sev(we, "en.lang.attribute_missing") == "low", "en/weak-engagement: lang_missing low")
+    f = finding(we, "en.errors.soft_404")
+    res.check(f is not None and f["severity"] == "medium" and f["confidence"] == "high" and "200" in f["evidence"] and status(we, "en.errors.unhelpful_404").get("reason") == "soft_404",
+              "en/weak-engagement: soft_404 medium/high, unhelpful_404 not_evaluated with reason soft_404")
+    f = finding(we, "en.interstitial.blocking")
+    res.check(f is not None and f["severity"] == "medium" and "welcome-modal" in json.dumps(f["evidence_items"]) and "fixed" in json.dumps(f["evidence_items"]),
+              "en/weak-engagement: interstitial names #welcome-modal, position fixed")
+    f = finding(we, "en.trust.signals_missing")
+    res.check(f is not None and f["severity"] == "medium" and f["confidence"] == "medium" and "present=none" in json.dumps(f["evidence_items"]), "en/weak-engagement: trust signals none present", f and f["evidence"])
+    f = finding(we, "en.continuity.h1_title_mismatch")
+    res.check(f is not None and f["severity"] == "low" and len(f["affected_pages"]) == 1 and f["affected_pages"][0].endswith("/"), "en/weak-engagement: continuity mismatch on home only")
+    # weak-ecommerce
+    wc = "weak-ecommerce"
+    res.check(sev(wc, "en.nav.breadcrumbs_missing") == "low" and conf(wc, "en.nav.breadcrumbs_missing") == "high", "en/weak-ecommerce: breadcrumbs low/high")
+    res.check(sev(wc, "en.nav.site_search_missing") == "low" and conf(wc, "en.nav.site_search_missing") == "high", "en/weak-ecommerce: site search low/high")
+    f = finding(wc, "en.nav.related_links_missing")
+    res.check(f is not None and f["severity"] == "low" and f["confidence"] == "medium" and f["affected_pages"][0].endswith("/shop"), "en/weak-ecommerce: related links low/medium on /shop", str(f and f["affected_pages"]))
+    f = finding(wc, "en.errors.unhelpful_404")
+    res.check(f is not None and f["severity"] == "low" and "home_link=false" in json.dumps(f["evidence_items"]) and status(wc, "en.errors.soft_404").get("status") == "pass", "en/weak-ecommerce: unhelpful_404 low, soft_404 passes")
+    f = finding(wc, "en.perf.page_weight_heavy")
+    res.check(f is not None and f["severity"] == "low" and f["confidence"] == "low" and "script_tags=41" in json.dumps(f["evidence_items"]) and len(f["affected_pages"]) == 1 and f["suggested_action"]["priority"] == "low",
+              "en/weak-ecommerce: page weight low/low on home only, priority low")
+    # blocked-links: cluster reclassified, nothing broken
+    bl = "blocked-links"
+    f = finding(bl, "en.links.blocked_cluster")
+    res.check(f is not None and f["status"] == "inconclusive" and f["severity"] == "info" and "3" in f["title"] and status(bl, "en.links.broken_sampled").get("status") == "pass",
+              "en/blocked-links: three 403 links form a cluster (inconclusive info), broken_sampled passes", f and f["title"])
+    # one-page-portfolio: category caps
+    st = {c["check_id"]: c for c in R["one-page-portfolio"]["checks"]}
+    gated = ["en.nav.landmark_missing", "en.nav.breadcrumbs_missing", "en.nav.site_search_missing", "en.nav.related_links_missing", "en.trust.signals_missing"]
+    res.check(all(st[c]["status"] == "not_evaluated" and st[c].get("reason") == "not_applicable_for_category" for c in gated), "en/one-page-portfolio: five checks not applicable for the category", str({c: st[c] for c in gated}))
+    res.check(st["en.links.broken_sampled"].get("reason") == "no_internal_links" and st["en.hero.value_prop_unclear"]["status"] == "pass" and st["en.cta.missing"]["status"] == "pass",
+              "en/one-page-portfolio: no internal links to sample; hero and mailto CTA pass")
+    # csr-shell / challenge-page / blanket-disallow: degraded reasons, no findings
+    st = {c["check_id"]: c for c in R["csr-shell"]["checks"]}
+    res.check(st["en.hero.value_prop_unclear"].get("reason") == "no_rendered_content" and st["en.mobile.viewport_missing"]["status"] == "pass" and st["en.errors.soft_404"]["status"] == "pass",
+              "en/csr-shell: content checks not_evaluated (no_rendered_content), head and 404 checks still run")
+    st = {c["check_id"]: c for c in R["challenge-page"]["checks"]}
+    res.check(all(c["status"] == "not_evaluated" and c.get("reason") == "challenge_page" for c in st.values()), "en/challenge-page: every check not_evaluated with reason challenge_page")
+    st = {c["check_id"]: c for c in R["blanket-disallow"]["checks"]}
+    res.check(all(c["status"] == "not_evaluated" and c.get("reason") == "robots_disallow" for c in st.values()), "en/blanket-disallow: every check not_evaluated with reason robots_disallow")
+    # degraded paths: broken workdir, offline, no-network in workdir mode
+    from auditlib.context import AuditContext
+    import tempfile, types
+    out = ep.run(AuditContext.from_workdir("/nonexistent/dir")).to_dict()
+    res.check(out["error"] and not out["findings"] and all(c["status"] == "not_evaluated" for c in out["checks"]), "en: broken workdir yields valid degraded output")
+    with tempfile.TemporaryDirectory() as td:
+        out = ep.run(AuditContext.from_url("https://example.com", td, offline=True)).to_dict()
+        res.check(out["error"] is None and len(out["checks"]) == 16 and all(c["status"] == "not_evaluated" for c in out["checks"]), "en: offline run degrades cleanly, all 16 not_evaluated, no error", str(out["error"]))
+        reasons = {c["check_id"]: c.get("reason") for c in out["checks"]}
+        res.check(reasons["en.links.broken_sampled"] == "network_disabled" and reasons["en.errors.soft_404"] == "network_disabled" and reasons["en.hero.value_prop_unclear"] == "network_disabled",
+                  "en: offline reasons are network_disabled", str(reasons))
+        res.check({f["check_id"] for f in out["findings"]} == {"en.links.broken_sampled"} and out["findings"][0]["severity"] == "info", "en: offline run emits exactly one info note")
+        res.check(os.path.exists(os.path.join(td, "work", "engagement.json")), "en: offline run still writes work/engagement.json")
+    with tempfile.TemporaryDirectory() as td:
+        ctx = AuditContext.from_url(farm.urls["clean-site"], td)
+        ep.run(ctx)
+        out = ep.run(AuditContext.from_workdir(td), types.SimpleNamespace(no_network=True)).to_dict()
+        st = {c["check_id"]: c for c in out["checks"]}
+        res.check(st["en.links.broken_sampled"].get("reason") == "network_disabled" and st["en.errors.soft_404"].get("reason") == "network_disabled" and st["en.hero.value_prop_unclear"]["status"] == "pass",
+                  "en: --no-network in workdir mode skips only the network checks")
+        work = json.load(open(os.path.join(td, "work", "engagement.json")))
+        res.check(work["network"] is False and work["requests_made"] == 0, "en: engagement.json records network=false, zero requests")
+    # engagement.json from a normal run has the link sample and the 404 probe
+    with tempfile.TemporaryDirectory() as td:
+        ep.run(AuditContext.from_url(farm.urls["clean-site"], td))
+        work = json.load(open(os.path.join(td, "work", "engagement.json")))
+        res.check(work["link_summary"]["sampled"] >= 6 and work["link_summary"]["broken"] == 0 and work["probe_404"]["verdict"] == "real_404" and work["probe_404"]["home_link"] is True,
+                  "en/clean-site: engagement.json has the link sample and a helpful real 404", str(work.get("link_summary")))
+        res.check(work["link_summary"]["requested"] <= 15 and work["requests_made"] <= 16, "en/clean-site: at most 15 link requests plus the 404 probe (%s)" % work["requests_made"])
+
+
+STAGES = {"manifest": None, "serve": None, "variants": None, "robots": None, "htmldoc": None, "extract": None, "fetch": None, "sample": None, "probe_cr": None, "probe_fx": None, "probe_ef": None, "probe_en": None, "live": None}
 
 
 def main(argv=None):
@@ -740,7 +863,7 @@ def main(argv=None):
     ap.add_argument("--live", nargs="*", metavar="URL", help="also run the live stage against these sites")
     args = ap.parse_args(argv)
     os.environ["BRAND_AUDIT_EXTERNAL"] = "0"  # the suite never contacts Wikipedia/Wikidata; the entity lookup is unit-tested on canned responses
-    stages = args.stage or ["manifest", "serve", "variants", "robots", "htmldoc", "extract", "fetch", "sample", "probe_cr", "probe_fx", "probe_ef"]
+    stages = args.stage or ["manifest", "serve", "variants", "robots", "htmldoc", "extract", "fetch", "sample", "probe_cr", "probe_fx", "probe_ef", "probe_en"]
     if args.live:
         stages.append("live")
     res = Results()
@@ -754,7 +877,7 @@ def main(argv=None):
             stage_htmldoc(res)
         if "extract" in stages:
             stage_extract(res)
-        if any(st in stages for st in ("serve", "variants", "fetch", "sample", "probe_cr", "probe_fx", "probe_ef")):
+        if any(st in stages for st in ("serve", "variants", "fetch", "sample", "probe_cr", "probe_fx", "probe_ef", "probe_en")):
             farm = FixtureFarm(base_port=args.base_port)
             farm.start()
             print("\nfixtures:")
@@ -774,6 +897,8 @@ def main(argv=None):
                 stage_probe_fx(res, farm)
             if "probe_ef" in stages:
                 stage_probe_ef(res, farm)
+            if "probe_en" in stages:
+                stage_probe_en(res, farm)
         if "live" in stages:
             stage_live(res, args.live or ["https://example.com/", "https://www.python.org/"])
     except Exception:  # noqa: BLE001

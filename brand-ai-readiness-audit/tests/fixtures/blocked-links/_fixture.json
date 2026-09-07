@@ -1,0 +1,40 @@
+{
+  "name": "blocked-links",
+  "description": "Clean site whose /terms, /privacy and /security pages answer a plain 403 to the audit's fetcher (a WAF or user-agent allowlist), while every sampled page is served normally.",
+  "base": "clean-site",
+  "category": "saas_software",
+  "routes": {
+    "/terms": {
+      "status": 403,
+      "content_type": "text/html",
+      "body": "<!doctype html><html><head><title>Forbidden</title></head><body><p>Forbidden</p></body></html>"
+    },
+    "/privacy": {
+      "status": 403,
+      "content_type": "text/html",
+      "body": "<!doctype html><html><head><title>Forbidden</title></head><body><p>Forbidden</p></body></html>"
+    },
+    "/security": {
+      "status": 403,
+      "content_type": "text/html",
+      "body": "<!doctype html><html><head><title>Forbidden</title></head><body><p>Forbidden</p></body></html>"
+    }
+  },
+  "expected": {
+    "fail": [],
+    "info": [
+      "en.links.blocked_cluster",
+      "ef.entity.wikidata_unavailable",
+      "ef.corroboration.offsite_spotcheck"
+    ],
+    "pass_required": [
+      "en.links.broken_sampled",
+      "en.mobile.viewport_missing",
+      "en.cta.missing",
+      "cr.access.http_error",
+      "cr.render.csr_shell",
+      "fx.facts.key_fact_missing"
+    ],
+    "notes": "Three sampled internal links (footer Terms, Privacy, Security; also linked from the home body) return 403 with no challenge fingerprint. Per the registry that is a fetcher block, not broken links: en.links.blocked_cluster is an inconclusive info finding listing the three, en.links.broken_sampled passes, and no severity count changes. The sampled role pages are all 200, so cr.access.http_error passes and every other check matches clean-site."
+  }
+}

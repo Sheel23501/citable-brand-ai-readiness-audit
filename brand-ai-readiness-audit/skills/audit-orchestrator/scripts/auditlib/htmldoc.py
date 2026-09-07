@@ -28,10 +28,12 @@ PRICE_RE = re.compile(r"(?:(?<![\w.])[$£€¥₹]\s?\d[\d,]*(?:\.\d+)?)|(?:\b\d
 
 
 class Link:
-    __slots__ = ("href", "url", "text", "context", "rel", "internal", "in_head")
+    __slots__ = ("href", "url", "text", "context", "rel", "internal", "in_head", "mpos", "in_list")
 
-    def __init__(self, href, url, text, context, rel, internal, in_head=False):
+    def __init__(self, href, url, text, context, rel, internal, in_head=False, mpos=None, in_list=False):
         self.href, self.url, self.text, self.context, self.rel, self.internal, self.in_head = href, url, text, context, rel, internal, in_head
+        self.mpos = mpos          # fraction of the served markup at which the <a> starts (0..1), None if unknown
+        self.in_list = in_list    # inside a <ul>/<ol>
 
     def to_dict(self):
         return {"href": self.href, "url": self.url, "text": self.text, "context": self.context, "internal": self.internal}
@@ -55,21 +57,53 @@ class _Parser(HTMLParser):
         self.text_parts = []
         self.body_text_parts = []
         self.div_stack = []      # (id, has_content_flag_index)
+        self.list_depth = 0      # open <ul>/<ol>
+        self.open_overlays = []  # [candidate_index, stack_len_after_push, body_parts_start]
+        self.cur_quote = None    # [text_parts, mpos] inside <blockquote>
+        self._line_starts = [0]
+        self._len = 1
 
     # -- helpers
     def _ctx(self):
         return self.ctx[-1] if self.ctx else ("body" if self.in_body else "head")
 
+    def _mpos(self):
+        """Fraction of the served markup (0..1) at the current tag; None if the parser cannot say."""
+        try:
+            line, off = self.getpos()
+            return min(1.0, max(0.0, (self._line_starts[line - 1] + off) / float(self._len)))
+        except Exception:  # noqa: BLE001
+            return None
+
+    def _close_overlays(self, end_mpos):
+        d = self.doc
+        keep = []
+        for idx, stack_len, start in self.open_overlays:
+            if len(self.stack) < stack_len:
+                text = "".join(self.body_text_parts[start:])
+                c = d.overlay_candidates[idx]
+                c["words"] = len(_WORD_RE.findall(text))
+                c["text"] = _clean(text)[:160]
+                c["end_mpos"] = end_mpos
+            else:
+                keep.append([idx, stack_len, start])
+        self.open_overlays = keep
+
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
         d = self.doc
+        mpos = self._mpos()
         if not self.in_body and tag not in _HEAD_TAGS:
             self.in_body = True  # pages that omit <body> (or fragments) still get body semantics
+            if d.body_mpos is None:
+                d.body_mpos = mpos
         if tag == "html":
             d.lang = (a.get("lang") or "").strip() or None
         elif tag == "body":
             self.in_body = True
             d.body_attrs = {k.lower(): (v or "") for k, v in attrs}
+            if d.body_mpos is None:
+                d.body_mpos = mpos
         elif tag == "meta":
             key = (a.get("name") or a.get("property") or a.get("http-equiv") or "").strip().lower()
             if key and "content" in a:
@@ -87,6 +121,8 @@ class _Parser(HTMLParser):
                 d.feeds.append(d._abs(href))
             if href and "alternate" in rel and a.get("hreflang"):
                 d.hreflangs.append(a.get("hreflang"))
+            if href and "stylesheet" in rel:
+                d.stylesheets.append(d._abs(href))
         elif tag == "title" and not d.title_seen:
             self.cur_title = []
         elif tag == "noscript":
@@ -96,24 +132,30 @@ class _Parser(HTMLParser):
             self.cur_script = [a, []]
             if a.get("src"):
                 d.external_scripts.append(d._abs(a["src"]))
-            if t == "application/ld+json":
-                pass
+            if t != "application/ld+json":
+                d.script_tags += 1
         elif tag == "a":
-            self.cur_link = [a, []]
+            self.cur_link = [a, [], mpos]
         elif tag in ("h1", "h2", "h3", "h4", "h5", "h6"):
-            self.cur_heading = [tag, []]
+            self.cur_heading = [tag, [], mpos]
+        elif tag in ("ul", "ol"):
+            self.list_depth += 1
+        elif tag == "blockquote":
+            self.cur_quote = [[], mpos]
+        elif tag == "article":
+            d.article_count += 1
         elif tag == "img":
             d.images.append({"src": d._abs(a.get("src") or a.get("data-src") or ""), "alt": a.get("alt"),
                              "width": _int(a.get("width")), "height": _int(a.get("height")),
                              "role": (a.get("role") or "").lower(), "context": self._ctx(),
-                             "loading": a.get("loading"), "pos": len(self.body_text_parts)})
+                             "loading": a.get("loading"), "pos": len(self.body_text_parts), "mpos": mpos})
         elif tag == "form":
             d.forms.append({"action": d._abs(a.get("action") or ""), "role": (a.get("role") or "").lower(),
-                            "method": (a.get("method") or "get").lower(), "inputs": [], "context": self._ctx()})
+                            "method": (a.get("method") or "get").lower(), "inputs": [], "context": self._ctx(), "mpos": mpos})
         elif tag == "input" and d.forms:
             d.forms[-1]["inputs"].append({"type": (a.get("type") or "text").lower(), "name": a.get("name"), "id": a.get("id")})
         elif tag == "button" or (tag == "input" and (a.get("type") or "").lower() in ("submit", "button")):
-            d.buttons.append({"text": (a.get("value") or "").strip(), "context": self._ctx(), "pos": len(self.body_text_parts)})
+            d.buttons.append({"text": (a.get("value") or "").strip(), "context": self._ctx(), "pos": len(self.body_text_parts), "mpos": mpos})
             if tag == "button":
                 self.cur_button = [a, []]
         elif tag == "time":
@@ -141,7 +183,13 @@ class _Parser(HTMLParser):
         if tag in ("nav", "ol", "ul", "div") and ("breadcrumb" in cls or "breadcrumb" in ident or "breadcrumb" in (a.get("aria-label") or "").lower()):
             d.breadcrumb_markup = True
         if any(k in cls or k in ident for k in ("modal", "overlay", "popup", "interstitial", "cookie", "consent", "lightbox", "newsletter-popup")):
-            d.overlay_candidates.append({"tag": tag, "id": ident, "class": cls, "pos": len(self.body_text_parts), "style": a.get("style") or ""})
+            style = (a.get("style") or "").lower()
+            hidden = ("hidden" in a) or (a.get("aria-hidden") or "").strip().lower() == "true" or bool(re.search(r"display\s*:\s*none|visibility\s*:\s*hidden", style))
+            pm = re.search(r"position\s*:\s*(fixed|absolute|sticky)", style)
+            d.overlay_candidates.append({"tag": tag, "id": ident, "class": cls, "pos": len(self.body_text_parts), "style": a.get("style") or "",
+                                         "mpos": mpos, "hidden": hidden, "position": pm.group(1) if pm else None, "words": 0, "text": "", "end_mpos": None})
+            # the element closes when the stack drops below its depth (the push above already happened)
+            self.open_overlays.append([len(d.overlay_candidates) - 1, len(self.stack), len(self.body_text_parts)])
         if "itemtype" in a or "typeof" in a or "vocab" in a:
             d.microdata_hint = True  # Microdata / RDFa present; not parsed, only noted
         if tag in _BLOCK:
@@ -174,6 +222,15 @@ class _Parser(HTMLParser):
                         self.skip_depth -= 1
                 del self.stack[i:]
                 break
+        if self.open_overlays:
+            self._close_overlays(self._mpos())
+        if tag in ("ul", "ol"):
+            self.list_depth = max(0, self.list_depth - 1)
+        if tag == "blockquote" and self.cur_quote is not None:
+            parts, qm = self.cur_quote
+            qt = _clean(" ".join(parts))
+            d.blockquotes.append({"text": qt[:300], "words": len(_WORD_RE.findall(qt)), "mpos": qm})
+            self.cur_quote = None
         if tag == "title" and self.cur_title is not None:
             d.title = _clean(" ".join(self.cur_title)) or None
             d.title_seen = True
@@ -192,7 +249,7 @@ class _Parser(HTMLParser):
             d.noscript_texts.append(_clean(" ".join(self.cur_noscript)))
             self.cur_noscript = None
         elif tag == "a" and self.cur_link is not None:
-            a, parts = self.cur_link
+            a, parts, lm = self.cur_link
             href = (a.get("href") or "").strip()
             text = _clean(" ".join(parts))
             if not text:
@@ -201,11 +258,12 @@ class _Parser(HTMLParser):
                 url = d._abs(href)
                 scheme = urlsplit(url).scheme
                 internal = d._is_internal(url) if scheme in ("http", "https") else False
-                d.links.append(Link(href, url, text, self._ctx(), (a.get("rel") or "").lower(), internal, not self.in_body))
+                d.links.append(Link(href, url, text, self._ctx(), (a.get("rel") or "").lower(), internal, not self.in_body,
+                                    mpos=lm, in_list=self.list_depth > 0))
             self.cur_link = None
         elif tag in ("h1", "h2", "h3", "h4", "h5", "h6") and self.cur_heading is not None:
-            t, parts = self.cur_heading
-            d.headings.append({"tag": t, "text": _clean(" ".join(parts)), "context": self._ctx(), "pos": len(self.body_text_parts)})
+            t, parts, hm = self.cur_heading
+            d.headings.append({"tag": t, "text": _clean(" ".join(parts)), "context": self._ctx(), "pos": len(self.body_text_parts), "mpos": hm})
             self.cur_heading = None
         elif tag == "button" and getattr(self, "cur_button", None):
             a, parts = self.cur_button
@@ -244,6 +302,8 @@ class _Parser(HTMLParser):
             self.cur_link[1].append(data)
         if self.cur_heading is not None:
             self.cur_heading[1].append(data)
+        if self.cur_quote is not None:
+            self.cur_quote[0].append(data)
         if getattr(self, "cur_button", None):
             self.cur_button[1].append(data)
         for entry in self.div_stack:
@@ -292,6 +352,11 @@ class Document:
         self.microdata_hint = False
         self.overlay_candidates = []
         self.empty_root_containers = []
+        self.body_mpos = None        # markup fraction where <body> (or the first body-level tag) starts
+        self.stylesheets = []
+        self.script_tags = 0         # <script> elements other than ld+json
+        self.article_count = 0       # <article> elements (two or more = a listing page)
+        self.blockquotes = []
         self.body_attrs = {}
         self.meta_refresh = None
         self.noscript_texts = []
@@ -299,14 +364,29 @@ class Document:
         self.html_bytes = len(html.encode("utf-8", "replace")) if isinstance(html, str) else len(html)
         self.parse_error = None
         p = _Parser(self)
+        text = html if isinstance(html, str) else html.decode("utf-8", "replace")
+        p._len = max(len(text), 1)
+        p._line_starts = [0] + [m.end() for m in re.finditer("\n", text)]
         try:
-            p.feed(html if isinstance(html, str) else html.decode("utf-8", "replace"))
+            p.feed(text)
             p.close()
         except Exception as e:  # noqa: BLE001
             self.parse_error = "%s: %s" % (type(e).__name__, e)
+        if p.open_overlays:  # unclosed overlays end with the document
+            p.stack = []
+            p._close_overlays(1.0)
         self._text = _WS_RE.sub(" ", "".join(p.text_parts).replace("\n", " \n ")).strip()
         self._body_text = _WS_RE.sub(" ", "".join(p.body_text_parts).replace("\n", " \n ")).strip()
         self._jsonld = None
+
+    # -- positions
+    def body_frac(self, mpos):
+        """Position within the body markup as a fraction 0..1 (None when unknown). 0.4 = the first 40% of the body markup."""
+        if mpos is None:
+            return None
+        start = self.body_mpos or 0.0
+        span = max(1.0 - start, 1e-9)
+        return max(0.0, min(1.0, (mpos - start) / span))
 
     # -- url helpers
     def _abs(self, href):

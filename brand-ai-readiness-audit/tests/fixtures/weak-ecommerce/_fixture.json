@@ -1,0 +1,42 @@
+{
+  "name": "weak-ecommerce",
+  "description": "A one-product furniture shop (Harbour Workshop) with sound discoverability and a clear first viewport, but weak orientation: no breadcrumbs on any secondary page, no site search, a product page that ends without related links, a bare 404 page with no way onward, and 41 script tags on the home page.",
+  "base": null,
+  "category": "ecommerce",
+  "routes": {},
+  "serve_expectations": {
+    "404_links_home": false
+  },
+  "expected": {
+    "fail": [
+      "en.nav.breadcrumbs_missing",
+      "en.nav.site_search_missing",
+      "en.nav.related_links_missing",
+      "en.errors.unhelpful_404",
+      "en.perf.page_weight_heavy"
+    ],
+    "info": [
+      "ef.entity.wikidata_unavailable",
+      "ef.corroboration.offsite_spotcheck"
+    ],
+    "pass_required": [
+      "en.hero.value_prop_unclear",
+      "en.cta.missing",
+      "en.nav.landmark_missing",
+      "en.links.broken_sampled",
+      "en.mobile.viewport_missing",
+      "en.trust.signals_missing",
+      "en.continuity.h1_title_mismatch",
+      "en.interstitial.blocking",
+      "en.lang.attribute_missing",
+      "en.errors.soft_404",
+      "fx.facts.key_fact_missing",
+      "fx.jsonld.required_props_missing",
+      "fx.content.faq_absent",
+      "ef.entity.sameas_no_authority",
+      "ef.corroboration.press_page_missing",
+      "cr.render.csr_shell"
+    ],
+    "notes": "Category ecommerce with high confidence: Product JSON-LD on /shop, nav words shop/cart/checkout, three prices on home. Roles: product=/shop (nav 'Shop'), blog=/journal, about, contact; pricing is a missing role. breadcrumbs_missing (low, high confidence): no breadcrumb markup or BreadcrumbList on any secondary page. site_search_missing (low): no search field on home. related_links_missing (low, medium confidence): /shop has no related heading and only one internal link in the second half of its content; /journal is a listing (two articles) and is not graded. unhelpful_404 (low): the 404 page has no home link, nav or search; soft_404 passes because the status is a real 404. page_weight_heavy (low, low confidence): home has 41 script tags; only home. Trust passes on the footer 'Returns & refunds' link; the hero lead names shop/order/make; the header 'Shop now' is the CTA on every key page; all sampled links resolve (cart and checkout pages exist)."
+  }
+}

@@ -124,6 +124,12 @@ it, for example the engagement probe's landing-continuity check, or
 | `en.hero.value_prop_unclear` | yes | yes | yes | yes | low | yes | yes | yes | yes |
 | all other `en.*` | yes | yes | yes | yes | yes | yes | yes | yes | yes |
 
+The word lists below, plus the category nouns and verbs of offer used by
+`en.hero.value_prop_unclear`, live in
+`skills/audit-orchestrator/scripts/auditlib/categories.py` (`CTA_VOCAB`,
+`CATEGORY_NOUNS`, `OFFER_VERBS`, `TRUST_SIGNALS`), which the engagement probe
+reads; this file owns the rule, the code owns the lists.
+
 Expected CTA vocabulary per category (used by `en.cta.missing`; a match is a
 `<a>` or `<button>` in the first viewport region whose text contains one):
 

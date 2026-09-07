@@ -26,7 +26,7 @@ from auditlib import extract as X  # noqa: E402
 
 PROBE = "fact-extractability-audit"
 FACTS_REL = "work/extracted_facts.json"
-GENERIC_TITLES = {"home", "home page", "homepage", "untitled", "untitled document", "welcome", "index", "new page", "default", "page", "site", "website", "document"}
+GENERIC_TITLES = X.GENERIC_TITLES  # shared with the engagement probe's continuity check
 PRESENT, PARTIAL, ABSENT = "present", "partial", "absent"
 IMAGE_FACT_WORDS = {
     "pricing": re.compile(r"\b(price|prices|pricing|plans?|rates?|fees?|tariffs?|costs?|packages?)\b", re.I),

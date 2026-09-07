@@ -1,0 +1,52 @@
+{
+  "name": "weak-engagement",
+  "description": "Clean site (Ledgerly) rebuilt so a visitor who arrives cannot orient or act: no viewport meta and no lang on any page, no navigation landmark (page links sit in the footer), no call to action on any key page, a fixed newsletter overlay with 60 words before the home heading, a two-word home heading followed by 130 words that never say what the product is, no trust signals (no testimonials, security, prices or terms/privacy links on home/about/contact), a dead link to /old-pricing, and a catch-all that answers 200 for unknown paths (soft 404). Discoverability signals stay intact.",
+  "base": "clean-site",
+  "category": "saas_software",
+  "routes": {
+    "/old-pricing": {
+      "status": 404,
+      "content_type": "text/html",
+      "body": "<!doctype html><html><head><title>Gone</title></head><body><p>Gone</p></body></html>"
+    },
+    "*": {
+      "status": 200,
+      "content_type": "text/html",
+      "file": "index.html"
+    }
+  },
+  "serve_expectations": {
+    "real_404": false
+  },
+  "expected": {
+    "fail": [
+      "en.mobile.viewport_missing",
+      "en.hero.value_prop_unclear",
+      "en.cta.missing",
+      "en.nav.landmark_missing",
+      "en.links.broken_sampled",
+      "en.lang.attribute_missing",
+      "en.errors.soft_404",
+      "en.interstitial.blocking",
+      "en.trust.signals_missing",
+      "en.continuity.h1_title_mismatch"
+    ],
+    "info": [
+      "ef.entity.wikidata_unavailable",
+      "ef.corroboration.offsite_spotcheck"
+    ],
+    "pass_required": [
+      "en.nav.breadcrumbs_missing",
+      "en.nav.site_search_missing",
+      "en.nav.related_links_missing",
+      "en.perf.page_weight_heavy",
+      "fx.facts.key_fact_missing",
+      "fx.jsonld.missing",
+      "ef.entity.nap_missing_plain_text",
+      "ef.entity.sameas_missing",
+      "cr.render.csr_shell",
+      "cr.index.sitemap_missing"
+    ],
+    "notes": "viewport_missing is high (all six pages, blast radius to the registered maximum). hero_unclear fires with two signals (h1 'Welcome friends' is two words; the 120 words after it contain no saas noun and no verb of offer) so confidence is medium. cta_missing on every key page (home, pricing, product, about, contact): the header has only the search form (role=search never counts) and the contact page's sales mailto is not in the saas vocabulary. landmark_missing on home (no nav, no role=navigation, header list has no links). broken_sampled: /old-pricing (explicit 404 route) linked from the home body. lang_missing on home. soft_404: the '*' route serves the home page with 200; unhelpful_404 is then not_evaluated with reason soft_404. interstitial: #welcome-modal, position:fixed, 60 words, before the h1. trust: none of testimonials/logos, a security or compliance link, a price on home/about/contact or the pricing page, or terms/privacy links. continuity on home only ('Welcome friends' shares nothing with the title or description). Breadcrumbs, search, related links and page weight stay green. pricing_or_trial is present (free plan / contact sales), so fx.facts.key_fact_missing passes."
+  }
+}
