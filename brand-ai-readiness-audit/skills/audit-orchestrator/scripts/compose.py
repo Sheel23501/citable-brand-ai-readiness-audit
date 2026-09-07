@@ -956,6 +956,7 @@ def main(argv=None):
             os.makedirs(os.path.dirname(os.path.abspath(out_path)) or ".", exist_ok=True)
             with open(out_path, "w", encoding="utf-8") as f:
                 json.dump(report, f, indent=2, ensure_ascii=False)
+        os.makedirs(os.path.dirname(os.path.abspath(md_path)) or ".", exist_ok=True)
         with open(md_path, "w", encoding="utf-8") as f:
             f.write(render_markdown(report))
     except OSError as e:

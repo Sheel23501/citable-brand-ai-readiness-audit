@@ -1,0 +1,16 @@
+{
+  "site": "http://127.0.0.1:65027",
+  "site_category": "unknown",
+  "extracted_at": "2026-09-07T22:36:52Z",
+  "network": true,
+  "requests_made": 0,
+  "pages_used": [],
+  "pages_rendered_or_not": [],
+  "pages_excluded": [
+    {
+      "role": "home",
+      "url": "http://127.0.0.1:65027/",
+      "reason": "http_error"
+    }
+  ]
+}

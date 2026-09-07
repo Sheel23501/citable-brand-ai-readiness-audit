@@ -1,0 +1,27 @@
+{
+  "site": "http://127.0.0.1:65027",
+  "site_category": "unknown",
+  "extracted_at": "2026-09-07T22:36:21Z",
+  "basis": "served_html_only",
+  "brand_name": {
+    "value": null,
+    "source": null,
+    "page": null
+  },
+  "facts": {},
+  "required_fact_ids": [
+    "what_it_does",
+    "location_or_contact"
+  ],
+  "pages_used": [],
+  "pages_excluded": [
+    {
+      "role": "home",
+      "url": "http://127.0.0.1:65027/",
+      "reason": "http_error"
+    }
+  ],
+  "identity": {},
+  "jsonld_recommendations": [],
+  "note": "Values are verbatim excerpts from the served HTML. status: present | partial | absent. The AI-answer simulation may use only these values."
+}

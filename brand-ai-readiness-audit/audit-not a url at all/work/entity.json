@@ -1,0 +1,30 @@
+{
+  "site": "https://not a url at all",
+  "domain": "not a url at all",
+  "site_category": "unknown",
+  "extracted_at": "2026-09-07T22:36:31Z",
+  "external_lookups": false,
+  "pages_used": [],
+  "pages_excluded": [
+    {
+      "role": "home",
+      "url": "https://not a url at all/",
+      "reason": "http_error"
+    }
+  ],
+  "suggested_offsite_queries": [
+    "\"not a url at all\"",
+    "\"not a url at all\" not a url at all",
+    "\"not a url at all\" reviews",
+    "\"not a url at all\" site:linkedin.com"
+  ],
+  "brand_name": {
+    "value": null,
+    "source": null,
+    "page": null
+  },
+  "lookup": {
+    "outcome": "unavailable",
+    "reason": "network_disabled"
+  }
+}

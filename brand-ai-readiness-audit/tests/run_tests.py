@@ -6,17 +6,15 @@ serves (home, robots.txt, sitemap.xml, 404 behaviour, route overrides), and
 validate every _fixture.json against the check registry so fixtures can never
 expect a check id that does not exist.
 
-Later steps add stages here rather than creating new runners:
-  Step 4          robots + fetch stages (done)
-  Step 5          htmldoc + sample stages (done)
-  Step 6          probe_cr stage (done)
-  Step 8          extract + probe_fx stages (done)
-  Step 6/8/10/12  run each probe against each fixture and compare `expected`
-  Step 14        compose stage: the dedupe table, ordering, and a report per fixture (done)
-  Step 15        validate stage: floor, superset, --final, 45 deliberately broken reports (done)
-  Step 16        run_audit stage: the command end to end on every fixture, plus its guards (done)
-  Step 17        orchestrator hygiene and the finalize.py answers flow (done)
-  Step 18         validate every report; assert no tracebacks anywhere
+Stages, in the order they run (each added by the step that built the thing it tests):
+  manifest   fixture manifests, registry ids, documentation hygiene for every skill      (Steps 3, 11-17)
+  serve, variants, robots, htmldoc, extract, fetch, sample                                (Steps 3-5, 8)
+  probe_cr, probe_fx, probe_ef, probe_en   each probe on every fixture against `expected`  (Steps 6, 8, 10, 12)
+  compose    the dedupe table, ordering, tags, a validated report per fixture              (Step 14)
+  validate   floor, superset, --final, 46 deliberately broken reports, the finalize flow   (Steps 15, 17)
+  run_audit  the command end to end on every fixture, plus its guards                      (Step 16)
+  scripts    every script, every usage path incl. wrong usage: no traceback anywhere       (Step 18)
+  live       optional, --live URL ...: real sites, no assertions on content                (Step 19)
 
 Usage:
     python3 tests/run_tests.py            # all stages available so far
@@ -1127,6 +1125,107 @@ def stage_run_audit(res, farm):
     res.check(_run_cli(["--quiet"])[0] != 0, "run_audit: no URL and no workdir is an error, not a crash")
 
 
+# ---------------------------------------------------------------- stage: scripts (every script, every usage path, no traceback)
+SCRIPTS = {
+    "crawl_probe.py": "crawl-render-audit", "facts_probe.py": "fact-extractability-audit",
+    "entity_probe.py": "entity-freshness-corroboration-audit", "engagement_probe.py": "engagement-audit",
+    "run_audit.py": "audit-orchestrator", "compose.py": "audit-orchestrator", "validate.py": "audit-orchestrator",
+    "finalize.py": "audit-orchestrator", "sample_site.py": "audit-orchestrator", "fetch_url.py": "audit-orchestrator",
+}
+
+
+def _invoke(script, args, cwd=None, timeout=150):
+    """Run one script exactly as a SKILL.md would: python3 <path> <args>, from the marketplace root by default."""
+    import subprocess
+    path = os.path.join(ROOT, "skills", SCRIPTS[script], "scripts", script)
+    try:
+        proc = subprocess.run([sys.executable, path] + list(args), capture_output=True, text=True,
+                              timeout=timeout, cwd=cwd or ROOT)
+    except subprocess.TimeoutExpired:
+        return None, "TIMEOUT after %ds" % timeout
+    return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
+
+
+def stage_scripts(res, farm):
+    print("\n== stage: every script, every usage path: no traceback ever reaches stdout or stderr")
+    import socket
+    import tempfile
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    refused = "http://127.0.0.1:%d/" % sock.getsockname()[1]
+    sock.close()
+    good = farm.urls["clean-site"]
+    with tempfile.TemporaryDirectory() as td:
+        wd = os.path.join(td, "wd")
+        code, blob = _invoke("run_audit.py", [good, "--workdir", wd, "--quiet"])
+        res.check(code == 0 and "Traceback" not in blob, "scripts: a reference workdir was built", blob[-200:])
+        missing = os.path.join(td, "missing")           # a path that does not exist and is writable
+        nofile = os.path.join(td, "nofile.json")
+        probes = ("crawl_probe.py", "facts_probe.py", "entity_probe.py", "engagement_probe.py")
+        # (script, args, allowed exit codes or None for "any, but no traceback")
+        matrix = []
+        for sc in probes:
+            matrix += [(sc, [], (2,)), (sc, ["--help"], (0,)), (sc, ["--bogus-flag"], (2,)),
+                       (sc, ["--workdir", missing], (0,)), (sc, ["--workdir", wd], (0,)),
+                       (sc, ["--workdir", wd, "--offline"], (0,)), (sc, ["--workdir", wd, "--category", "no_such_category"], (0,)),
+                       (sc, ["--url", good, "--workdir", os.path.join(td, "u-" + sc)], (0,)),
+                       (sc, ["--url", "not a url at all"], (0,)), (sc, ["--url", refused], (0,)),
+                       (sc, ["--url", good, "--workdir", os.path.join(td, "u-" + sc), "--out", os.path.join(td, "o-" + sc + ".json")], (0,))]
+        matrix += [
+            ("run_audit.py", [], (2,)), ("run_audit.py", ["--help"], (0,)), ("run_audit.py", ["--bogus-flag"], (2,)),
+            ("run_audit.py", ["--workdir", missing], (1,)), ("run_audit.py", ["not a url at all", "--workdir", os.path.join(td, "r1"), "--quiet"], None),
+            ("run_audit.py", [refused, "--workdir", os.path.join(td, "r2"), "--quiet"], (0,)),
+            ("run_audit.py", [good, "--workdir", os.path.join(td, "r3"), "--time-budget", "-5", "--quiet"], (0,)),
+            ("run_audit.py", ["--workdir", wd, "--offline", "--quiet"], (0,)),
+            ("compose.py", [], (2,)), ("compose.py", ["--help"], (0,)), ("compose.py", ["--workdir", missing, "--quiet"], (0,)),
+            ("compose.py", ["--workdir", wd, "--quiet"], (0,)), ("compose.py", ["--workdir", wd, "--render-only", "--quiet"], (0,)),
+            ("compose.py", ["--workdir", os.path.join(td, "empty-c"), "--render-only", "--quiet"], (0,)),
+            ("compose.py", ["--workdir", wd, "--category", "no_such_category", "--quiet"], (0,)),
+            ("validate.py", [], (2,)), ("validate.py", ["--help"], (0,)),
+            ("validate.py", ["--workdir", os.path.join(td, "never-written")], (1,)),
+            ("validate.py", ["--report", nofile], (1,)), ("validate.py", ["--workdir", wd, "--quiet"], (0,)),
+            ("validate.py", ["--workdir", wd, "--final", "--quiet"], (1,)),
+            ("finalize.py", [], (2,)), ("finalize.py", ["--help"], (0,)),
+            ("finalize.py", ["--workdir", missing, "--answers", nofile], (1,)),
+            ("finalize.py", ["--workdir", wd, "--answers", nofile], (1,)),
+            ("finalize.py", ["--workdir", wd, "--answers", os.path.join(wd, "sample.json")], (1,)),
+            ("sample_site.py", [], (2,)), ("sample_site.py", ["--help"], (0,)),
+            ("sample_site.py", [good, "--workdir", os.path.join(td, "s1"), "--quiet"], (0,)),
+            ("sample_site.py", [good, "--category", "no_such_category"], (2,)),
+            ("sample_site.py", ["not a url at all", "--quiet"], None), ("sample_site.py", [refused, "--quiet"], None),
+            ("sample_site.py", [good, "--offline", "--quiet"], (0,)),
+            ("fetch_url.py", [], (2,)), ("fetch_url.py", ["--help"], (0,)), ("fetch_url.py", [good], (0,)),
+            ("fetch_url.py", [good, "--robots"], (0,)), ("fetch_url.py", [good, "--body", "--workdir", os.path.join(td, "f1")], (0,)),
+            ("fetch_url.py", ["not a url at all"], None), ("fetch_url.py", [refused], None), ("fetch_url.py", [good, "--offline"], (0,)),
+        ]
+        for script, args, codes in matrix:
+            code, blob = _invoke(script, args)
+            label = "%s %s" % (script, " ".join(a if len(a) < 40 else "<path>" for a in args) or "(no args)")
+            res.check(code is not None and "Traceback" not in blob, "scripts: %s emits no traceback" % label, blob.strip()[-220:])
+            if codes is not None:
+                res.check(code in codes, "scripts: %s exits %s" % (label, "/".join(map(str, codes))), "exit %s: %s" % (code, blob.strip()[-160:]))
+        # the scripts do not depend on the working directory: every SKILL.md says "from the marketplace root",
+        # but an agent that runs them from elsewhere must get the same result
+        for script, args in (("crawl_probe.py", ["--workdir", wd]), ("compose.py", ["--workdir", wd, "--quiet"]),
+                             ("validate.py", ["--workdir", wd, "--quiet"]), ("run_audit.py", ["--workdir", wd, "--offline", "--quiet"])):
+            code, blob = _invoke(script, args, cwd=td)
+            res.check(code == 0 and "Traceback" not in blob, "scripts: %s works from a foreign working directory" % script, blob[-200:])
+        # every probe's --help documents --url, --workdir and --category, which the orchestrator relies on
+        for sc in probes:
+            code, blob = _invoke(sc, ["--help"])
+            res.check(all(flag in blob for flag in ("--url", "--workdir", "--out", "--offline", "--category")),
+                      "scripts: %s --help lists the shared flags" % sc)
+    # the shared library never prints: a probe's stdout is its JSON and nothing else
+    with tempfile.TemporaryDirectory() as td:
+        code, blob = _invoke("crawl_probe.py", ["--url", farm.urls["weak-engagement"], "--workdir", td])
+        try:
+            json.loads(blob)
+            clean = True
+        except ValueError:
+            clean = False
+        res.check(code == 0 and clean, "scripts: a probe's stdout is exactly one JSON document", blob[:160])
+
+
 # ---------------------------------------------------------------- stage: probe_cr (crawl-render probe on fixtures)
 def stage_probe_cr(res, farm):
     print("\n== stage: crawl-render probe on every fixture")
@@ -1480,7 +1579,7 @@ def stage_probe_en(res, farm):
         res.check(work["link_summary"]["requested"] <= 15 and work["requests_made"] <= 16, "en/clean-site: at most 15 link requests plus the 404 probe (%s)" % work["requests_made"])
 
 
-STAGES = {"manifest": None, "serve": None, "variants": None, "robots": None, "htmldoc": None, "extract": None, "fetch": None, "sample": None, "probe_cr": None, "probe_fx": None, "probe_ef": None, "probe_en": None, "compose": None, "validate": None, "run_audit": None, "live": None}
+STAGES = {"manifest": None, "serve": None, "variants": None, "robots": None, "htmldoc": None, "extract": None, "fetch": None, "sample": None, "probe_cr": None, "probe_fx": None, "probe_ef": None, "probe_en": None, "compose": None, "validate": None, "run_audit": None, "scripts": None, "live": None}
 
 
 def main(argv=None):
@@ -1491,7 +1590,7 @@ def main(argv=None):
     ap.add_argument("--live", nargs="*", metavar="URL", help="also run the live stage against these sites")
     args = ap.parse_args(argv)
     os.environ["BRAND_AUDIT_EXTERNAL"] = "0"  # the suite never contacts Wikipedia/Wikidata; the entity lookup is unit-tested on canned responses
-    stages = args.stage or ["manifest", "serve", "variants", "robots", "htmldoc", "extract", "fetch", "sample", "probe_cr", "probe_fx", "probe_ef", "probe_en", "compose", "validate", "run_audit"]
+    stages = args.stage or ["manifest", "serve", "variants", "robots", "htmldoc", "extract", "fetch", "sample", "probe_cr", "probe_fx", "probe_ef", "probe_en", "compose", "validate", "run_audit", "scripts"]
     if args.live:
         stages.append("live")
     res = Results()
@@ -1505,7 +1604,7 @@ def main(argv=None):
             stage_htmldoc(res)
         if "extract" in stages:
             stage_extract(res)
-        if any(st in stages for st in ("serve", "variants", "fetch", "sample", "probe_cr", "probe_fx", "probe_ef", "probe_en", "compose", "validate", "run_audit")):
+        if any(st in stages for st in ("serve", "variants", "fetch", "sample", "probe_cr", "probe_fx", "probe_ef", "probe_en", "compose", "validate", "run_audit", "scripts")):
             farm = FixtureFarm(base_port=args.base_port)
             farm.start()
             print("\nfixtures:")
@@ -1533,6 +1632,8 @@ def main(argv=None):
                 stage_validate(res, farm)
             if "run_audit" in stages:
                 stage_run_audit(res, farm)
+            if "scripts" in stages:
+                stage_scripts(res, farm)
         if "live" in stages:
             stage_live(res, args.live or ["https://example.com/", "https://www.python.org/"])
     except Exception:  # noqa: BLE001

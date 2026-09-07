@@ -1,0 +1,16 @@
+{
+  "site": "https://not a url at all",
+  "site_category": "unknown",
+  "extracted_at": "2026-09-07T22:36:50Z",
+  "network": true,
+  "requests_made": 0,
+  "pages_used": [],
+  "pages_rendered_or_not": [],
+  "pages_excluded": [
+    {
+      "role": "home",
+      "url": "https://not a url at all/",
+      "reason": "http_error"
+    }
+  ]
+}

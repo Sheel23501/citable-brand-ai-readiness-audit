@@ -83,14 +83,15 @@ with the code, the handout and the code win. Several of their citations are
 | 1 Fetch layer | 4–5 | done: fetch helper + robots, sampler + categorizer |
 | 2 Probes | 6–13 | done |
 | 3 Orchestrator | 14–17 | done: compose.py, validate.py, run_audit.py, finalize.py, the entrypoint SKILL.md and simulation_rules.md |
-| 4 Hardening | 18–20 | **Step 18 (test runner) is next**, then the live pass, then source verification |
+| 4 Hardening | 18–20 | Step 18 done. **Step 19 (live generalization pass) is next**, then source verification |
 | 5 Packaging | 21–24 | not started: README, demo, sweep, dry-run judging |
 
-Suite: **2513 checks, 0 failures, GREEN.** All five skills pass the validator.
+Suite: **2688 checks, 0 failures, GREEN.** It now takes over ten minutes; run it in the background
+or with `--stage <name>` while iterating, and plainly once before ticking a step. All five skills pass the validator.
 
 Code size: ~8,100 lines. Largest pieces: `engagement_probe.py` 1044, `compose.py` 800, `validate.py` 335, `run_audit.py` 210, `finalize.py` 130,
 `entity_probe.py` 820, `extract.py` 702, `facts_probe.py` 624, `fetch.py` 528,
-`htmldoc.py` 522, `run_tests.py` 1520.
+`htmldoc.py` 522, `run_tests.py` 1640.
 
 Registry: 58 checks — 16 `cr.*`, 12 `fx.*`, 12 `ef.*`, 16 `en.*`, 2 `or.*`.
 
@@ -422,14 +423,29 @@ and quotations render. The orchestrator is now held to the same reference/script
 tests as the four probes. The literal "fresh agent session given only the SKILL.md" test
 belongs to Step 24's dry run.
 
-## 12. Next step — Step 18 (test runner)
+## 12. Step 18 — done (test runner)
 
-Read the plan's Step 18 text first. Most of what it lists already exists: stages
-`probe_en`, `compose`, `validate` and `run_audit` were added as each step landed, and the
-`run_audit` stage already asserts no traceback in the CLI's output. What is left is the
-plan's last clause: **a traceback grep over every script's stdout/stderr**, meaning every
-script in `skills/*/scripts/` invoked the way its SKILL.md says (including the wrong-usage
-paths: no arguments, a bad flag, a missing workdir), never emitting a Python traceback.
-Add that as a stage, keep everything green, and update the runner's docstring stage list.
-Do not re-implement stages that exist; extend them where the plan text asks for something
-they do not yet check.
+The stages the plan lists had each landed with the step that built the thing they test,
+so Step 18 added the last clause: a **`scripts` stage** that invokes all ten scripts the
+way their SKILL.md says, as subprocesses, across an invocation matrix of about ninety rows:
+no arguments, `--help`, an unknown flag, a missing workdir, a valid workdir, `--offline`,
+an unknown `--category`, a fixture URL, a non-URL string, a refused connection, `--out`.
+Every row asserts that no traceback reaches stdout or stderr, and rows with a documented
+exit code assert it. Also: every script from a foreign working directory, every probe's
+`--help` listing the shared flags, and a probe's stdout being exactly one JSON document.
+
+It caught one real edge — `compose.py --render-only` into a directory that did not exist
+could not write the Markdown (a clean exit 1, not a traceback) — now fixed. The runner's
+docstring is the stage list in run order; `--stage <name>` runs one.
+
+## 13. Next step — Step 19 (live generalization pass)
+
+Read the plan's Step 19 text first. Run `run_audit.py` on 8–10 real sites of different
+categories and sizes and read every report critically for **false positives**: a finding
+that would embarrass the tool in front of a site owner. Fix rules, never sites. Two known
+items to resolve by rule: python.org ties `publisher_media` / `nonprofit_institution` 4-4
+and resolves by table order (needs a documented tiebreak in `site_categories.md` and
+`sampler.py`); djangoproject.com infers `unknown` at low confidence. Watch the engagement
+probe's link sample on large sites (7-14 s) and any site that serves a challenge page.
+Every rule change needs a fixture or a unit assertion, and the suite must stay green.
+Reports from this pass are inputs to Step 22's demo report, so keep the workdirs.
