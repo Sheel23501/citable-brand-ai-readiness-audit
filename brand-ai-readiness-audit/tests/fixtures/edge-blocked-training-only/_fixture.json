@@ -1,0 +1,21 @@
+{
+  "name": "edge-blocked-training-only",
+  "description": "Clean site whose edge refuses only the training-only crawler. A deliberate policy choice, not a discoverability defect: the live-answer and index crawlers are served, so the site can still be cited today.",
+  "base": "clean-site",
+  "category": "saas_software",
+  "routes": {},
+  "ua_deny": {
+    "match": ["GPTBot"],
+    "status": 403,
+    "body": "<!doctype html><title>Forbidden</title><p>Request blocked.</p>"
+  },
+  "expected": {
+    "fail": [],
+    "info": ["cr.access.edge_block_training", "ef.entity.wikidata_unavailable", "ef.corroboration.offsite_spotcheck"],
+    "pass_required": [
+      "cr.access.edge_block", "cr.access.http_error", "cr.robots.training_bot_blocked",
+      "cr.render.js_gate", "cr.render.csr_shell"
+    ],
+    "notes": "False-positive guard for the edge check. Only GPTBot (training_only) is refused; OAI-SearchBot and Claude-User are served. Blocking training crawlers does not stop the site being fetched or cited when a user asks about it, so this must be an info policy note and cr.access.edge_block must pass. This mirrors the robots.txt rule that a training-only block is never graded as a defect."
+  }
+}

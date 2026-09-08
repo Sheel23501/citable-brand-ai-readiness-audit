@@ -37,7 +37,7 @@ replaced with the real repository URL in Step 21.
 | Response body | 2 MiB (2,097,152 bytes) | Stop reading; `truncated=true`; dependent checks drop one confidence level |
 | Retry | once, only on HTTP 429, after `Retry-After` seconds capped at 10 s (default 3 s when the header is absent) | Second 429 recorded as final |
 | Politeness delay | ≥ 0.5 s between requests to the same host | — |
-| Requests per audit | ≤ 40 total. Budget: robots 1, sitemap ≤ 2, pages ≤ 6, 404 probe 1, link sample ≤ 15, entity lookup ≤ 2 (one host's robots.txt + one article or EntityData document), other ≤ 13 | Further requests are refused with `error=budget_exhausted` |
+| Requests per audit | ≤ 40 total. Budget: robots 1, sitemap ≤ 2, pages ≤ 6, edge-access probe ≤ 3 (one GET of the home URL per published crawler token, `cr.access.edge_block`), 404 probe 1, link sample ≤ 15, entity lookup ≤ 2 (one host's robots.txt + one article or EntityData document), other ≤ 10 | Further requests are refused with `error=budget_exhausted` |
 | Wall clock per audit | 300 s (Step 16 orchestrator); each probe ≤ 60 s | Probe returns what it has, `error=time_budget` |
 
 Cross-host redirects are followed within the cap and recorded (`final_url`,

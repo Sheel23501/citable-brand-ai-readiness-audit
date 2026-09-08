@@ -173,6 +173,7 @@ in a probe or a SKILL.md invents a rule that belongs here.
 |---|---|
 | `references/report_schema.md` | Probe output, Finding, Evidence, final report floor and superset, ordering, run layout, Markdown rendering |
 | `references/severity_confidence_rubric.md` | Severity, confidence, effort, adjustment order, quick-win rule, wording |
+| `references/sources.md` | Every external claim this marketplace makes, with the URL it was verified against; the AI bot tier rows and the tokens deliberately excluded |
 | `references/check_ids.md` | check_id naming rule and the registry of every check with defaults; positive titles for passed checks |
 | `references/coverage_map.md` | Map from the handout's Round-2 concepts A–F to our seven audit stages, check-to-stage map, dedupe table, derived tags, explicit non-coverage |
 | `references/site_categories.md` | Category ids, inference scoring, page roles, key facts, engagement caps, severity overrides, simulation questions |

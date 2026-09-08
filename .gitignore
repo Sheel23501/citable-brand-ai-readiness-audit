@@ -1,0 +1,24 @@
+# Audit run outputs (generated at runtime in the CWD, never committed).
+# Anchored with a leading slash so this can NEVER match skills/audit-orchestrator/.
+/audit-*/
+/brand-ai-readiness-audit/audit-*/
+
+# Local research/strategy docs (not part of the submission).
+# Delete this line if you want to share them with the team.
+/strategy/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Logs
+*.log
+
+# Build artifact: the submission zip is produced by packaging, never committed
+/brand-ai-readiness-audit.zip
+
+# OS noise
+.DS_Store
+Thumbs.db

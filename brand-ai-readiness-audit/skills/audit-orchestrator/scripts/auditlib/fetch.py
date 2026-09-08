@@ -30,8 +30,21 @@ from . import __version__
 
 # ------------------------------------------------------------------ constants (fetch_policy.md section 2-3)
 USER_AGENT = ("Mozilla/5.0 (compatible; brand-ai-readiness-audit/%s; read-only audit; "
-              "+https://github.com/brand-ai-readiness-audit)" % __version__)
+              "+https://github.com/Sheel23501/potential-winner)" % __version__)
 AUDIT_TOKEN = _robots.AUDIT_TOKEN
+
+# Published user-agent strings for the edge-level access check (cr.access.edge_block).
+# Sourced from each operator's own documentation; see references/sources.md.
+# Tier annotations mirror bot_tiers.md so severity stays consistent with the robots checks.
+PROBE_USER_AGENTS = (
+    ("OAI-SearchBot", "index",
+     "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; OAI-SearchBot/1.0; +https://openai.com/searchbot)"),
+    ("Claude-User", "live_answer",
+     "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-User/1.0; +Claude-User@anthropic.com)"),
+    ("GPTBot", "training_only",
+     "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GPTBot/1.1; +https://openai.com/gptbot)"),
+)
+
 DEFAULT_HEADERS = {
     "User-Agent": USER_AGENT,
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.5",
@@ -293,6 +306,28 @@ class Fetcher:
             r["error_detail"] = "%s: %s" % (type(e).__name__, e)
             self._record(r, purpose)
             return r
+
+    def get_as(self, url, user_agent, purpose="ua_probe", timeout=None):
+        """GET `url` announcing a different User-Agent, then restore the default.
+
+        Used only by the edge-level access check (`cr.access.edge_block`), which
+        asks a question robots.txt cannot answer: does the server actually serve
+        this page to a declared AI crawler, or does a CDN/WAF refuse it?
+
+        Still a plain GET under the same budget, politeness delay and robots
+        rules as every other request. We announce a crawler's published token to
+        observe how the origin responds; we never use it to get around a refusal.
+        A non-200 here is recorded as evidence and the probe stops.
+        """
+        previous = self.headers.get("User-Agent")
+        self.headers["User-Agent"] = user_agent
+        try:
+            return self.get(url, purpose=purpose, timeout=timeout)
+        finally:
+            if previous is None:
+                self.headers.pop("User-Agent", None)
+            else:
+                self.headers["User-Agent"] = previous
 
     # ------------------------------------------------------------ internals
     def _result(self, url):

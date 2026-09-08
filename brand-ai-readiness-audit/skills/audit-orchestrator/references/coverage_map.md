@@ -99,7 +99,7 @@ Rules:
 | Off-site agreement at scale: how many independent sources repeat each fact | D | Requires third-party indices; out of scope for a read-only site audit. | Check the site's own anchors and corroboration surface; bounded spot-check when a search tool exists. |
 | Personalization: what a particular user sees | E | Depends on the user, not the site. | Report the site-side levers (location, language, audience facts) as present/absent. |
 | Email summarization behaviour | F | Not a website property. | Cover the web analogue: substance in readable text, not buried. |
-| User-agent-based cloaking or bot-specific WAF rules | A | The audit uses one honest user agent and never impersonates a listed bot. | Report challenge pages as `inconclusive` and tell the owner how to verify with the vendor's tools. |
+| Cloaking beyond the home URL and the three tokens probed | A | `cr.access.edge_block` requests the home URL once per published crawler token, so it sees user-agent-based refusal there. It cannot see rules that vary by IP, geography, cookie state, or that apply only to other pages. | Compare the home URL across three tokens; report challenge pages as `inconclusive` and tell the owner how to verify with the vendor's tools. |
 | Rendering with a headless browser | C | Deliberate: the point is to see what a non-JavaScript fetcher sees. | Two-signal CSR detection; recommend verifying with `curl`. |
 | `llms.txt` and similar proposed conventions | B | Adoption by assistants is not confirmed by operator documentation. | Not graded. Mentioned in proactive recommendations only as optional. |
 | Search ranking, domain authority, backlink volume | D | Third-party data. | Not claimed. |

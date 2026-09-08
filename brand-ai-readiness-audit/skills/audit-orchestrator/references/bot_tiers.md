@@ -3,10 +3,10 @@
 Used by the crawl-render probe to grade robots.txt rules and by compose to
 word robots findings. The tier, not the vendor, decides severity.
 
-Verification status: every row must be confirmed against the operator's public
-documentation in Step 20 and the source URL recorded in the `sources.md` file
-produced there. Until then rows are marked `unverified`. A row that cannot be
-confirmed is removed, not kept with a guess.
+Verification status: every row is confirmed against the operator's public
+documentation, with the source URL recorded in `sources.md`. A row that cannot
+be confirmed is removed, not kept with a guess. The loader enforces this: rows
+whose Status is not `verified` are ignored at runtime.
 
 ---
 
@@ -28,36 +28,43 @@ for both index and live grounding; the higher tier (`live_answer`) governs.
 Match is case-insensitive on the product token (RFC 9309 §2.2.1) exactly as it
 appears in a `User-agent:` line. Substring matching is not used.
 
+Every row below was confirmed against the operator's own public documentation on
+2026-09-08; the URLs are in `sources.md`. A token whose operator publishes no
+documentation is **not listed**, because we cannot state its purpose or even its
+exact spelling with confidence, and a wrong row would produce a false finding.
+Removed for that reason: `anthropic-ai` (legacy token, absent from Anthropic's
+current crawler docs), `Bytespider` (ByteDance publishes no reachable
+documentation), `cohere-ai` and `YouBot` (no vendor documentation; third-party
+directories disagree on the exact string), and `Diffbot` (documented, but its
+own docs say it does not crawl for generative-AI training, so it is not an
+answer-engine crawler and blocking it does not affect AI visibility).
+
 | Token | Operator | Tier | Notes | Status |
 |---|---|---|---|---|
-| `ChatGPT-User` | OpenAI | `live_answer` | User-initiated fetches from ChatGPT. | unverified |
-| `OAI-SearchBot` | OpenAI | `index` | Index for ChatGPT search features. | unverified |
-| `GPTBot` | OpenAI | `training_only` | | unverified |
-| `Claude-User` | Anthropic | `live_answer` | User-initiated fetches from Claude. | unverified |
-| `Claude-SearchBot` | Anthropic | `index` | | unverified |
-| `ClaudeBot` | Anthropic | `training_only` | | unverified |
-| `anthropic-ai` | Anthropic | `training_only` | Legacy token still seen in robots files. | unverified |
-| `Perplexity-User` | Perplexity | `live_answer` | User-initiated fetches. | unverified |
-| `PerplexityBot` | Perplexity | `index` | | unverified |
-| `Googlebot` | Google | `index` | Also powers AI Overviews / AI Mode grounding. Blocking removes the site from Google Search. | unverified |
-| `Google-Extended` | Google | `training_only` | Controls Gemini training and Gemini-app grounding, not classic Search or AI Overviews. | unverified |
-| `Bingbot` | Microsoft | `index` | Also grounds Copilot. Blocking removes the site from Bing. | unverified |
-| `Applebot` | Apple | `index` | Siri, Spotlight, Safari suggestions, Apple Intelligence. | unverified |
-| `Applebot-Extended` | Apple | `training_only` | | unverified |
-| `DuckAssistBot` | DuckDuckGo | `live_answer` | | unverified |
-| `DuckDuckBot` | DuckDuckGo | `index` | | unverified |
-| `Amazonbot` | Amazon | `index` | Alexa answers. | unverified |
-| `MistralAI-User` | Mistral | `live_answer` | | unverified |
-| `meta-externalfetcher` | Meta | `live_answer` | User-initiated fetches. | unverified |
-| `meta-externalagent` | Meta | `training_only` | | unverified |
-| `YouBot` | You.com | `index` | | unverified |
-| `CCBot` | Common Crawl | `training_only` | Corpus used by many trainers. | unverified |
-| `Bytespider` | ByteDance | `training_only` | | unverified |
-| `cohere-ai` | Cohere | `training_only` | | unverified |
-| `Diffbot` | Diffbot | `training_only` | Knowledge-graph extraction. | unverified |
+| `ChatGPT-User` | OpenAI | `live_answer` | User-initiated fetches from ChatGPT and Custom GPTs. | verified |
+| `Claude-User` | Anthropic | `live_answer` | Fetches a page when a Claude user asks about it. | verified |
+| `Perplexity-User` | Perplexity | `live_answer` | User-initiated fetches. Perplexity states this agent generally ignores robots.txt, so a Disallow may not stop it. | verified |
+| `DuckAssistBot` | DuckDuckGo | `live_answer` | Crawls in real time for DuckAssist AI answers, which cite their sources. | verified |
+| `MistralAI-User` | Mistral | `live_answer` | Le Chat user actions. Mistral states it is not used for automatic crawling or training. | verified |
+| `meta-externalfetcher` | Meta | `live_answer` | Fetches individual links at a user's request. Meta states it may bypass robots.txt. | verified |
+| `OAI-SearchBot` | OpenAI | `index` | Index for ChatGPT search. OpenAI: sites opted out "will not be shown in ChatGPT search answers". | verified |
+| `Claude-SearchBot` | Anthropic | `index` | Improves search result quality for Claude users. | verified |
+| `PerplexityBot` | Perplexity | `index` | Surfaces and links sites in Perplexity results. Explicitly not used for foundation-model training. | verified |
+| `Googlebot` | Google | `index` | Google Search, Discover, Images, Video, News. Blocking removes the site from Google Search. | verified |
+| `Bingbot` | Microsoft | `index` | Bing index, which also grounds Copilot. Blocking removes the site from Bing. | verified |
+| `Applebot` | Apple | `index` | Spotlight, Siri, Safari suggestions. | verified |
+| `DuckDuckBot` | DuckDuckGo | `index` | DuckDuckGo search results. | verified |
+| `Amazonbot` | Amazon | `index` | Fetches and indexes page content for Amazon products and services. | verified |
+| `GPTBot` | OpenAI | `training_only` | Training for OpenAI foundation models. | verified |
+| `ClaudeBot` | Anthropic | `training_only` | Collects content that may contribute to model training. | verified |
+| `Google-Extended` | Google | `training_only` | Gemini training and grounding. Google: it "does not impact a site's inclusion in Google Search nor is it used as a ranking signal". | verified |
+| `Applebot-Extended` | Apple | `training_only` | Does not crawl; only governs whether Applebot-crawled data trains Apple models. Pages disallowing it still appear in search. | verified |
+| `meta-externalagent` | Meta | `training_only` | Training foundation models and indexing content. | verified |
+| `CCBot` | Common Crawl | `training_only` | Open web-crawl corpus. Common Crawl does not describe it as a training crawler, but the corpus is widely used for model training, so a block is treated as a training-scope choice. | verified |
 
 Not listed here ⇒ not graded. A `Disallow` for an unlisted token produces no
-finding. Do not add tokens outside this file.
+finding. Do not add tokens outside this file, and do not add a row without a
+source URL in `sources.md`.
 
 ---
 

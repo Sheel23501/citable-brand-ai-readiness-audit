@@ -1,0 +1,22 @@
+{
+  "name": "edge-blocked-bots",
+  "description": "Clean site whose robots.txt permits every crawler, but whose edge refuses the published AI crawler user agents with 403. The defect is invisible to any audit that only reads robots.txt.",
+  "base": "clean-site",
+  "category": "saas_software",
+  "routes": {},
+  "ua_deny": {
+    "match": ["OAI-SearchBot", "Claude-User", "GPTBot"],
+    "status": 403,
+    "body": "<!doctype html><title>Forbidden</title><p>Request blocked.</p>"
+  },
+  "expected": {
+    "fail": ["cr.access.edge_block"],
+    "info": ["ef.entity.wikidata_unavailable", "ef.corroboration.offsite_spotcheck"],
+    "pass_required": [
+      "cr.robots.blanket_disallow", "cr.robots.live_answer_bot_blocked", "cr.robots.index_bot_blocked",
+      "cr.robots.training_bot_blocked", "cr.access.http_error", "cr.access.challenge_page",
+      "cr.access.edge_block_training", "cr.render.js_gate", "cr.render.csr_shell"
+    ],
+    "notes": "robots.txt is clean-site's, which allows everyone, so every cr.robots.* check passes: this is exactly the case a robots.txt-only checker reports as healthy. Both citation-tier agents probed (OAI-SearchBot/index, Claude-User/live_answer) are refused, so cr.access.edge_block is critical. cr.access.edge_block_training passes because a citation-tier block outranks the training-only note. The audit's own user agent is served normally, so every other check matches clean-site."
+  }
+}

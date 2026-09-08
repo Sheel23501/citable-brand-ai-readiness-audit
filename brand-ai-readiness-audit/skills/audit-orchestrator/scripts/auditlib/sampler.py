@@ -17,7 +17,7 @@ import re
 import zlib
 from urllib.parse import urlsplit, urljoin
 
-from .fetch import normalize_url, origin_of, registrable_domain
+from .fetch import PROBE_USER_AGENTS, normalize_url, origin_of, registrable_domain
 from .htmldoc import Document
 
 MAX_PAGES = 6
@@ -378,7 +378,7 @@ def categorize(pages, docs, sitemap_urls, home_url, internal_pages_estimate, ove
 def sample_site(fetcher, url, category_override=None, save=True):
     """Fetch home + up to 5 role pages, categorize, return the sample manifest (fetch_policy.md section 8)."""
     manifest = {"site": None, "input_url": url, "sampled_at": _now(), "site_category": None,
-                "robots": None, "sitemap": None, "pages": [], "missing_roles": [], "internal_links_seen": 0,
+                "robots": None, "sitemap": None, "edge_access": None, "pages": [], "missing_roles": [], "internal_links_seen": 0,
                 "internal_pages_estimate": 0, "requests_made": 0, "notes": []}
     try:
         return _sample(fetcher, url, category_override, save, manifest)
@@ -396,6 +396,32 @@ def _page_entry(role, url, source, r, doc=None):
         e["summary"] = doc.summary()
     return e
 
+
+
+def probe_edge_access(fetcher, url, home_r):
+    """Ask what robots.txt cannot answer: does the origin actually serve a declared AI crawler?
+
+    robots.txt states a site's policy. A CDN or WAF can refuse an AI crawler regardless of
+    that policy, and inspecting robots.txt alone cannot see it. We request the same URL
+    announcing each crawler's published token and compare the response with the baseline
+    fetch made under our own user agent.
+
+    Read-only GETs under the same budget, delay and robots rules as every other request.
+    We announce a token to observe the origin's response; never to get around a refusal.
+    Returns None when there is no usable baseline to compare against.
+    """
+    if not home_r.ok or home_r.get("challenge") or (home_r.get("status") or 0) != 200:
+        return None
+    baseline_bytes = home_r.get("bytes") or 0
+    out = {"url": home_r.get("final_url") or url,
+           "baseline": {"user_agent": "audit", "status": home_r.get("status"), "bytes": baseline_bytes},
+           "agents": []}
+    for token, tier, ua in PROBE_USER_AGENTS:
+        r = fetcher.get_as(out["url"], ua, purpose="ua_probe")
+        out["agents"].append({"token": token, "tier": tier, "status": r.get("status"),
+                              "bytes": r.get("bytes") or 0, "error": r.get("error"),
+                              "challenge": bool(r.get("challenge"))})
+    return out
 
 def _sample(fetcher, url, category_override, save, manifest):
     url = normalize_url(url)
@@ -415,6 +441,7 @@ def _sample(fetcher, url, category_override, save, manifest):
         home_doc = Document(home_r.text, base_url=home_r["final_url"])
         docs["home"] = home_doc
     manifest["pages"].append(_page_entry("home", url, "input", home_r, home_doc))
+    manifest["edge_access"] = probe_edge_access(fetcher, url, home_r)
 
     # sitemap (bounded to 2 requests)
     sm = discover_sitemap(fetcher, site_origin, robots)

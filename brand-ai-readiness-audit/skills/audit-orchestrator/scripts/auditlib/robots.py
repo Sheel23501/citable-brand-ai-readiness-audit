@@ -184,7 +184,9 @@ def _path_of(url_or_path):
 
 
 # ----------------------------------------------------------- bot tiers
-_TIER_ROW = re.compile(r"^\| `([^`]+)` \| ([^|]+?) \| `(live_answer|index|training_only)` \|", re.M)
+# Token | Operator | Tier | Notes | Status -- only rows whose Status is exactly "verified" are loaded,
+# so an unconfirmed row in the markdown can never reach a finding (sources.md).
+_TIER_ROW = re.compile(r"^\| `([^`]+)` \| ([^|]+?) \| `(live_answer|index|training_only)` \|([^|]*)\|\s*([A-Za-z]+)\s*\|", re.M)
 
 
 def load_bot_tiers(path=BOT_TIERS_MD):
@@ -198,7 +200,9 @@ def load_bot_tiers(path=BOT_TIERS_MD):
     except OSError:
         return {}
     tiers = {}
-    for token, operator, tier in _TIER_ROW.findall(text):
+    for token, operator, tier, _notes, status in _TIER_ROW.findall(text):
+        if status.strip().lower() != "verified":
+            continue  # unverified rows are inert: see sources.md
         tiers[token.lower()] = {"token": token, "operator": operator.strip(), "tier": tier}
     return tiers
 

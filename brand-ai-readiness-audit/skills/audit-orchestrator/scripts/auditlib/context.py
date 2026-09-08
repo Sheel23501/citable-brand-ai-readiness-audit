@@ -61,6 +61,7 @@ class AuditContext:
         self.pages = []
         self.robots = Robots(None, state="unreachable")
         self.sitemap = {"state": "missing"}
+        self.edge_access = None   # sampler's per-user-agent probe of the home URL (may be None)
         self.error = None
         self.fetcher = None
 
@@ -99,6 +100,7 @@ class AuditContext:
         self.category = sc.get("value") or "unknown"
         self.category_info = sc
         self.sitemap = m.get("sitemap") or {"state": "missing"}
+        self.edge_access = m.get("edge_access")
         rob = m.get("robots") or {}
         text = None
         rpath = rob.get("path")

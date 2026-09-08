@@ -1,0 +1,178 @@
+{
+  "site": "https://www.python.org",
+  "site_category": "nonprofit_institution",
+  "extracted_at": "2026-09-08T14:04:32Z",
+  "basis": "served_html_only",
+  "brand_name": {
+    "value": "Python.org",
+    "page": "https://www.python.org/",
+    "source": "meta:og:site_name"
+  },
+  "facts": {
+    "mission": {
+      "status": "absent",
+      "kind": null,
+      "value": null,
+      "page": null,
+      "source": null,
+      "required": true
+    },
+    "programs_or_services": {
+      "status": "present",
+      "kind": "list",
+      "value": "Get Started; Download; Docs; Jobs; Upcoming Events",
+      "page": "https://www.python.org/",
+      "source": "heading",
+      "required": true
+    },
+    "location": {
+      "status": "absent",
+      "kind": null,
+      "value": null,
+      "page": null,
+      "source": null,
+      "required": true
+    },
+    "how_to_participate": {
+      "status": "present",
+      "kind": "call_to_action",
+      "value": "…The Python Network Donate ≡ Menu Search This Site GO A A Smaller Larger Reset…",
+      "page": "https://www.python.org/",
+      "source": "text",
+      "required": true
+    },
+    "audience": {
+      "status": "present",
+      "kind": "list",
+      "value": "Get Started; Download; Docs; Jobs; Upcoming Events",
+      "page": "https://www.python.org/",
+      "source": "heading",
+      "required": false,
+      "note": "from programs_or_services"
+    },
+    "differentiator": {
+      "status": "present",
+      "kind": "claim",
+      "value": "…has made it the most popular language for machine learning and artificial intelligence. Python's flexibility has allowed Anyscale to make ML/AI…",
+      "page": "https://www.python.org/",
+      "source": "text",
+      "required": false
+    }
+  },
+  "required_fact_ids": [
+    "mission",
+    "programs_or_services",
+    "location",
+    "how_to_participate"
+  ],
+  "pages_used": [
+    {
+      "role": "home",
+      "url": "https://www.python.org/",
+      "words": 980,
+      "jsonld_types": [
+        "WebSite",
+        "SearchAction"
+      ]
+    },
+    {
+      "role": "about",
+      "url": "https://www.python.org/about/",
+      "words": 688,
+      "jsonld_types": [
+        "WebSite",
+        "SearchAction"
+      ]
+    },
+    {
+      "role": "contact",
+      "url": "https://www.python.org/about/help/",
+      "words": 734,
+      "jsonld_types": [
+        "WebSite",
+        "SearchAction"
+      ]
+    },
+    {
+      "role": "blog",
+      "url": "https://www.python.org/blogs/",
+      "words": 490,
+      "jsonld_types": [
+        "WebSite",
+        "SearchAction"
+      ]
+    }
+  ],
+  "pages_excluded": [],
+  "identity": {
+    "home": {
+      "title": "Welcome to Python.org",
+      "h1": [
+        "Intuitive Interpretation",
+        "Compound Data Types"
+      ],
+      "description": "The official home of the Python Programming Language",
+      "og_site_name": "Python.org"
+    },
+    "about": {
+      "title": "About Python™ | Python.org",
+      "h1": [
+        "Python is powerful... and fast; plays well with others; runs everywhere; is friendly & easy to learn; is Open."
+      ],
+      "description": "The official home of the Python Programming Language",
+      "og_site_name": "Python.org"
+    },
+    "contact": {
+      "title": "Help | Python.org",
+      "h1": [
+        "Help",
+        "New to programming and to Python?"
+      ],
+      "description": "The official home of the Python Programming Language",
+      "og_site_name": "Python.org"
+    },
+    "blog": {
+      "title": "Our Blogs | Python.org",
+      "h1": [
+        "The 2026 PSF Board Election is Open!"
+      ],
+      "description": "The official home of the Python Programming Language",
+      "og_site_name": "Python.org"
+    }
+  },
+  "jsonld_recommendations": [
+    {
+      "page": "https://www.python.org/",
+      "type": "WebSite",
+      "missing_recommended": [
+        "name",
+        "publisher"
+      ]
+    },
+    {
+      "page": "https://www.python.org/about/",
+      "type": "WebSite",
+      "missing_recommended": [
+        "name",
+        "publisher"
+      ]
+    },
+    {
+      "page": "https://www.python.org/about/help/",
+      "type": "WebSite",
+      "missing_recommended": [
+        "name",
+        "publisher"
+      ]
+    },
+    {
+      "page": "https://www.python.org/blogs/",
+      "type": "WebSite",
+      "missing_recommended": [
+        "name",
+        "publisher"
+      ]
+    }
+  ],
+  "note": "Values are verbatim excerpts from the served HTML. status: present | partial | absent. The AI-answer simulation may use only these values."
+}

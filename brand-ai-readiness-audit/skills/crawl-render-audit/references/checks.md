@@ -61,6 +61,61 @@ are authoritative regardless of what our own fetch experienced.
 **Evidence.** The content-type header and byte count.
 **Why critical.** The entry point is where every crawler starts; a PDF or file there offers no navigation, no structured data, and no quotable HTML text. The sampler may still find HTML pages via the sitemap and those are audited, but the front door is the finding.
 
+### `cr.access.edge_block` · high, critical when every citation-tier agent is refused · high
+
+**Rule.** The sampler requests the home URL once per published crawler token
+(`OAI-SearchBot` / index, `Claude-User` / live_answer, `GPTBot` /
+training_only) and compares each response with the baseline fetch made under
+the audit's own user agent. The check fails when the baseline is 200 but a
+`live_answer` or `index` agent gets a transport error or a status ≥ 400.
+Critical when every citation-tier agent probed is refused.
+
+**Evidence.** The baseline status and byte count, then one row per refused
+agent with its token, tier and status.
+
+**Why it matters.** robots.txt states a site's *policy*; this states the
+origin's *behaviour*. A CDN or WAF can refuse an AI crawler no matter what
+robots.txt permits, and a site can therefore pass every `cr.robots.*` check
+while being completely unreachable to the crawlers that fetch pages for AI
+answers. This check is the only one in the marketplace that can see that,
+because it is the only one that asks the server rather than reading a file.
+
+**Why the requests are safe.** Three read-only GETs of one URL, under the same
+budget, politeness delay and robots rules as every other request
+(`fetch_policy.md` section 3). We announce a crawler's published token to
+observe how the origin responds; we never use one to get around a refusal. A
+refusal is recorded as evidence and the probe stops.
+
+**Not a finding when.** The baseline itself is missing, challenged or non-200
+(there is nothing to compare against, so the check is `not_evaluated`), or the
+run had no network.
+
+### `cr.access.edge_block_training` · info · high
+
+**Rule.** Only `training_only` agents are refused at the edge, and no
+citation-tier agent is. Reported as a policy note, never as a defect.
+
+**Evidence.** The refused training agents and the baseline status.
+
+**Why info.** Blocking a training crawler keeps content out of future model
+training. It does not stop the site being fetched or cited when a user asks
+about it today. This mirrors `cr.robots.training_bot_blocked`: the same
+decision is graded the same way whether it is made in robots.txt or at the
+edge.
+
+### `cr.access.ua_content_variance` · info · low
+
+**Rule.** Every probed agent is served 200, but at least one response body
+differs from the baseline by more than half its size.
+
+**Evidence.** The baseline byte count and each differing agent's byte count.
+
+**Why info and low confidence.** Serving a crawler materially different HTML
+means the rest of this report may not describe what the crawler actually
+reads. But A/B tests, personalisation, cookie state and compression all
+produce the same signal from a single byte-count comparison, so the check
+reports the observation and explicitly declines to call it a defect.
+
 ## Render (stage `render`)
 
 Both render checks require the page to be **thin**: fewer than 60 visible

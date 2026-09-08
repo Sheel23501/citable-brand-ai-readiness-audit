@@ -1,0 +1,1015 @@
+{
+  "site": "python.org",
+  "site_url": "https://www.python.org",
+  "audited_at": "2026-09-08T14:04:42Z",
+  "tool": {
+    "name": "brand-ai-readiness-audit",
+    "version": "0.1.0"
+  },
+  "input_url": "https://www.python.org",
+  "site_category": {
+    "value": "nonprofit_institution",
+    "confidence": "medium",
+    "signals": [
+      "nav:donate",
+      "nav:get involved",
+      "url:/donate",
+      "url:/get-involved",
+      "tld:.org"
+    ]
+  },
+  "pages_sampled": [
+    {
+      "role": "home",
+      "url": "https://www.python.org/",
+      "status": 200,
+      "snapshot": "snapshots/home.html",
+      "challenge": false
+    },
+    {
+      "role": "about",
+      "url": "https://www.python.org/about/",
+      "status": 200,
+      "snapshot": "snapshots/about.html",
+      "challenge": false
+    },
+    {
+      "role": "contact",
+      "url": "https://www.python.org/about/help/",
+      "status": 200,
+      "snapshot": "snapshots/contact.html",
+      "challenge": false
+    },
+    {
+      "role": "blog",
+      "url": "https://www.python.org/blogs/",
+      "status": 200,
+      "snapshot": "snapshots/blog.html",
+      "challenge": false
+    }
+  ],
+  "summary": {
+    "total_findings": 10,
+    "critical": 0,
+    "high": 1,
+    "medium": 2,
+    "low": 5,
+    "info": 2,
+    "checks_run": 61,
+    "checks_passed": 47,
+    "checks_failed": 9,
+    "checks_inconclusive": 0,
+    "checks_not_evaluated": 5
+  },
+  "findings": [
+    {
+      "check_id": "fx.facts.key_fact_missing",
+      "title": "2 of 4 key facts for a nonprofit or institutional site are not extractable as text",
+      "status": "fail",
+      "severity": "high",
+      "confidence": "medium",
+      "effort": "medium",
+      "mechanism": "extract",
+      "affected_pages": [],
+      "evidence": "Searched 4 sampled pages (home, about, contact, blog). Found 2 of 4 key facts as plain text or structured data; not found: mission (absent); location (absent).",
+      "evidence_items": [
+        {
+          "page": "site",
+          "kind": "computed",
+          "value": "pages_searched=4 (home, about, contact, blog); key_facts=4; found=2; missing=mission,location"
+        },
+        {
+          "page": "https://www.python.org/",
+          "kind": "text_excerpt",
+          "value": "Get Started; Download; Docs; Jobs; Upcoming Events",
+          "note": "programs_or_services found via heading"
+        },
+        {
+          "page": "https://www.python.org/",
+          "kind": "text_excerpt",
+          "value": "…The Python Network Donate ≡ Menu Search This Site GO A A Smaller Larger Reset…",
+          "note": "how_to_participate found via text"
+        }
+      ],
+      "why_it_matters": "An assistant answers from the text it can extract. A fact that is absent, or present only as a hint, is a question the brand cannot be quoted on, so the answer comes from a competitor or from nowhere. The brand is invisible for that question.",
+      "suggested_action": {
+        "summary": "Add the missing facts as plain text on the pages a visitor would expect them (mission, location).",
+        "detail": "State the mission in one plain sentence on the home and about pages. State the location as text (city and country at minimum). Mirror each fact in the matching JSON-LD property (offers.price, address, telephone, openingHoursSpecification, description, audience) so both text and structured data agree.",
+        "impact": "high",
+        "effort": "medium",
+        "priority": "high"
+      },
+      "references": [
+        "https://developers.google.com/search/docs/appearance/structured-data/sd-policies"
+      ],
+      "dedupe_key": "fx.facts.key_fact_missing|",
+      "source_skill": "fact-extractability-audit",
+      "id": "F-001",
+      "rank": 1,
+      "round2_mode": "invisible",
+      "handout_concepts": [
+        "A",
+        "B",
+        "C"
+      ],
+      "pipeline_stage": "ranking",
+      "opportunity_type": "content",
+      "quick_win": false
+    },
+    {
+      "check_id": "ef.entity.nap_missing_plain_text",
+      "title": "Postal address or phone number is not visible as plain text on the home/about/contact…",
+      "status": "fail",
+      "severity": "medium",
+      "confidence": "high",
+      "effort": "low",
+      "mechanism": "entity",
+      "affected_pages": [
+        "https://www.python.org/",
+        "https://www.python.org/about/",
+        "https://www.python.org/about/help/"
+      ],
+      "evidence": "Checked the visible text of home, about, contact. Present: email, name. Missing: postal address or phone number. Structured data or images may carry them, but an assistant cross-checking the brand's identity reads the text.",
+      "evidence_items": [
+        {
+          "page": "https://www.python.org/",
+          "kind": "text_excerpt",
+          "value": "Python.org",
+          "note": "name found"
+        },
+        {
+          "page": "https://www.python.org/about/help/",
+          "kind": "text_excerpt",
+          "value": "python-announce@python.org",
+          "note": "email found"
+        },
+        {
+          "page": "site",
+          "kind": "computed",
+          "value": "pages_checked=home, about, contact; required=name|postal address or phone number; missing=postal address or phone number"
+        }
+      ],
+      "why_it_matters": "Name, address and phone are the three facts every directory, register and knowledge graph holds about a business. When the site itself does not state them as text, the assistant cannot confirm it has the right entity, and inconsistent copies elsewhere win.",
+      "suggested_action": {
+        "summary": "State the organisation name, postal address and phone number as visible text in the site footer or on the contact page.",
+        "detail": "Use the same spelling and format everywhere (footer, contact page, JSON-LD PostalAddress and telephone, Google Business Profile, LinkedIn). A footer line is enough: 'Ledgerly Software Ltd · 12 Harbour Street, Bristol BS1 4QA · +44 117 496 0123'.",
+        "impact": "medium",
+        "effort": "low",
+        "priority": "medium"
+      },
+      "references": [
+        "https://developers.google.com/search/docs/appearance/structured-data/organization"
+      ],
+      "dedupe_key": "ef.entity.nap_missing_plain_text|https://www.python.org/,https://www.python.org/about/,https://www.python.org/about/help/",
+      "source_skill": "entity-freshness-corroboration-audit",
+      "id": "F-002",
+      "rank": 2,
+      "round2_mode": "stale",
+      "handout_concepts": [
+        "D"
+      ],
+      "pipeline_stage": "ranking",
+      "opportunity_type": "content",
+      "quick_win": true
+    },
+    {
+      "check_id": "en.hero.value_prop_unclear",
+      "title": "Home page heading is 2 words, too short to state what the site offers",
+      "status": "fail",
+      "severity": "medium",
+      "confidence": "low",
+      "effort": "medium",
+      "mechanism": "engagement",
+      "affected_pages": [
+        "https://www.python.org/"
+      ],
+      "evidence": "Home page: <h1> 'Intuitive Interpretation' (2 words); the text below it does name the offer (work).",
+      "evidence_items": [
+        {
+          "page": "https://www.python.org/",
+          "kind": "text_excerpt",
+          "value": "Intuitive Interpretation",
+          "location": "h1"
+        },
+        {
+          "page": "https://www.python.org/",
+          "kind": "text_excerpt",
+          "value": "Intuitive Interpretation Calculations are simple with Python and expression syntax is straightforward the operators and work as expected parentheses can be used for grouping More about simple math fun",
+          "note": "first 120 words of the first viewport"
+        },
+        {
+          "page": "https://www.python.org/",
+          "kind": "computed",
+          "value": "signals=h1_too_short:2_words; category_noun=none; offer_verb=work"
+        }
+      ],
+      "why_it_matters": "Most of a visit's attention lands in the first screen. A visitor who cannot tell within a few seconds what the site offers and for whom leaves, and the click an assistant sent is wasted: the bouncing mode.",
+      "suggested_action": {
+        "summary": "Rewrite the home page's first viewport as a headline that names the offer and the customer, a one-sentence subhead, and a primary call to action.",
+        "detail": "Use a 5-12 word <h1> that states what the site provides (the product or service noun) for whom, followed by one plain sentence. Check with a stranger: shown only the first screen, can they say what you sell?",
+        "impact": "medium",
+        "effort": "medium",
+        "priority": "low"
+      },
+      "references": [],
+      "dedupe_key": "en.hero.value_prop_unclear|https://www.python.org/",
+      "source_skill": "engagement-audit",
+      "id": "F-003",
+      "rank": 3,
+      "round2_mode": "bouncing",
+      "handout_concepts": [],
+      "pipeline_stage": "post_click",
+      "opportunity_type": "content",
+      "quick_win": false
+    },
+    {
+      "check_id": "fx.identity.h1_missing_or_multiple",
+      "title": "2 pages have multiple <h1> elements",
+      "status": "fail",
+      "severity": "low",
+      "confidence": "high",
+      "effort": "low",
+      "mechanism": "extract",
+      "affected_pages": [
+        "https://www.python.org/",
+        "https://www.python.org/about/help/"
+      ],
+      "evidence": "home: 5 h1; contact: 10 h1.",
+      "evidence_items": [
+        {
+          "page": "https://www.python.org/",
+          "kind": "computed",
+          "value": "h1_count=5"
+        },
+        {
+          "page": "https://www.python.org/about/help/",
+          "kind": "computed",
+          "value": "h1_count=10"
+        }
+      ],
+      "why_it_matters": "The single main heading is how a machine decides what the page is about. Zero headings leave it guessing; several compete.",
+      "suggested_action": {
+        "summary": "Use exactly one <h1> per page that states the page's subject.",
+        "detail": "Demote extra h1s to h2, or add an h1 above the main content. Check the template rather than individual pages.",
+        "impact": "low",
+        "effort": "low",
+        "priority": "low"
+      },
+      "references": [],
+      "dedupe_key": "fx.identity.h1_missing_or_multiple|https://www.python.org/,https://www.python.org/about/help/",
+      "source_skill": "fact-extractability-audit",
+      "id": "F-004",
+      "rank": 4,
+      "round2_mode": "invisible",
+      "handout_concepts": [
+        "A",
+        "B",
+        "C"
+      ],
+      "pipeline_stage": "ranking",
+      "opportunity_type": "content",
+      "quick_win": false
+    },
+    {
+      "check_id": "cr.index.sitemap_missing",
+      "title": "No XML sitemap is advertised or found at the standard paths",
+      "status": "fail",
+      "severity": "low",
+      "confidence": "high",
+      "effort": "low",
+      "mechanism": "render",
+      "affected_pages": [],
+      "evidence": "robots.txt has no Sitemap line and https://www.python.org/sitemap.xml, https://www.python.org/sitemap_index.xml did not return a sitemap.",
+      "evidence_items": [
+        {
+          "page": "sitemap",
+          "kind": "http_status",
+          "value": "tried=https://www.python.org/sitemap.xml;https://www.python.org/sitemap_index.xml; robots_sitemap_lines=0"
+        }
+      ],
+      "why_it_matters": "Crawlers can still follow links, but a sitemap is how they learn about pages that are not linked prominently and when pages changed. Without it, deep pages are found late or not at all.",
+      "suggested_action": {
+        "summary": "Publish /sitemap.xml listing the public pages with lastmod dates, and reference it from robots.txt.",
+        "detail": "Most CMSs and frameworks generate one. Add 'Sitemap: https://<host>/sitemap.xml' to robots.txt. Verify the file returns 200 and parses.",
+        "impact": "low",
+        "effort": "low",
+        "priority": "low"
+      },
+      "references": [
+        "https://www.sitemaps.org/protocol.html"
+      ],
+      "dedupe_key": "cr.index.sitemap_missing|",
+      "source_skill": "crawl-render-audit",
+      "id": "F-005",
+      "rank": 5,
+      "round2_mode": "invisible",
+      "handout_concepts": [
+        "A",
+        "C"
+      ],
+      "pipeline_stage": "retrieval",
+      "opportunity_type": "technical",
+      "quick_win": false
+    },
+    {
+      "check_id": "en.continuity.h1_title_mismatch",
+      "title": "Home/Blog page heading does not match its title and description",
+      "status": "fail",
+      "severity": "low",
+      "confidence": "medium",
+      "effort": "low",
+      "mechanism": "engagement",
+      "affected_pages": [
+        "https://www.python.org/",
+        "https://www.python.org/blogs/"
+      ],
+      "evidence": "On 2 of 4 graded pages (home, blog) the <h1> shares no content word of four or more letters with the <title> or the meta description.",
+      "evidence_items": [
+        {
+          "page": "https://www.python.org/",
+          "kind": "computed",
+          "value": "h1='Intuitive Interpretation'; title='Welcome to Python.org'; shared_words=none",
+          "note": "home page"
+        },
+        {
+          "page": "https://www.python.org/blogs/",
+          "kind": "computed",
+          "value": "h1='The 2026 PSF Board Election is Open!'; title='Our Blogs | Python.org'; shared_words=none",
+          "note": "blog page"
+        }
+      ],
+      "why_it_matters": "An assistant or a search result shows the title and description; the visitor arrives expecting that. A heading that says something else makes them doubt they are in the right place, and they go back.",
+      "suggested_action": {
+        "summary": "Make the <h1> of the home/blog pages restate the promise of its title and description.",
+        "detail": "The title, description and h1 should share the same key noun. Rewrite whichever of the three is off-message; usually the h1.",
+        "impact": "low",
+        "effort": "low",
+        "priority": "low"
+      },
+      "references": [],
+      "dedupe_key": "en.continuity.h1_title_mismatch|https://www.python.org/,https://www.python.org/blogs/",
+      "source_skill": "engagement-audit",
+      "id": "F-006",
+      "rank": 6,
+      "round2_mode": "bouncing",
+      "handout_concepts": [],
+      "pipeline_stage": "post_click",
+      "opportunity_type": "content",
+      "quick_win": false
+    },
+    {
+      "check_id": "fx.jsonld.no_organization",
+      "title": "JSON-LD is present but no Organization node describes the site owner",
+      "status": "fail",
+      "severity": "low",
+      "confidence": "medium",
+      "effort": "low",
+      "mechanism": "extract",
+      "affected_pages": [
+        "https://www.python.org/",
+        "https://www.python.org/about/"
+      ],
+      "evidence": "Structured data types found: SearchAction, WebSite; none on the home or about page identifies the organisation behind the site.",
+      "evidence_items": [
+        {
+          "page": "https://www.python.org/",
+          "kind": "computed",
+          "value": "jsonld_types=WebSite,SearchAction"
+        },
+        {
+          "page": "https://www.python.org/about/",
+          "kind": "computed",
+          "value": "jsonld_types=WebSite,SearchAction"
+        }
+      ],
+      "why_it_matters": "Without an Organization node there is no machine-readable statement of who the brand is, so page-level markup floats unattached to an entity.",
+      "suggested_action": {
+        "summary": "Add an Organization JSON-LD node (name, url, logo, sameAs) to the home page.",
+        "detail": "One block in the home page <head> is enough; reference it from other nodes via publisher or provider.",
+        "impact": "low",
+        "effort": "low",
+        "priority": "low"
+      },
+      "references": [
+        "https://developers.google.com/search/docs/appearance/structured-data/intro-structured-data"
+      ],
+      "dedupe_key": "fx.jsonld.no_organization|https://www.python.org/,https://www.python.org/about/",
+      "source_skill": "fact-extractability-audit",
+      "id": "F-007",
+      "rank": 7,
+      "round2_mode": "invisible",
+      "handout_concepts": [
+        "A",
+        "B",
+        "C"
+      ],
+      "pipeline_stage": "ranking",
+      "opportunity_type": "content",
+      "quick_win": false
+    },
+    {
+      "check_id": "fx.content.faq_absent",
+      "title": "No FAQ-shaped content or FAQPage markup on the sampled pages",
+      "status": "fail",
+      "severity": "low",
+      "confidence": "medium",
+      "effort": "medium",
+      "mechanism": "extract",
+      "affected_pages": [],
+      "evidence": "None of the 4 sampled pages has a FAQ heading, three or more question headings, or FAQPage JSON-LD.",
+      "evidence_items": [
+        {
+          "page": "https://www.python.org/",
+          "kind": "computed",
+          "value": "faq_heading=false; question_headings=0; FAQPage=false"
+        },
+        {
+          "page": "https://www.python.org/about/",
+          "kind": "computed",
+          "value": "faq_heading=false; question_headings=0; FAQPage=false"
+        },
+        {
+          "page": "https://www.python.org/about/help/",
+          "kind": "computed",
+          "value": "faq_heading=false; question_headings=9; FAQPage=false"
+        },
+        {
+          "page": "https://www.python.org/blogs/",
+          "kind": "computed",
+          "value": "faq_heading=false; question_headings=0; FAQPage=false"
+        }
+      ],
+      "why_it_matters": "Assistants answer questions; content already shaped as question and answer is the easiest to quote verbatim. This is an opportunity rather than a defect.",
+      "suggested_action": {
+        "summary": "Add a short FAQ (five real questions customers ask, answered in one or two sentences each) on the pricing or product page, with FAQPage JSON-LD.",
+        "detail": "Use the questions your support inbox actually receives. Put each question in a heading and the answer directly under it, then mirror them in FAQPage mainEntity. Keep answers factual and specific.",
+        "impact": "low",
+        "effort": "medium",
+        "priority": "low"
+      },
+      "references": [
+        "https://schema.org/FAQPage"
+      ],
+      "dedupe_key": "fx.content.faq_absent|",
+      "source_skill": "fact-extractability-audit",
+      "id": "F-008",
+      "rank": 8,
+      "round2_mode": "invisible",
+      "handout_concepts": [
+        "A",
+        "B",
+        "C"
+      ],
+      "pipeline_stage": "ranking",
+      "opportunity_type": "content",
+      "quick_win": false
+    },
+    {
+      "check_id": "ef.corroboration.offsite_spotcheck",
+      "title": "Off-site mention spot-check not performed",
+      "status": "not_evaluated",
+      "severity": "info",
+      "confidence": "high",
+      "effort": "n/a",
+      "mechanism": "corroboration",
+      "affected_pages": [],
+      "evidence": "No search-tool result at work/offsite_mentions.json. The off-site check is an agent step: it needs a web-search tool, which this script does not have.",
+      "evidence_items": [
+        {
+          "page": "site",
+          "kind": "computed",
+          "value": "suggested_queries=\"Python.org\" | \"Python.org\" python.org | \"Python.org\" reviews | \"Python.org\" site:linkedin.com"
+        }
+      ],
+      "why_it_matters": "Without it the report says nothing about whether independent sources repeat the brand's facts; that is a limitation, not a defect of the site.",
+      "suggested_action": {
+        "summary": "Run the bounded spot-check described in SKILL.md (at most five searches), write work/offsite_mentions.json, and re-run this probe.",
+        "detail": "Search the suggested queries with a web-search tool, record up to ten mentions with url, kind (news, directory, review, social, wiki, other) and whether each restates a site fact, then re-run with --workdir.",
+        "impact": "low",
+        "effort": "n/a",
+        "priority": "low"
+      },
+      "references": [],
+      "dedupe_key": "ef.corroboration.offsite_spotcheck|",
+      "reason": "tool_unavailable",
+      "source_skill": "entity-freshness-corroboration-audit",
+      "id": "F-009",
+      "rank": 9,
+      "round2_mode": "stale",
+      "handout_concepts": [
+        "D"
+      ],
+      "pipeline_stage": "ranking",
+      "opportunity_type": "content",
+      "quick_win": false
+    },
+    {
+      "check_id": "or.simulation.question_unanswerable",
+      "title": "2 of the questions a buyer would ask cannot be answered from this site's text",
+      "status": "fail",
+      "severity": "info",
+      "confidence": "high",
+      "effort": "n/a",
+      "mechanism": "extract",
+      "affected_pages": [],
+      "evidence": "Simulated from work/extracted_facts.json only: 2 of 4 questions unanswerable; facts absent: location, mission.",
+      "evidence_items": [
+        {
+          "page": "site",
+          "kind": "computed",
+          "value": "question=What is Python.org's mission?; missing_facts=mission"
+        },
+        {
+          "page": "site",
+          "kind": "computed",
+          "value": "question=What programs does Python.org run, and where?; missing_facts=location"
+        }
+      ],
+      "why_it_matters": "An assistant answering at fetch time has only what the pages say. Where the site is silent it either declines to answer or uses someone else's page, and the brand is invisible for that question.",
+      "suggested_action": {
+        "summary": "State each missing fact in plain sentence text on the page a visitor would look for it.",
+        "detail": "The specific defect is already reported by the fact-extractability findings; this is the reader-facing consequence. Re-run the audit afterwards: the simulation is deterministic.",
+        "impact": "low",
+        "effort": "n/a",
+        "priority": "low"
+      },
+      "references": [],
+      "dedupe_key": "or.simulation.question_unanswerable|",
+      "source_skill": "audit-orchestrator",
+      "id": "F-010",
+      "rank": 10,
+      "round2_mode": "invisible",
+      "handout_concepts": [
+        "B"
+      ],
+      "pipeline_stage": "selection",
+      "opportunity_type": "content",
+      "quick_win": false
+    }
+  ],
+  "quick_wins": [
+    "F-002"
+  ],
+  "passed_checks": [
+    {
+      "check_id": "cr.access.challenge_page",
+      "title": "No page served a bot challenge to the audit fetcher",
+      "source_skill": "crawl-render-audit",
+      "stage": "access"
+    },
+    {
+      "check_id": "cr.access.edge_block",
+      "title": "AI crawlers are served the page, not refused at the edge",
+      "source_skill": "crawl-render-audit",
+      "stage": "access"
+    },
+    {
+      "check_id": "cr.access.edge_block_training",
+      "title": "Training-only crawlers are not refused at the edge",
+      "source_skill": "crawl-render-audit",
+      "stage": "access"
+    },
+    {
+      "check_id": "cr.access.http_error",
+      "title": "Every sampled page returned a successful HTTP status",
+      "source_skill": "crawl-render-audit",
+      "stage": "access"
+    },
+    {
+      "check_id": "cr.access.non_html_seed",
+      "title": "The home URL returns an HTML document",
+      "source_skill": "crawl-render-audit",
+      "stage": "access"
+    },
+    {
+      "check_id": "cr.access.ua_content_variance",
+      "title": "The page is the same size for every crawler tested",
+      "source_skill": "crawl-render-audit",
+      "stage": "access"
+    },
+    {
+      "check_id": "cr.index.canonical_mismatch",
+      "title": "Canonical URLs match the pages that declare them",
+      "source_skill": "crawl-render-audit",
+      "stage": "render"
+    },
+    {
+      "check_id": "cr.index.canonical_offsite",
+      "title": "No canonical URL points to another domain",
+      "source_skill": "crawl-render-audit",
+      "stage": "render"
+    },
+    {
+      "check_id": "cr.index.noindex_on_key_page",
+      "title": "No key page is marked noindex",
+      "source_skill": "crawl-render-audit",
+      "stage": "render"
+    },
+    {
+      "check_id": "cr.render.csr_shell",
+      "title": "Sampled pages carry their text in the server response",
+      "source_skill": "crawl-render-audit",
+      "stage": "render"
+    },
+    {
+      "check_id": "cr.render.js_gate",
+      "title": "No sampled page hides its content behind a JavaScript gate",
+      "source_skill": "crawl-render-audit",
+      "stage": "render"
+    },
+    {
+      "check_id": "cr.robots.blanket_disallow",
+      "title": "robots.txt does not blanket-disallow crawlers",
+      "source_skill": "crawl-render-audit",
+      "stage": "access"
+    },
+    {
+      "check_id": "cr.robots.index_bot_blocked",
+      "title": "Search index bots are allowed to crawl",
+      "source_skill": "crawl-render-audit",
+      "stage": "access"
+    },
+    {
+      "check_id": "cr.robots.key_page_disallowed",
+      "title": "Every sampled key page is crawlable",
+      "source_skill": "crawl-render-audit",
+      "stage": "access"
+    },
+    {
+      "check_id": "cr.robots.live_answer_bot_blocked",
+      "title": "Assistant answer-time bots are allowed to crawl",
+      "source_skill": "crawl-render-audit",
+      "stage": "access"
+    },
+    {
+      "check_id": "cr.robots.training_bot_blocked",
+      "title": "Training-only bots are not blocked",
+      "source_skill": "crawl-render-audit",
+      "stage": "access"
+    },
+    {
+      "check_id": "cr.robots.unreachable",
+      "title": "robots.txt was fetched and parsed",
+      "source_skill": "crawl-render-audit",
+      "stage": "access"
+    },
+    {
+      "check_id": "ef.corroboration.press_page_missing",
+      "title": "The site offers a press, news or blog surface",
+      "source_skill": "entity-freshness-corroboration-audit",
+      "stage": "corroboration"
+    },
+    {
+      "check_id": "ef.entity.name_inconsistent",
+      "title": "The brand is named consistently across the site",
+      "source_skill": "entity-freshness-corroboration-audit",
+      "stage": "entity"
+    },
+    {
+      "check_id": "ef.entity.wikidata_ambiguous",
+      "title": "The brand name resolves to this brand",
+      "source_skill": "entity-freshness-corroboration-audit",
+      "stage": "entity"
+    },
+    {
+      "check_id": "ef.entity.wikidata_not_found",
+      "title": "The brand name was found in the reference source",
+      "source_skill": "entity-freshness-corroboration-audit",
+      "stage": "entity"
+    },
+    {
+      "check_id": "ef.entity.wikidata_unavailable",
+      "title": "The entity lookup ran",
+      "source_skill": "entity-freshness-corroboration-audit",
+      "stage": "entity"
+    },
+    {
+      "check_id": "ef.freshness.date_modified_mismatch",
+      "title": "Structured dates agree with the visible dates",
+      "source_skill": "entity-freshness-corroboration-audit",
+      "stage": "freshness"
+    },
+    {
+      "check_id": "ef.freshness.no_visible_dates",
+      "title": "Pages carry visible dates",
+      "source_skill": "entity-freshness-corroboration-audit",
+      "stage": "freshness"
+    },
+    {
+      "check_id": "ef.freshness.stale_copyright_year",
+      "title": "The copyright year is current",
+      "source_skill": "entity-freshness-corroboration-audit",
+      "stage": "freshness"
+    },
+    {
+      "check_id": "en.cta.missing",
+      "title": "Every key page offers a clear next step",
+      "source_skill": "engagement-audit",
+      "stage": "engagement"
+    },
+    {
+      "check_id": "en.errors.soft_404",
+      "title": "A missing page returns a real 404",
+      "source_skill": "engagement-audit",
+      "stage": "engagement"
+    },
+    {
+      "check_id": "en.errors.unhelpful_404",
+      "title": "The 404 page helps a visitor continue",
+      "source_skill": "engagement-audit",
+      "stage": "engagement"
+    },
+    {
+      "check_id": "en.interstitial.blocking",
+      "title": "No interstitial covers the content on arrival",
+      "source_skill": "engagement-audit",
+      "stage": "engagement"
+    },
+    {
+      "check_id": "en.lang.attribute_missing",
+      "title": "The page declares its language",
+      "source_skill": "engagement-audit",
+      "stage": "engagement"
+    },
+    {
+      "check_id": "en.links.blocked_cluster",
+      "title": "No cluster of links blocked the audit fetcher",
+      "source_skill": "engagement-audit",
+      "stage": "engagement"
+    },
+    {
+      "check_id": "en.links.broken_sampled",
+      "title": "Every sampled internal link resolves",
+      "source_skill": "engagement-audit",
+      "stage": "engagement"
+    },
+    {
+      "check_id": "en.mobile.viewport_missing",
+      "title": "Pages declare a mobile viewport",
+      "source_skill": "engagement-audit",
+      "stage": "engagement"
+    },
+    {
+      "check_id": "en.nav.breadcrumbs_missing",
+      "title": "Interior pages show breadcrumbs",
+      "source_skill": "engagement-audit",
+      "stage": "engagement"
+    },
+    {
+      "check_id": "en.nav.landmark_missing",
+      "title": "The site has a navigation landmark",
+      "source_skill": "engagement-audit",
+      "stage": "engagement"
+    },
+    {
+      "check_id": "en.nav.site_search_missing",
+      "title": "The site offers a search field",
+      "source_skill": "engagement-audit",
+      "stage": "engagement"
+    },
+    {
+      "check_id": "en.perf.page_weight_heavy",
+      "title": "Page weight is within the proxy thresholds",
+      "source_skill": "engagement-audit",
+      "stage": "engagement"
+    },
+    {
+      "check_id": "en.trust.signals_missing",
+      "title": "The trust signals expected for this category are present",
+      "source_skill": "engagement-audit",
+      "stage": "engagement"
+    },
+    {
+      "check_id": "fx.facts.image_only",
+      "title": "No key fact is locked inside an image",
+      "source_skill": "fact-extractability-audit",
+      "stage": "extract"
+    },
+    {
+      "check_id": "fx.identity.meta_description_missing",
+      "title": "Every sampled page has a meta description",
+      "source_skill": "fact-extractability-audit",
+      "stage": "extract"
+    },
+    {
+      "check_id": "fx.identity.og_missing",
+      "title": "Open Graph title or description is present",
+      "source_skill": "fact-extractability-audit",
+      "stage": "extract"
+    },
+    {
+      "check_id": "fx.identity.title_missing_or_generic",
+      "title": "Every sampled page has a specific title",
+      "source_skill": "fact-extractability-audit",
+      "stage": "extract"
+    },
+    {
+      "check_id": "fx.jsonld.malformed",
+      "title": "Every JSON-LD block parses",
+      "source_skill": "fact-extractability-audit",
+      "stage": "extract"
+    },
+    {
+      "check_id": "fx.jsonld.missing",
+      "title": "Structured data (JSON-LD) is present",
+      "source_skill": "fact-extractability-audit",
+      "stage": "extract"
+    },
+    {
+      "check_id": "fx.jsonld.required_props_missing",
+      "title": "JSON-LD nodes carry their identifying properties",
+      "source_skill": "fact-extractability-audit",
+      "stage": "extract"
+    },
+    {
+      "check_id": "fx.media.alt_text_missing",
+      "title": "Content images carry alt text",
+      "source_skill": "fact-extractability-audit",
+      "stage": "extract"
+    },
+    {
+      "check_id": "or.run.probe_error",
+      "title": "Every probe completed without an internal error",
+      "source_skill": "audit-orchestrator",
+      "stage": null
+    }
+  ],
+  "coverage": {
+    "handout_concepts": {
+      "A": "partial",
+      "B": "covered",
+      "C": "partial",
+      "D": "partial",
+      "E": "out_of_scope",
+      "F": "out_of_scope"
+    },
+    "stages": {
+      "access": "evaluated",
+      "render": "partial",
+      "extract": "evaluated",
+      "entity": "partial",
+      "freshness": "evaluated",
+      "corroboration": "partial",
+      "engagement": "evaluated"
+    },
+    "not_evaluated": [
+      {
+        "check_id": "cr.index.sitemap_invalid",
+        "reason": "sitemap_missing"
+      },
+      {
+        "check_id": "ef.corroboration.offsite_spotcheck",
+        "reason": "tool_unavailable"
+      },
+      {
+        "check_id": "ef.entity.sameas_missing",
+        "reason": "dependency_failed"
+      },
+      {
+        "check_id": "ef.entity.sameas_no_authority",
+        "reason": "dependency_failed"
+      }
+    ],
+    "not_applicable_for_category": [
+      {
+        "check_id": "en.nav.related_links_missing",
+        "reason": "not_applicable_for_category"
+      }
+    ],
+    "statement": "Handout concepts covered: B fully; A, C, D partially (sitemap_invalid: sitemap_missing; offsite_spotcheck: tool_unavailable; sameas_missing: dependency_failed); E and F out of scope for a site audit, site-side levers reported. Stages evaluated: access, extract, freshness, engagement; partial: render, entity, corroboration. Pages sampled: 4 (home, about, contact, blog); no page found for: pricing, product. Requests made: 10. This audit reads what a non-JavaScript fetcher receives; it does not query live assistants or execute scripts."
+  },
+  "proactive_recommendations": [
+    {
+      "title": "Add the recommended properties to the existing structured data",
+      "rationale": "The structured data present is valid but thin. Missing recommended properties (WebSite: name, publisher; WebSite: name, publisher; WebSite: name, publisher) are the ones assistants use to distinguish one entity from another.",
+      "mechanism": "extract",
+      "effort": "low",
+      "priority": "medium"
+    },
+    {
+      "title": "Consider publishing a plain-text summary of the site at /llms.txt",
+      "rationale": "An optional, unproven convention: adoption by assistants is not confirmed by any operator's documentation, so it is not graded anywhere in this audit. It costs one file, and the exercise of writing it usually exposes facts the site never states plainly.",
+      "mechanism": "extract",
+      "effort": "low",
+      "priority": "low"
+    },
+    {
+      "title": "Publish datable milestones on the news surface others can cite",
+      "rationale": "The site already has a place to publish. Dated, factual announcements are what other sites quote, and repeated facts across independent sources are what make an entity trusted.",
+      "mechanism": "corroboration",
+      "effort": "medium",
+      "priority": "low"
+    }
+  ],
+  "ai_answer_simulation": {
+    "basis": "extracted_facts_only",
+    "facts_file": "work/extracted_facts.json",
+    "brand": "Python.org",
+    "questions": [
+      {
+        "id": "q1",
+        "question": "What is Python.org's mission?",
+        "answerable": false,
+        "answer_from_facts": null,
+        "facts_used": [],
+        "missing_facts": [
+          "mission"
+        ],
+        "see_finding": "F-001"
+      },
+      {
+        "id": "q2",
+        "question": "What programs does Python.org run, and where?",
+        "answerable": false,
+        "answer_from_facts": null,
+        "facts_used": [
+          "programs_or_services"
+        ],
+        "missing_facts": [
+          "location"
+        ],
+        "see_finding": "F-001"
+      },
+      {
+        "id": "q3",
+        "question": "How do I donate, apply, or join?",
+        "answerable": true,
+        "answer_from_facts": "According to the home page, the only text extracted about taking part is a navigation fragment: \"The Python Network Donate ≡ Menu Search This Site GO A A Smaller Larger Reset\".",
+        "facts_used": [
+          "how_to_participate"
+        ],
+        "missing_facts": []
+      },
+      {
+        "id": "q4",
+        "question": "Is Python.org a good fit for a supporter like me?",
+        "answerable": true,
+        "answer_from_facts": "The home page describes what it offers only as \"Get Started; Download; Docs; Jobs; Upcoming Events\".",
+        "facts_used": [
+          "programs_or_services"
+        ],
+        "missing_facts": []
+      },
+      {
+        "id": "q5",
+        "question": "What sets Python.org apart from alternatives?",
+        "answerable": true,
+        "answer_from_facts": "The only differentiating text extracted from the home page is \"has made it the most popular language for machine learning and artificial intelligence. Python's flexibility has allowed Anyscale to make ML/AI\".",
+        "facts_used": [
+          "differentiator"
+        ],
+        "missing_facts": [],
+        "informational": true
+      }
+    ],
+    "attribution_note": "None of the three quoted values carry the name Python.org inside the text itself, so an assistant quoting these lines would hold the facts without the name attached to them. The name is used consistently across the sampled pages and a corroboration surface exists, but no Organization node describes the site owner (F-007)."
+  },
+  "narrative_summary": "Invisible: an assistant can reach and read these pages, but two of the four key facts expected of a nonprofit or institutional site are not extractable as plain text (F-001), and no Organization node identifies the site owner (F-007). Stale or mistrusted: no postal address or phone number appears as plain text on the home page (F-002), and the off-site mention spot-check was not performed (F-009), so nothing in this run corroborates the brand beyond its own pages. The simulation answered three of five buyer questions from the extracted facts; the mission and location questions could not be answered at all (F-010). Bouncing: the home page heading is two words, too short to state what the site offers (F-003), and one page's heading does not match its title and description (F-006). Start with F-002, the one quick win: publish a postal address or phone number as plain text on the home page.",
+  "limitations": [
+    "This report reflects a single point-in-time fetch of 4 sampled pages; personalised or A/B-tested pages may differ between runs.",
+    "Off-site mention spot-check skipped: tool unavailable.",
+    "This audit reads served HTML only and does not execute JavaScript or query live assistants.",
+    "Not covered: Whether a specific assistant actually cites or misrepresents the brand today. Simulate strictly from the extracted-facts file (`or.simulation.*`) and state that it is a simulation.",
+    "Not covered: Inclusion in any model's training data. Grade training-only bot blocks as `info` policy notes.",
+    "Not covered: Off-site agreement at scale: how many independent sources repeat each fact. Check the site's own anchors and corroboration surface; bounded spot-check when a search tool exists.",
+    "Not covered: Personalization: what a particular user sees. Report the site-side levers (location, language, audience facts) as present/absent.",
+    "Not covered: Email summarization behaviour. Cover the web analogue: substance in readable text, not buried.",
+    "Not covered: Cloaking beyond the home URL and the three tokens probed. Compare the home URL across three tokens; report challenge pages as `inconclusive` and tell the owner how to verify with the vendor's tools.",
+    "Not covered: Rendering with a headless browser. Two-signal CSR detection; recommend verifying with `curl`.",
+    "Not covered: `llms.txt` and similar proposed conventions. Not graded. Mentioned in proactive recommendations only as optional.",
+    "Not covered: Search ranking, domain authority, backlink volume. Not claimed.",
+    "Not covered: Accessibility conformance (WCAG). Only `alt` and `lang` where they also serve extraction.",
+    "Not covered: Real performance (Core Web Vitals). Page-weight proxy at `low` confidence.",
+    "Not covered: Content quality, accuracy, or brand voice. Facts are reported as present/absent, never as correct/incorrect.",
+    "Not covered: Pages beyond the ≤ 6 sampled. Sample by role; state the sample in every finding's evidence."
+  ],
+  "suppressed_findings": [],
+  "run": {
+    "wall_clock_seconds": 16.7,
+    "requests_made": 10,
+    "probe_errors": [],
+    "time_budget_seconds": 300.0,
+    "probes": [
+      {
+        "probe": "crawl-render-audit",
+        "seconds": 0.41,
+        "error": null
+      },
+      {
+        "probe": "fact-extractability-audit",
+        "seconds": 0.33,
+        "error": null
+      },
+      {
+        "probe": "entity-freshness-corroboration-audit",
+        "seconds": 1.7,
+        "error": null
+      },
+      {
+        "probe": "engagement-audit",
+        "seconds": 8.75,
+        "error": null
+      }
+    ]
+  }
+}

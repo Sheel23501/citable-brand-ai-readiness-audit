@@ -37,6 +37,8 @@ FIXTURE_SCHEMA = {
     "category": "site category id the sampler should infer (site_categories.md)",
     "routes": {"/path": {"status": 200, "content_type": "text/html", "file": "relative/file", "headers": {}},
                "*": "optional catch-all applied to any path that matches no route and no static file (a soft-404 site)"},
+    "ua_deny": {"match": ["substring of a User-Agent ..."], "status": 403,
+                "body": "optional body", "paths": ["optional: only these paths; default all"]},
     "serve_expectations": {"real_404": "false when the fixture deliberately answers 200 for unknown paths (default true)",
                            "404_links_home": "false when the fixture's 404 page deliberately has no home link (default true)"},
     "expected": {
@@ -66,6 +68,7 @@ def load_fixture(name):
         meta = json.load(f)
     meta.setdefault("base", None)
     meta.setdefault("routes", {})
+    meta.setdefault("ua_deny", None)
     meta["dir"] = os.path.join(FIXTURES_DIR, name)
     meta["base_dir"] = os.path.join(FIXTURES_DIR, meta["base"]) if meta["base"] else None
     return meta
@@ -146,6 +149,15 @@ def make_handler(meta, base_url):
 
         def do_GET(self):
             path = urlsplit(self.path).path or "/"
+            # 0. user-agent gate: a CDN/WAF refusing a named crawler regardless of robots.txt
+            deny = meta.get("ua_deny")
+            if deny:
+                ua = self.headers.get("User-Agent", "")
+                paths = deny.get("paths")
+                if (not paths or path in paths) and any(m.lower() in ua.lower() for m in deny.get("match", [])):
+                    body = (deny.get("body") or "<!doctype html><title>Forbidden</title><p>Forbidden</p>").encode("utf-8")
+                    self._send(deny.get("status", 403), "text/html", body)
+                    return
             # 1. explicit route override
             route = meta["routes"].get(path)
             if route:

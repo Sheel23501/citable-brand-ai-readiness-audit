@@ -220,6 +220,88 @@ def check_access(ctx, out):
     return ok_pages
 
 
+
+# ---------------------------------------------------------------- edge-level access checks
+EDGE_IDS = ("cr.access.edge_block", "cr.access.edge_block_training", "cr.access.ua_content_variance")
+
+
+def check_edge_access(ctx, out):
+    """Does the origin actually serve a declared AI crawler, or does a CDN/WAF refuse it?
+
+    robots.txt states policy; this reads behaviour. A site can allow every AI crawler in
+    robots.txt and still return 403 to them at the edge, which robots.txt inspection alone
+    cannot see. The sampler does the requests (so a workdir replay reproduces this exactly);
+    this function only grades what it recorded.
+    """
+    ea = ctx.edge_access
+    if not ea or not ea.get("agents"):
+        for cid in EDGE_IDS:
+            out.not_evaluated(cid, reason="no_baseline" if ea is None else "network_disabled")
+        return
+    base_bytes = (ea.get("baseline") or {}).get("bytes") or 0
+    refused, served = [], []
+    for a in ea["agents"]:
+        st = a.get("status") or 0
+        if a.get("error") or st >= 400:
+            refused.append(a)
+        else:
+            served.append(a)
+
+    cite = [a for a in refused if a["tier"] in ("live_answer", "index")]
+    train = [a for a in refused if a["tier"] == "training_only"]
+    probed_cite = [a for a in ea["agents"] if a["tier"] in ("live_answer", "index")]
+
+    def _desc(a):
+        return "%s (%s): %s" % (a["token"], a["tier"], a.get("error") or "HTTP %s" % a.get("status"))
+
+    if cite:
+        every = len(cite) == len(probed_cite) and probed_cite
+        out.fail("cr.access.edge_block",
+                 title="The site is served to this audit but refused to %s" % (
+                     "every AI crawler tested" if every else "%d AI crawler%s" % (len(cite), "" if len(cite) == 1 else "s")),
+                 evidence="GET %s returned HTTP %s (%d bytes) to the audit's own user agent, but %s. robots.txt is not the cause: this is the origin or its CDN answering differently by user agent." % (
+                     ea["url"], (ea.get("baseline") or {}).get("status"), base_bytes, "; ".join(_desc(a) for a in cite)),
+                 evidence_items=[evidence_item(ea["url"], "http_status", "audit user agent -> %s (%d bytes)" % (
+                     (ea.get("baseline") or {}).get("status"), base_bytes))] +
+                     [evidence_item(ea["url"], "http_status", _desc(a), note="user-agent probe") for a in cite],
+                 why="These are the crawlers that fetch and index pages for AI answers. A page they cannot retrieve cannot be quoted or cited, no matter what robots.txt permits. Because the block is at the network edge, it is invisible to every audit that only reads robots.txt.",
+                 action="Allow the published AI crawler user agents through the CDN or WAF, then re-run this check.",
+                 detail="In Cloudflare, Akamai, Fastly or your WAF, find the bot-management or firewall rule matching these user agents and add an allow rule (most vendors ship a verified-bot list). Confirm with: curl -A '%s' -I %s and check for HTTP 200." % (
+                     "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; OAI-SearchBot/1.0; +https://openai.com/searchbot)", ea["url"]),
+                 references=[REFS["robots"]],
+                 extra_adjust=["edge_block_all_citation_tiers:critical"] if every else None)
+        if every:
+            out.findings[-1]["severity"] = "critical"
+            out.findings[-1]["suggested_action"]["impact"] = "high"
+    else:
+        out.check("cr.access.edge_block", "pass")
+
+    if train and not cite:
+        out.policy_note("cr.access.edge_block_training",
+                        title="Training-only crawlers are refused at the edge (policy note, not a defect)",
+                        evidence="%s refused while the audit's own user agent received HTTP %s. No live-answer or index crawler was refused." % (
+                            "; ".join(_desc(a) for a in train), (ea.get("baseline") or {}).get("status")),
+                        evidence_items=[evidence_item(ea["url"], "http_status", _desc(a), note="user-agent probe") for a in train],
+                        why="Blocking training crawlers keeps content out of future model training. It does not stop the site being fetched or cited when someone asks about it today, so it is recorded as a choice rather than a problem.",
+                        action="No action needed unless you intended these crawlers to have access.",
+                        detail="If the block was not deliberate, check the CDN or WAF bot rules for these user agents.")
+    else:
+        out.check("cr.access.edge_block_training", "pass")
+
+    varied = [a for a in served if base_bytes and abs((a.get("bytes") or 0) - base_bytes) > base_bytes * 0.5]
+    if varied and not cite:
+        out.inconclusive("cr.access.ua_content_variance", reason="content_varies_by_user_agent",
+                         title="The home page body size differs by user agent",
+                         evidence="Baseline %d bytes; %s. The audit cannot tell whether this is deliberate, an A/B test, or personalisation." % (
+                             base_bytes, "; ".join("%s: %d bytes" % (a["token"], a.get("bytes") or 0) for a in varied)),
+                         evidence_items=[evidence_item(ea["url"], "computed", "%s=%d bytes vs baseline %d" % (
+                             a["token"], a.get("bytes") or 0, base_bytes)) for a in varied],
+                         why="Serving materially different content to a crawler than to other clients means what an assistant reads is not what the audit measured, so the rest of this report may not describe what the crawler sees.",
+                         action="Confirm the difference is intentional; if it is not, serve the same HTML to all user agents.",
+                         detail="Compare the two responses directly: curl -A '<crawler UA>' URL against curl -A '<browser UA>' URL and diff them.")
+    else:
+        out.check("cr.access.ua_content_variance", "pass")
+
 # ---------------------------------------------------------------- render checks
 def check_render(ctx, out):
     gates, shells = [], []
@@ -397,6 +479,10 @@ def run(ctx):
         check_access(ctx, out)
     except Exception as e:  # noqa: BLE001
         out.error = (out.error or "") + " access checks: %s: %s" % (type(e).__name__, e)
+    try:
+        check_edge_access(ctx, out)
+    except Exception as e:  # noqa: BLE001
+        out.error = (out.error or "") + " edge access checks: %s: %s" % (type(e).__name__, e)
     try:
         check_render(ctx, out)
     except Exception as e:  # noqa: BLE001

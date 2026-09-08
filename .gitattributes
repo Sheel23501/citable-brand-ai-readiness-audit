@@ -1,0 +1,7 @@
+# Test fixtures are served verbatim as HTTP responses and some assertions match
+# exact bytes (e.g. b"User-agent: *\nDisallow: /"). Git's autocrlf would rewrite
+# them to CRLF on Windows checkout and break those tests. Keep them byte-exact.
+brand-ai-readiness-audit/tests/fixtures/** -text
+
+# Everything else: normalise to LF in the repository.
+* text=auto eol=lf

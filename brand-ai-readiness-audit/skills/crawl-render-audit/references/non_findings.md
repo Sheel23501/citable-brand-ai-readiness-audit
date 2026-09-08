@@ -31,3 +31,20 @@ is part of the detection-accuracy contract: few false positives.
   verified-bot lists; the finding points the owner there.
 - Anything on pages that were not sampled. The sample is home plus up to
   five role pages; every finding lists the pages it applies to.
+
+## A crawler user agent that is served normally
+
+Announcing `OAI-SearchBot`, `Claude-User` or `GPTBot` and receiving the same
+200 the audit's own user agent received is not a finding, and neither is a
+small difference in byte count: pages carry timestamps, CSRF tokens and
+rotating banners. `cr.access.ua_content_variance` only speaks when a body
+differs from the baseline by more than half its size, and even then it reports
+an observation at `info` rather than a defect, because A/B tests and
+personalisation produce exactly the same signal.
+
+## A training-only crawler refused at the edge
+
+Refusing `GPTBot` while serving `OAI-SearchBot` and `Claude-User` is a policy
+choice about model training, not a discoverability defect: the site can still
+be fetched and cited when someone asks about it. It is reported as `info` by
+`cr.access.edge_block_training`, exactly as the equivalent robots.txt rule is.
