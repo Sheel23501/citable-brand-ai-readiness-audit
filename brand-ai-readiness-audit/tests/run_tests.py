@@ -427,6 +427,59 @@ def stage_htmldoc(res):
     res.check(cat["value"] == "ecommerce" and cat["confidence"] == "high", "ecommerce: jsonld 3 + nav 2 + prices 2 => high (%s)" % cat["scores"].get("ecommerce"))
     cat = categorize([], {"home": Document("<p>hi</p>", base_url="https://z.example/")}, [], "https://z.example/", 1)
     res.check(cat["value"] == "unknown", "bare page with <=5 pages scores 2 for portfolio, below threshold => unknown")
+    # Step 19 rules: a headline is not a menu label; section names need company; sibling subdomains are nav; ties resolve by rule
+    head = lambda body, base="https://s.example/": Document("<html><body><nav>%s</nav></body></html>" % body, base_url=base)  # noqa: E731
+    cat = categorize([], {"home": head('<a href="/blogs/">News</a><a href="/psf/newsletter/">Newsletter</a>'
+                                        '<a href="/x/">Saving the world with Open Data and Python</a>'
+                                        '<a href="/success-stories/category/business/">Business</a>', "https://s.org/")}, [], "https://s.org/", 60)
+    res.check("nav:world" not in cat["signals"] and "section:world" not in cat["signals"],
+              "categorize: a category word inside a headline is not a nav signal", str(cat["signals"]))
+    res.check("nav:business" not in cat["signals"] and "section:business" not in cat["signals"],
+              "categorize: a single section name does not score", str(cat["signals"]))
+    cat = categorize([], {"home": head('<a href="/w/">World</a><a href="/b/">Business</a><a href="/p/">Politics</a><a href="/n/">News</a>',
+                                        "https://paper.example/")}, [], "https://paper.example/", 400)
+    res.check(cat["value"] == "publisher_media" and "section:world" in cat["signals"] and "section:business" in cat["signals"],
+              "categorize: two or more section names make a masthead", str(cat))
+    cat = categorize([], {"home": head('<a href="https://docs.proj.example/">Documentation</a><a href="/pricing/">Pricing</a>'
+                                        '<a href="https://app.proj.example/login">Log in</a>', "https://www.proj.example/")},
+                     [], "https://www.proj.example/", 50)
+    res.check(cat["value"] == "saas_software" and "nav:documentation" in cat["signals"] and "nav:log in" in cat["signals"],
+              "categorize: nav links to sibling subdomains count as the site's own navigation", str(cat))
+    cat = categorize([], {"home": head('<a href="https://elsewhere.example/docs">Documentation</a><a href="/pricing/">Pricing</a>',
+                                        "https://www.proj.example/")}, [], "https://www.proj.example/", 50)
+    res.check("nav:documentation" not in cat["signals"], "categorize: a link to another domain is not navigation", str(cat["signals"]))
+    # equal scores, unequal evidence: a self-declared JSON-LD type outranks three menu labels
+    strong = Document('<html><head><script type="application/ld+json">{"@context":"https://schema.org","@type":"NGO","name":"T"}</script></head>'
+                      '<body><nav><a href="/n/">News</a><a href="/l/">Latest</a><a href="/s/">Subscribe</a></nav></body></html>',
+                      base_url="https://t.example/")
+    cat = categorize([], {"home": strong}, [], "https://t.example/", 40)
+    res.check(cat["scores"]["publisher_media"] == cat["scores"]["nonprofit_institution"] == 3, "categorize: the strength fixture ties on score (%s)" % cat["scores"])
+    res.check(cat["value"] == "nonprofit_institution" and not any(w.startswith("tie:") for w in cat["signals"]) and cat["confidence"] == "medium",
+              "categorize: a tie on score resolves to the stronger evidence, with no tie recorded", str(cat))
+    # a generic LocalBusiness type is weaker than a specific one, and than three menu labels for another category
+    agency = Document('<html><head><script type="application/ld+json">{"@type":"LocalBusiness","name":"C"}</script></head>'
+                      '<body><nav><a href="/s/">Services</a><a href="/c/">Clients</a><a href="/w/">Our work</a></nav></body></html>',
+                      base_url="https://agency.example/")
+    cat = categorize([], {"home": agency}, [], "https://agency.example/", 30)
+    res.check(cat["value"] == "professional_services" and cat["scores"]["local_business"] == 2,
+              "categorize: a generic LocalBusiness type scores 2 and loses to an agency's own navigation", str(cat))
+    diner = Document('<html><head><script type="application/ld+json">{"@type":"Restaurant","name":"D"}</script></head><body></body></html>',
+                     base_url="https://diner.example/")
+    cat = categorize([], {"home": diner}, [], "https://diner.example/", 30)
+    res.check(cat["value"] == "local_business" and cat["scores"]["local_business"] == 3, "categorize: a specific type still scores 3", str(cat))
+    # role discovery: a headline containing 'plans' is not the pricing page
+    news = Document('<html><body><nav><a href="/en/news/Broadcom-plans-new-vSphere-Standard-1144.html">Broadcom plans new vSphere Standard</a>'
+                    '<a href="/plans/">Plans</a></nav></body></html>', base_url="https://p.example/")
+    cands = find_role_candidates(news, [], "https://p.example/")
+    urls = [c["url"] for c in cands.get("pricing", [])]
+    res.check(urls == ["https://p.example/plans/"], "roles: a headline containing 'plans' is not a pricing candidate; the label 'Plans' is", str(urls))
+    # a dead-even tie: same score, same evidence strength, same breadth -> table order, recorded, low confidence
+    even = head('<a href="/n/">News</a><a href="/l/">Latest</a><a href="/s/">Subscribe</a>'
+                '<a href="/d/">Donate</a><a href="/m/">Mission</a><a href="/v/">Volunteer</a>', "https://t.example/")
+    cat = categorize([], {"home": even}, [], "https://t.example/", 40)
+    res.check(cat["scores"]["publisher_media"] == cat["scores"]["nonprofit_institution"] == 3, "categorize: the even fixture ties (%s)" % cat["scores"])
+    res.check(cat["value"] == "publisher_media" and "tie:nonprofit_institution" in cat["signals"] and cat["confidence"] == "low",
+              "categorize: a dead-even tie falls to table order, is recorded, and lowers confidence", str(cat))
     cat = categorize([], {}, [], "https://z.example/", 0, override="local_business")
     res.check(cat["value"] == "local_business" and cat["signals"] == ["user_supplied"], "user override wins")
 
@@ -761,6 +814,8 @@ def stage_compose(res, farm):
         if name == "csr-shell":
             sim = [f for f in fnds if f["check_id"] == "or.simulation.question_unanswerable"]
             res.check(sim and sim[0]["severity"] == "info", "compose/csr-shell: unanswerable questions are reported as info")
+            res.check(sim and sim[0]["status"] == "not_evaluated" and sim[0].get("reason") == "no_readable_pages",
+                      "compose/csr-shell: with nothing readable the simulation is not_evaluated, not 'the site is silent'", str(sim[0].get("reason")))
             open_qs = [q for q in report["ai_answer_simulation"]["questions"] if not q["answerable"] and not q.get("informational")]
             res.check(open_qs and all(q.get("see_finding") in {f["id"] for f in fnds} for q in open_qs),
                       "compose/csr-shell: every unanswerable question points at the finding that explains it",
@@ -1298,6 +1353,19 @@ def stage_extract(res):
 def stage_probe_fx(res, farm):
     print("\n== stage: fact-extractability probe on every fixture")
     fp = _load_probe("fact-extractability-audit", "facts_probe.py")
+    # image_only reads labels, never captions or sentences (Step 19 live pass)
+    sig = fp.image_fact_signals
+    res.check(sig("Google map of Clearleft office location", "Screenshot-2022.webp", "Come over to our place", "address") == [],
+              "fx: a seven-word caption is not an address label")
+    res.check(sig("An animated image showing location pins dropping onto a street map", "locationdata_v2.gif", "Press Contacts", "address") == [],
+              "fx: a caption mentioning location is not an address label")
+    res.check(sig("VMware logo on smartphone", "photo.jpeg", "Broadcom plans new vSphere Standard", "pricing") == [],
+              "fx: a five-word headline containing 'plans' is not a pricing heading")
+    res.check(sig("Pricing", "pricing-table.png", "", "pricing") == ["alt", "filename"], "fx: a short alt and a filename token are labels")
+    res.check(sig("", "photo.jpg", "Plans", "pricing") == ["heading"], "fx: a one-word heading 'Plans' is a pricing label")
+    res.check(sig("Opening hours", "img_2231.jpg", "", "hours") == ["alt"], "fx: 'Opening hours' alt is a label")
+    res.check(fp.IMAGE_FACT_PAGES["address"] == ("contact", "about", "home") and "blog" not in sum(fp.IMAGE_FACT_PAGES.values(), ()),
+              "fx: image_only never grades a blog page")
     R = run_probe_on_fixtures(res, farm, "fx.", fp, "fx")
     from auditlib.context import AuditContext
     import tempfile
@@ -1368,6 +1436,23 @@ def stage_probe_ef(res, farm):
     from auditlib.findings import validate_probe_output
     print("\n== stage: entity-freshness-corroboration probe on every fixture (external lookups disabled)")
     ep = _load_probe("entity-freshness-corroboration-audit", "entity_probe.py")
+    # Step 19 live pass: open copyright ranges, NAP for unknown, the lookup's second title
+    import types as _types
+    fake = lambda text: _types.SimpleNamespace(doc=_types.SimpleNamespace(body_text=text))  # noqa: E731
+    this_year = ep._today().year
+    res.check([y for y, _ in ep.copyright_years(fake("Copyright © 2005-now Clearleft Ltd. All rights reserved."))] == [this_year],
+              "ef: '© 2005-now' is the current year, not 2005")
+    res.check([y for y, _ in ep.copyright_years(fake("© 2005–present Example"))] == [this_year], "ef: '© 2005–present' is current")
+    res.check([y for y, _ in ep.copyright_years(fake("© 2019-2024 Example"))] == [2024], "ef: a closed range counts its later year")
+    res.check([y for y, _ in ep.copyright_years(fake("© 2019 Example"))] == [2019], "ef: a single year is itself")
+    res.check(list(ep.nap_requirement("unknown")) == ["name", "contact (address, phone or email)"], "ef: an unclassified site needs name plus any contact")
+    res.check(list(ep.nap_requirement("local_business")) == ["name", "postal address", "phone number"], "ef: a local business still needs address and phone")
+    res.check(ep.lookup_alternates("Dishoom Indian Restaurants", [("Dishoom Indian Restaurants", "meta:og:site_name", None), ("Dishoom", "title:common_segment", None)]) == ["Dishoom"],
+              "ef: the shorter self-name is the lookup's second title")
+    res.check(ep.lookup_alternates("Dishoom", [("Dishoom", "meta", None), ("Dishoom Indian Restaurants", "jsonld", None)]) == [],
+              "ef: a longer name is never a second title")
+    res.check(ep.lookup_alternates("Acme Ltd", [("Acme Ltd", "meta", None), ("acme ltd", "title:common_segment", None)]) == [],
+              "ef: the same name differently cased is not an alternate")
     R = run_probe_on_fixtures(res, farm, "ef.", ep, "ef")
     sev = lambda name, cid: next((f["severity"] for f in R[name]["findings"] if f["check_id"] == cid), None)
     conf = lambda name, cid: next((f["confidence"] for f in R[name]["findings"] if f["check_id"] == cid), None)

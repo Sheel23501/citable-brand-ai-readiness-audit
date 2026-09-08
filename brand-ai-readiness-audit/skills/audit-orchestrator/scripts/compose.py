@@ -33,7 +33,7 @@ sys.path.insert(0, HERE)
 
 from auditlib import __version__  # noqa: E402
 from auditlib.categories import (AUDIENCE_FACT, AUDIENCE_PHRASE, SIMULATION_QUESTIONS,  # noqa: E402
-                                 key_pages)
+                                 category_label, key_pages)
 from auditlib.findings import (SEVERITIES, Registry, ProbeOutput, evidence_item,  # noqa: E402
                                impact_for, priority_for)
 
@@ -652,11 +652,26 @@ def build_limitations(sample, probes, checks):
 
 
 # ---------------------------------------------------------------- orchestrator-level findings
-def orchestrator_findings(site, category, pages_examined, simulation, probes, load_errors, registry):
+def orchestrator_findings(site, category, pages_examined, simulation, probes, load_errors, registry, facts=None):
     """or.simulation.question_unanswerable and or.run.probe_error, built through the shared builder."""
     out = ProbeOutput("audit-orchestrator", site, category, pages_examined, registry=registry)
     unanswerable = [q for q in simulation["questions"] if not q["answerable"] and not q.get("informational")]
-    if unanswerable:
+    readable = bool((facts or {}).get("pages_used"))
+    if unanswerable and not readable:
+        # nothing was read, so nothing about the site's text can be concluded: not_evaluated, and say why
+        reasons = sorted({e.get("reason") for e in (facts or {}).get("pages_excluded") or [] if e.get("reason")})
+        reason = "no_readable_pages" if facts is not None else "facts_file_missing"
+        out.not_evaluated(
+            "or.simulation.question_unanswerable", reason=reason, emit_finding=True,
+            title="No question could be simulated: no sampled page was readable",
+            evidence="The simulation reads only the extracted-facts file, and no page reached it (%s), so whether the site "
+                     "states these facts is unknown, not absent." % (", ".join(reasons) if reasons else reason),
+            evidence_items=[evidence_item("site", "computed", "pages_used=0; excluded=%s" % (",".join(reasons) or "none"))],
+            why="An unanswerable question here says nothing about the site's content: the audit could not read it. The "
+                "access findings above are the reason, and the fix.",
+            action="Resolve the access finding first, then re-run the audit so the facts file has pages to read.",
+            detail="For a challenge page, allow the audit's user agent through; for an unreachable site, check the URL.")
+    elif unanswerable:
         missing = sorted({m for q in unanswerable for m in q["missing_facts"]})
         out.policy_note(
             "or.simulation.question_unanswerable",
@@ -717,7 +732,7 @@ def compose(workdir, wall_clock=None, input_url=None, category_override=None):
         facts_rel = (probe.get("artifacts") or {}).get("extracted_facts") or facts_rel
     simulation = build_simulation(facts, category, _host(site_url), facts_rel or "work/extracted_facts.json")
 
-    orch = orchestrator_findings(site_url, category, pages_examined, simulation, probes, data["load_errors"], registry)
+    orch = orchestrator_findings(site_url, category, pages_examined, simulation, probes, data["load_errors"], registry, facts=facts)
     for f in orch.findings:
         f = json.loads(json.dumps(f))
         f["source_skill"] = "audit-orchestrator"
@@ -919,7 +934,7 @@ def render_markdown(report):
                                                         for e in cov["not_evaluated"]))
         L.append("")
     if cov.get("not_applicable_for_category"):
-        L.append("Not applicable to a %s site: " % (report.get("site_category") or {}).get("value", "site")
+        L.append("Not applicable to %s: " % category_label((report.get("site_category") or {}).get("value", "unknown"))
                  + ", ".join("`%s`" % e["check_id"] for e in cov["not_applicable_for_category"]))
         L.append("")
     for line in report.get("limitations") or []:

@@ -58,15 +58,18 @@ Score every category from the home page plus the discovered nav:
 | Signal | Points | Cap per category |
 |---|---|---|
 | JSON-LD `@type` match on any sampled page (types and subtypes listed in `CATEGORY_SIGNALS`) | 3 | 3 |
+| Generic parent type only (`LocalBusiness`, the schema.org parent of `ProfessionalService`, `Store`, `Restaurant`, …), when no specific type matched | 2 | 2 |
 | Nav keyword match (link text or href slug) | 1 each | 4 |
 | URL pattern match on discovered internal links | 1 each | 2 |
 | TLD hint | 1 | 1 |
 | Page-count rule (`portfolio_personal` only: ≤ 5 internal pages) | 2 | 2 |
 | Price-count rule (`ecommerce` only: ≥ 3 currency-formatted prices on home) | 2 | 2 |
 
-- Category = highest score. Tie → order of the table above (earlier wins).
+- A nav keyword counts only on a **menu-length label**: link text of at most four words. A category word inside a headline or a sentence ("Saving the world with Open Data") is not a signal. Links to a sibling subdomain of the site (`docs.example.com` from `www.example.com`) are the site's own navigation and count.
+- Newspaper **section names** (`world`, `business`, `politics`, `sport`, `culture`, `opinion` and their German, French and Spanish equivalents) are ordinary words on their own; they score for `publisher_media` only when **two or more distinct** ones appear, as `section:<word>`, within the nav cap.
+- Category = highest score. **Tie** → the category whose points rest on stronger evidence: a JSON-LD type beats menu labels, which beat URL patterns, which beat the TLD and the count rules; if still equal, the one with more distinct signals; if still equal, the order of the table above, and that last resort is recorded as `tie:<runner-up>` in `signals` with confidence `low`, because the inference is genuinely uncertain.
 - Score < 3 → `unknown`.
-- Category confidence: score ≥ 6 `high`; 3–5 `medium`; `unknown` is always `low`.
+- Category confidence: score ≥ 6 `high`; 3–5 `medium`; `unknown` is always `low`; an unresolved tie is `low`.
 - The winning signals are recorded as strings like `nav:pricing`, `jsonld:SoftwareApplication`, `url:/products/`, `tld:.org` in `site_category.signals`.
 - A user-supplied `--category` flag overrides inference and is recorded with confidence `high` and signal `user_supplied`.
 
@@ -90,6 +93,8 @@ and SoftwareApplication markup commonly sits on about and product pages.
 ---
 
 ## 3. Page roles (used by the sampler and every probe)
+
+Role discovery from link text follows the same label rule as category inference: a role keyword counts only in link text of at most four words. A headline that contains "plans" is not the pricing page; a slug match (`/pricing`) is unaffected.
 
 | role | Nav keywords (any language row above) | Sitemap fallback pattern |
 |---|---|---|

@@ -69,7 +69,10 @@ CATEGORY_SIGNALS = {
         "tld": ["io", "app", "dev"],
     },
     "local_business": {
-        "jsonld": ["LocalBusiness", "Restaurant", "Store", "Dentist", "Physician", "MedicalClinic", "Hotel", "LodgingBusiness",
+        # LocalBusiness is the schema.org parent of ProfessionalService, Store, Restaurant, ...: a site that declares only
+        # the parent has said "a business with premises", not which kind, so it scores as generic (2), not specific (3)
+        "jsonld_generic": ["LocalBusiness"],
+        "jsonld": ["Restaurant", "Store", "Dentist", "Physician", "MedicalClinic", "Hotel", "LodgingBusiness",
                    "FoodEstablishment", "CafeOrCoffeeShop", "Bakery", "BarOrPub", "AutoRepair", "HairSalon", "BeautySalon",
                    "HealthAndBeautyBusiness", "HomeAndConstructionBusiness", "Plumber", "Electrician", "RealEstateAgent",
                    "SportsActivityLocation", "ExerciseGym", "AutomotiveBusiness", "ChildCare", "DryCleaningOrLaundry",
@@ -90,8 +93,10 @@ CATEGORY_SIGNALS = {
     },
     "publisher_media": {
         "jsonld": ["NewsArticle", "Article", "BlogPosting", "NewsMediaOrganization", "Periodical", "ReportageNewsArticle"],
-        "nav": ["news", "latest", "sections", "opinion", "subscribe", "politics", "sport", "sports", "culture", "world",
-                "business", "newsletter", "aktuelles", "actualités", "noticias"],
+        "nav": ["news", "latest", "sections", "subscribe", "newsletter", "aktuelles", "actualités", "noticias"],
+        # section names: any one of these is an ordinary word; two or more together are a newspaper's masthead
+        "nav_cluster": {"members": ["world", "business", "politics", "sport", "sports", "culture", "opinion",
+                                    "wirtschaft", "politik", "monde", "économie", "mundo", "economía"], "min": 2},
         "url": ["/news/", "/article/", "/articles/", "/opinion/", "/section/", "/category/", "/tag/"],
         "tld": ["news", "media"],
     },
@@ -117,8 +122,12 @@ CATEGORY_SIGNALS = {
         "tld": [],
     },
 }
-SCORE_CAPS = {"jsonld": 3, "nav": 4, "url": 2, "tld": 1}
+SCORE_CAPS = {"jsonld": 3, "jsonld_generic": 2, "nav": 4, "url": 2, "tld": 1}
 THRESHOLD = 3
+NAV_LABEL_MAX_WORDS = 4   # a nav keyword must be a menu label; a category word inside a headline is not a signal
+# tiebreak order of evidence: a self-declared JSON-LD type beats menu labels, which beat URL patterns, which beat
+# the TLD and the count rules
+_SIGNAL_RANK = {"jsonld": 3, "nav": 2, "section": 2, "url": 1, "tld": 0, "pages": 0, "prices": 0}
 
 
 def _now():
@@ -134,10 +143,13 @@ def _slug_parts(url):
     return [p for p in path.split("/") if p]
 
 
-def _keyword_hit(text, keywords):
-    """Whole-phrase match: keyword equals the text, or appears as a whole word/phrase inside short link text."""
+def _keyword_hit(text, keywords, max_words=None):
+    """Whole-phrase match: keyword equals the text, or appears as a whole word/phrase inside short link text.
+    `max_words` limits the match to menu-length labels: a category word inside a headline is not a signal."""
     t = _norm_text(text)
     if not t or len(t) > 60:
+        return None
+    if max_words and len(t.split()) > max_words:
         return None
     for k in keywords:
         if t == k or re.search(r"(?<!\w)" + re.escape(k) + r"(?!\w)", t):
@@ -231,7 +243,7 @@ def find_role_candidates(doc, sitemap_urls, home_url):
             continue
         parts = _slug_parts(l.url)
         for role in ROLE_ORDER:
-            k = _keyword_hit(l.text, ROLE_KEYWORDS[role])
+            k = _keyword_hit(l.text, ROLE_KEYWORDS[role], max_words=NAV_LABEL_MAX_WORDS)  # a label, not a headline
             slug_hit = None
             if parts:
                 for s in ROLE_SLUGS[role]:
@@ -275,9 +287,13 @@ def categorize(pages, docs, sitemap_urls, home_url, internal_pages_estimate, ove
     nav_texts = []
     link_urls = []
     if home is not None:
-        for l in home.internal_links:
-            nav_texts.append((_norm_text(l.text), l.url))
-            link_urls.append(l.url.lower())
+        # a nav link to a sibling subdomain (docs.example.com from www.example.com) is the site's own navigation
+        site_domain = registrable_domain(host)
+        for l in home.links:
+            link_host = (urlsplit(l.url).hostname or "").lower()
+            if l.url.startswith(("http://", "https://")) and registrable_domain(link_host) == site_domain:
+                nav_texts.append((_norm_text(l.text), l.url))
+                link_urls.append(l.url.lower())
     link_urls += [u.lower() for u in sitemap_urls[:200]]
     jsonld_types = []
     for role, d in docs.items():
@@ -289,19 +305,34 @@ def categorize(pages, docs, sitemap_urls, home_url, internal_pages_estimate, ove
         sig = CATEGORY_SIGNALS[cat]
         sc, why = 0, []
         j = [t for t in jsonld_types if t in sig["jsonld"]]
+        g = [t for t in jsonld_types if t in sig.get("jsonld_generic", ())]
         if j:
             sc += SCORE_CAPS["jsonld"]
             why.append("jsonld:" + j[0])
+        elif g:
+            sc += SCORE_CAPS["jsonld_generic"]
+            why.append("jsonld:%s(generic)" % g[0])
         n = 0
         seen_kw = set()
         for text, url in nav_texts:
-            k = _keyword_hit(text, sig["nav"])
+            k = _keyword_hit(text, sig["nav"], max_words=NAV_LABEL_MAX_WORDS)
             if k and k not in seen_kw:
                 seen_kw.add(k)
                 n += 1
                 why.append("nav:" + k)
                 if n >= SCORE_CAPS["nav"]:
                     break
+        cluster = sig.get("nav_cluster")
+        if cluster and n < SCORE_CAPS["nav"]:
+            members = set()
+            for text, url in nav_texts:
+                k = _keyword_hit(text, cluster["members"], max_words=NAV_LABEL_MAX_WORDS)
+                if k:
+                    members.add(k)
+            if len(members) >= cluster["min"]:
+                for k in sorted(members)[:SCORE_CAPS["nav"] - n]:
+                    why.append("section:" + k)
+                n = min(SCORE_CAPS["nav"], n + len(members))
         sc += n
         u = 0
         seen_pat = set()
@@ -326,11 +357,21 @@ def categorize(pages, docs, sitemap_urls, home_url, internal_pages_estimate, ove
             why.append("prices:%d" % len(home.price_mentions))
         scores[cat] = sc
         signals[cat] = why
-    best = max(CATEGORY_ORDER, key=lambda c: (scores[c], -CATEGORY_ORDER.index(c)))
+    # Tie rule (site_categories.md section 2): equal scores are separated by the strength of the evidence behind
+    # them, then by breadth; only then by table order, and that last resort is recorded and lowers confidence.
+    strength = {c: (scores[c], max([_SIGNAL_RANK.get(w.split(":")[0], 0) for w in signals[c]] or [0]), len(signals[c]))
+                for c in CATEGORY_ORDER}
+    ranked = sorted(CATEGORY_ORDER, key=lambda c: (strength[c], -CATEGORY_ORDER.index(c)), reverse=True)
+    best = ranked[0]
     if scores[best] < THRESHOLD:
         return {"value": "unknown", "confidence": "low", "signals": signals.get(best, [])[:3], "scores": scores}
     conf = "high" if scores[best] >= 6 else "medium"
-    return {"value": best, "confidence": conf, "signals": signals[best], "scores": scores}
+    why = list(signals[best])
+    runner = ranked[1]
+    if strength[runner] == strength[best]:
+        why.append("tie:" + runner)
+        conf = "low"
+    return {"value": best, "confidence": conf, "signals": why, "scores": scores}
 
 
 # ------------------------------------------------------------------ main entry

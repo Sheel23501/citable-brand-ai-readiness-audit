@@ -1,7 +1,7 @@
 {
   "site": "https://not a url at all",
   "input_url": "not a url at all",
-  "sampled_at": "2026-09-07T22:36:49Z",
+  "sampled_at": "2026-09-08T01:32:38Z",
   "site_category": {
     "value": "unknown",
     "confidence": "low",
@@ -55,13 +55,13 @@
         "is_text": false,
         "bytes": 0,
         "truncated": false,
-        "elapsed_ms": 512,
+        "elapsed_ms": 508,
         "challenge": false,
         "challenge_vendor": null,
         "blocked": false,
         "skipped": null,
         "error": "unknown",
-        "fetched_at": "2026-09-07T22:36:49Z",
+        "fetched_at": "2026-09-08T01:32:38Z",
         "body_path": null
       }
     }

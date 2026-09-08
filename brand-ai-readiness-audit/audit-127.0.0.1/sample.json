@@ -1,7 +1,7 @@
 {
-  "site": "http://127.0.0.1:65027",
-  "input_url": "http://127.0.0.1:65027/",
-  "sampled_at": "2026-09-07T22:36:50Z",
+  "site": "http://127.0.0.1:52837",
+  "input_url": "http://127.0.0.1:52837/",
+  "sampled_at": "2026-09-08T01:32:40Z",
   "site_category": {
     "value": "unknown",
     "confidence": "low",
@@ -19,32 +19,32 @@
   },
   "robots": {
     "state": "unreachable",
-    "url": "http://127.0.0.1:65027/robots.txt",
+    "url": "http://127.0.0.1:52837/robots.txt",
     "sitemaps": [],
     "path": null,
     "parse_errors": []
   },
   "sitemap": {
     "state": "unreachable",
-    "url": "http://127.0.0.1:65027/sitemap_index.xml",
+    "url": "http://127.0.0.1:52837/sitemap_index.xml",
     "url_count": 0,
     "path": null,
     "from_robots": false,
     "error": "connection_refused",
     "tried": [
-      "http://127.0.0.1:65027/sitemap.xml",
-      "http://127.0.0.1:65027/sitemap_index.xml"
+      "http://127.0.0.1:52837/sitemap.xml",
+      "http://127.0.0.1:52837/sitemap_index.xml"
     ]
   },
   "pages": [
     {
       "role": "home",
-      "url": "http://127.0.0.1:65027/",
-      "final_url": "http://127.0.0.1:65027/",
+      "url": "http://127.0.0.1:52837/",
+      "final_url": "http://127.0.0.1:52837/",
       "source": "input",
       "fetch": {
-        "url": "http://127.0.0.1:65027/",
-        "final_url": "http://127.0.0.1:65027/",
+        "url": "http://127.0.0.1:52837/",
+        "final_url": "http://127.0.0.1:52837/",
         "redirect_chain": [],
         "cross_domain": false,
         "status": null,
@@ -55,13 +55,13 @@
         "is_text": false,
         "bytes": 0,
         "truncated": false,
-        "elapsed_ms": 500,
+        "elapsed_ms": 503,
         "challenge": false,
         "challenge_vendor": null,
         "blocked": false,
         "skipped": null,
         "error": "connection_refused",
-        "fetched_at": "2026-09-07T22:36:50Z",
+        "fetched_at": "2026-09-08T01:32:40Z",
         "body_path": null
       }
     }

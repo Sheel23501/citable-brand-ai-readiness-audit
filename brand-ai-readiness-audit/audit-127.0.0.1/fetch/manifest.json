@@ -1,5 +1,5 @@
 {
-  "site": "http://127.0.0.1:65027",
+  "site": "http://127.0.0.1:52837",
   "user_agent": "Mozilla/5.0 (compatible; brand-ai-readiness-audit/0.1.0; read-only audit; +https://github.com/brand-ai-readiness-audit)",
   "requests_made": 4,
   "by_purpose": {
@@ -10,9 +10,9 @@
   "budget": 40,
   "offline": false,
   "robots": {
-    "http://127.0.0.1:65027": {
+    "http://127.0.0.1:52837": {
       "state": "unreachable",
-      "url": "http://127.0.0.1:65027/robots.txt",
+      "url": "http://127.0.0.1:52837/robots.txt",
       "groups": [],
       "sitemaps": [],
       "parse_errors": []
@@ -20,8 +20,8 @@
   },
   "fetches": [
     {
-      "url": "http://127.0.0.1:65027/robots.txt",
-      "final_url": "http://127.0.0.1:65027/robots.txt",
+      "url": "http://127.0.0.1:52837/robots.txt",
+      "final_url": "http://127.0.0.1:52837/robots.txt",
       "redirect_chain": [],
       "cross_domain": false,
       "status": null,
@@ -38,12 +38,12 @@
       "blocked": false,
       "skipped": null,
       "error": "connection_refused",
-      "fetched_at": "2026-09-07T22:36:50Z",
+      "fetched_at": "2026-09-08T01:32:40Z",
       "body_path": null
     },
     {
-      "url": "http://127.0.0.1:65027/",
-      "final_url": "http://127.0.0.1:65027/",
+      "url": "http://127.0.0.1:52837/",
+      "final_url": "http://127.0.0.1:52837/",
       "redirect_chain": [],
       "cross_domain": false,
       "status": null,
@@ -54,18 +54,18 @@
       "is_text": false,
       "bytes": 0,
       "truncated": false,
-      "elapsed_ms": 500,
+      "elapsed_ms": 503,
       "challenge": false,
       "challenge_vendor": null,
       "blocked": false,
       "skipped": null,
       "error": "connection_refused",
-      "fetched_at": "2026-09-07T22:36:50Z",
+      "fetched_at": "2026-09-08T01:32:40Z",
       "body_path": null
     },
     {
-      "url": "http://127.0.0.1:65027/sitemap.xml",
-      "final_url": "http://127.0.0.1:65027/sitemap.xml",
+      "url": "http://127.0.0.1:52837/sitemap.xml",
+      "final_url": "http://127.0.0.1:52837/sitemap.xml",
       "redirect_chain": [],
       "cross_domain": false,
       "status": null,
@@ -76,18 +76,18 @@
       "is_text": false,
       "bytes": 0,
       "truncated": false,
-      "elapsed_ms": 499,
+      "elapsed_ms": 504,
       "challenge": false,
       "challenge_vendor": null,
       "blocked": false,
       "skipped": null,
       "error": "connection_refused",
-      "fetched_at": "2026-09-07T22:36:51Z",
+      "fetched_at": "2026-09-08T01:32:41Z",
       "body_path": null
     },
     {
-      "url": "http://127.0.0.1:65027/sitemap_index.xml",
-      "final_url": "http://127.0.0.1:65027/sitemap_index.xml",
+      "url": "http://127.0.0.1:52837/sitemap_index.xml",
+      "final_url": "http://127.0.0.1:52837/sitemap_index.xml",
       "redirect_chain": [],
       "cross_domain": false,
       "status": null,
@@ -98,13 +98,13 @@
       "is_text": false,
       "bytes": 0,
       "truncated": false,
-      "elapsed_ms": 500,
+      "elapsed_ms": 504,
       "challenge": false,
       "challenge_vendor": null,
       "blocked": false,
       "skipped": null,
       "error": "connection_refused",
-      "fetched_at": "2026-09-07T22:36:51Z",
+      "fetched_at": "2026-09-08T01:32:41Z",
       "body_path": null
     }
   ]

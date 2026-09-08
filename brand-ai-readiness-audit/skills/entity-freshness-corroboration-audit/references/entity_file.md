@@ -105,3 +105,5 @@ With the lookup enabled, `mode` would be `verify_wikipedia`, `target` the
 article URL, and `outcome` `verified` (an article, not a disambiguation
 page): all three `wikidata_*` checks pass and no external request is made on
 any later `--workdir` run.
+
+`tried` (added in Step 19): every lookup URL requested in order, at most two; `target` is the last one.

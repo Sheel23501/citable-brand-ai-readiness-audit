@@ -83,10 +83,10 @@ with the code, the handout and the code win. Several of their citations are
 | 1 Fetch layer | 4–5 | done: fetch helper + robots, sampler + categorizer |
 | 2 Probes | 6–13 | done |
 | 3 Orchestrator | 14–17 | done: compose.py, validate.py, run_audit.py, finalize.py, the entrypoint SKILL.md and simulation_rules.md |
-| 4 Hardening | 18–20 | Step 18 done. **Step 19 (live generalization pass) is next**, then source verification |
+| 4 Hardening | 18–20 | Steps 18–19 done. **Step 20 (source verification) is next** |
 | 5 Packaging | 21–24 | not started: README, demo, sweep, dry-run judging |
 
-Suite: **2688 checks, 0 failures, GREEN.** It now takes over ten minutes; run it in the background
+Suite: **2717 checks, 0 failures, GREEN.** It now takes over ten minutes; run it in the background
 or with `--stage <name>` while iterating, and plainly once before ticking a step. All five skills pass the validator.
 
 Code size: ~8,100 lines. Largest pieces: `engagement_probe.py` 1044, `compose.py` 800, `validate.py` 335, `run_audit.py` 210, `finalize.py` 130,
@@ -438,14 +438,55 @@ It caught one real edge — `compose.py --render-only` into a directory that did
 could not write the Markdown (a clean exit 1, not a traceback) — now fixed. The runner's
 docstring is the stage list in run order; `--stage <name>` runs one.
 
-## 13. Next step — Step 19 (live generalization pass)
+## 13. Step 19 — done (live generalization pass)
 
-Read the plan's Step 19 text first. Run `run_audit.py` on 8–10 real sites of different
-categories and sizes and read every report critically for **false positives**: a finding
-that would embarrass the tool in front of a site owner. Fix rules, never sites. Two known
-items to resolve by rule: python.org ties `publisher_media` / `nonprofit_institution` 4-4
-and resolves by table order (needs a documented tiebreak in `site_categories.md` and
-`sampler.py`); djangoproject.com infers `unknown` at low confidence. Watch the engagement
-probe's link sample on large sites (7-14 s) and any site that serves a challenge page.
-Every rule change needs a fixture or a unit assertion, and the suite must stay green.
-Reports from this pass are inputs to Step 22's demo report, so keep the workdirs.
+Thirteen sites, one per category plus the plan's edge cases (German, bot-protected,
+unreachable, non-HTML seed, bare IP), then python.org and djangoproject.com re-checked.
+Every run exit 0, no traceback, longest 41 s. Workdirs are kept under the scratchpad
+`live-pass/` (`wd-*` first pass, `v3-*` after the fixes) as inputs for Step 22.
+
+**The method was the plan's: read every finding and ask whether it would survive a
+judge who knows the site.** Nine rule defects surfaced; none was fixed by naming a site.
+The one worth remembering is `fx.facts.image_only`, which fired four times and was wrong
+four times — a photo caption containing "location", a headline containing "plans", an
+article image on a corporate blog. The principle that fixed it also fixed category
+inference and role discovery: **a label is not a sentence.** A fact word inside prose is
+not a signal; only short alt text, a filename token, or a short heading is. The same
+principle removed python.org's `nav:world` (an eight-word headline) and heise's "pricing
+page" (a news headline containing "plans").
+
+Category inference got three more rules, all in `site_categories.md` section 2 and
+`sampler.py`: newspaper section names score only as a cluster of two or more; nav links
+to sibling subdomains are the site's own navigation; a generic `LocalBusiness` type scores
+2 while a specific one scores 3. And the documented tiebreak: stronger evidence kind, then
+breadth, then table order — that last resort recorded as `tie:<runner-up>` with confidence
+`low`, because an unresolved tie *is* uncertainty. python.org now resolves to
+`nonprofit_institution` by score with no tie; djangoproject.com to `saas_software`.
+
+Entity: `© 2005-now` is the current year; the discover lookup tries the site's shorter
+self-name once (Dishoom's long `og:site_name` had produced a false `not_found`; the short
+name found the article, which is the 2016 film — a *true* collision, and the finding now
+says "Wikipedia's 'Dishoom' is not this brand, and the site links no entity of its own");
+an unclassified site's NAP requirement is any contact, not a postal address. Compose: when
+no page was readable, the simulation check is `not_evaluated` with reason
+`no_readable_pages` — an unread site is unknown, not silent. `category_label()` in
+`categories.py` ended "a unknown site".
+
+Two honest non-fixes: paulgraham.com stays `unknown` (image-only navigation with no alt
+text gives nothing to score, and its 18 findings are true of the page), and Clearleft's
+`wikidata_not_found` stays at low confidence as the registry says.
+
+**Known quality item for Step 22:** the `how_to_participate` fact excerpt can be a window
+of navigation chrome ("…Donate ≡ Menu Search…"); the detector should prefer the matching
+link's text. It is a fact excerpt, not a finding, so it was out of Step 19's scope.
+
+## 14. Next step — Step 20 (source verification)
+
+Read the plan's Step 20 text first: open every citation and every Adobe fact with a web
+tool, keep only what is confirmed with URLs in `audit-orchestrator/references/sources.md`,
+and **remove** anything unconfirmed from code, references and README — never soften it.
+The list to verify is in the plan text (bot_tiers.md rows, the two arXiv papers, the
+studies and statistics from the strategy PDFs, the URLs in every probe's `REFS` dict).
+Grep for `REFS = {` in each probe and for `http` in every references file to build the
+inventory before opening anything. Invariant 11 has held so far only because Step 20 was
+always going to do this; it is the step that makes the README's claims safe to print.

@@ -32,7 +32,7 @@ sys.path.insert(0, os.path.normpath(os.path.join(HERE, "..", "..", "audit-orches
 
 from auditlib import extract as X  # noqa: E402
 from auditlib.categories import (CTA_VOCAB, CATEGORY_NOUNS, OFFER_VERBS, TRUST_SIGNALS, TRUST_SIGNALS_DEFAULT,  # noqa: E402
-                                 engagement_cap, is_key_page)
+                                 engagement_cap, is_key_page, category_label)
 from auditlib.cli import probe_main  # noqa: E402
 from auditlib.fetch import Fetcher, normalize_url, registrable_domain  # noqa: E402
 from auditlib.findings import ProbeOutput, evidence_item, impact_for, priority_for  # noqa: E402
@@ -743,8 +743,8 @@ def check_trust(ctx, out, usable, work):
     items.append(evidence_item("site", "computed", "pages_checked=%s; rule=%s; present=%s; missing=%s" % (
         ",".join(p.role for p in pages), rule, ",".join(present) or "none", ",".join(missing))))
     _fail(out, cid, cap,
-          title="None of the trust signals expected of a %s site is visible on the home, about or contact page" % ctx.category.replace("_", " ")
-          if not present else "Trust signals on the home, about and contact pages fall short of what a %s site needs" % ctx.category.replace("_", " "),
+          title="None of the trust signals expected of %s is visible on the home, about or contact page" % category_label(ctx.category)
+          if not present else "Trust signals on the home, about and contact pages fall short of what %s needs" % category_label(ctx.category),
           evidence="Checked %s for %s: found %s." % (", ".join(p.role for p in pages), rule, ", ".join(present) or "none of them"),
           evidence_items=items,
           why="A visitor deciding whether to stay looks for proof that others trust the site: names, addresses, reviews, policies. When the pages they land on show none, the offer reads as unverified and they go back to the assistant.",

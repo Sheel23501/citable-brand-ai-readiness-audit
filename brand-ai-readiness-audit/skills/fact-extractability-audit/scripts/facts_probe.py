@@ -19,7 +19,7 @@ from urllib.parse import urlsplit
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.normpath(os.path.join(HERE, "..", "..", "audit-orchestrator", "scripts")))
 from auditlib.cli import probe_main  # noqa: E402
-from auditlib.categories import KEY_FACTS, AUDIENCE_FACT, SEVERITY_OVERRIDES  # noqa: E402
+from auditlib.categories import KEY_FACTS, AUDIENCE_FACT, SEVERITY_OVERRIDES, category_label  # noqa: E402
 from auditlib.findings import ProbeOutput, evidence_item  # noqa: E402
 from auditlib.render import render_state  # noqa: E402
 from auditlib import extract as X  # noqa: E402
@@ -37,6 +37,25 @@ IMAGE_FACT_WORDS = {
 }
 IMAGE_FACT_TO_FACT_IDS = {"pricing": ("pricing_or_trial", "sample_product_price"), "hours": ("opening_hours",), "address": ("address", "location", "location_or_service_area", "headquarters", "location_or_contact"),
                           "menu": ("services_or_menu",), "specs": ()}
+# Where each fact is expected to live. An image on a blog post is a photo, whatever its caption says.
+IMAGE_FACT_PAGES = {"pricing": ("pricing", "product", "home"), "hours": ("contact", "home", "about", "product"),
+                    "address": ("contact", "about", "home"), "menu": ("product", "home"), "specs": ()}
+IMAGE_ALT_MAX_WORDS = 5       # a label ("Opening hours", "Price list 2026"), not a caption
+IMAGE_HEADING_MAX_WORDS = 4   # a heading that names the fact, not a sentence that happens to contain the word
+
+
+def image_fact_signals(alt, fname, heading, fact):
+    """Which of alt / filename / heading name `fact` as a label. Captions and sentences never count: the words that
+    mark a fact ("plans", "location", "hours") are ordinary words inside prose."""
+    rx = IMAGE_FACT_WORDS[fact]
+    signals = []
+    if alt and len(alt.split()) <= IMAGE_ALT_MAX_WORDS and rx.search(alt):
+        signals.append("alt")
+    if fname and rx.search(fname):
+        signals.append("filename")
+    if heading and len(heading.split()) <= IMAGE_HEADING_MAX_WORDS and rx.search(heading):
+        signals.append("heading")
+    return signals
 REFS = {
     "jsonld": "https://developers.google.com/search/docs/appearance/structured-data/intro-structured-data",
     "sd_general": "https://developers.google.com/search/docs/appearance/structured-data/sd-policies",
@@ -256,7 +275,7 @@ def check_key_facts(ctx, out, pages, required, facts):
             items.append(evidence_item(f["page"] or "site", "text_excerpt", f["value"] or "", note="%s found via %s" % (fid, f["source"])))
     advice = " ".join(FACT_ADVICE.get(fid, "Add %s as plain text." % fid) for fid, _ in missing[:3])
     out.fail("fx.facts.key_fact_missing",
-             title="%d of %d key facts for a %s site are not extractable as text" % (len(missing), len(required), ctx.category.replace("_", " ")),
+             title="%d of %d key facts for %s are not extractable as text" % (len(missing), len(required), category_label(ctx.category)),
              evidence="Searched %d sampled pages (%s). Found %d of %d key facts as plain text or structured data; not found: %s." % (
                  len(pages), roles, len(required) - len(missing), len(required), "; ".join(parts)),
              evidence_items=items,
@@ -285,8 +304,11 @@ def check_image_only(ctx, out, pages, facts):
             for hd in d.headings:
                 if hd["pos"] <= img.get("pos", 0):
                     heading = hd["text"] or ""
-            for fact, rx in IMAGE_FACT_WORDS.items():
-                signals = [s for s, val in (("alt", alt), ("filename", fname), ("heading", heading)) if val and rx.search(val)]
+            for fact in IMAGE_FACT_WORDS:
+                # only the category's key facts, only on the pages where that fact is expected, only from labels
+                if not any(f in required for f in IMAGE_FACT_TO_FACT_IDS[fact]) or p.role not in IMAGE_FACT_PAGES[fact]:
+                    continue
+                signals = image_fact_signals(alt, fname, heading, fact)
                 if not signals:
                     continue
                 if fact == "pricing" and X.PRICE_RE.search(p_text):
@@ -300,7 +322,7 @@ def check_image_only(ctx, out, pages, facts):
                 if fact == "specs":
                     continue  # never a finding: feature grids are usually decorative restatements of text
                 page_hits.append({"fact": fact, "src": img.get("src"), "alt": alt, "filename": fname, "heading": heading, "signals": signals,
-                                  "key_fact": any(f in required for f in IMAGE_FACT_TO_FACT_IDS[fact])})
+                                  "key_fact": True})
                 break
         if page_hits:
             hits_by_page.append((p, page_hits))
@@ -309,7 +331,6 @@ def check_image_only(ctx, out, pages, facts):
         return
     for p, hits in hits_by_page:
         strong = any(len(h["signals"]) >= 2 for h in hits)
-        key = any(h["key_fact"] for h in hits)
         kinds = sorted({h["fact"] for h in hits})
         f = out.fail("fx.facts.image_only",
                      title="%s exist%s only as an image on the %s page" % (" and ".join(k.capitalize() for k in kinds), "s" if len(kinds) == 1 else "", p.role),
@@ -324,11 +345,6 @@ def check_image_only(ctx, out, pages, facts):
                      action="Reproduce the %s as HTML text on this page (a table or list), keeping the image if you like." % " and ".join(kinds),
                      detail="Add the same information as a text table or list directly under the image, and add the matching JSON-LD (Offer.price and priceCurrency for prices, openingHoursSpecification for hours, PostalAddress for addresses). Verify by searching the page source for the numbers.",
                      pages=[p.final_url], page_roles=[p.role], confidence="medium" if strong else "low")
-        if not key and f["severity"] == "high":
-            f["severity"] = "medium"
-            f["suggested_action"]["impact"] = "medium"
-            f["suggested_action"]["priority"] = "medium" if f["confidence"] != "low" else "low"
-            f["evidence_items"].append(evidence_item(p.final_url, "computed", "adjustments=non_key_fact:medium"))
 
 
 def check_jsonld(ctx, out, pages):

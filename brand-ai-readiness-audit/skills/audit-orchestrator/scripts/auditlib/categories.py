@@ -214,3 +214,17 @@ AUDIENCE_PHRASE = {
     "corporate_enterprise": "a customer like me",
     "unknown": "someone like me",
 }
+
+
+# How a category is named inside a sentence ("... key facts for a local business site ..."). Owned here so no
+# probe writes "a unknown site".
+CATEGORY_LABEL = {
+    "ecommerce": "an e-commerce site", "saas_software": "a SaaS site", "local_business": "a local business site",
+    "professional_services": "a professional services site", "publisher_media": "a publisher's site",
+    "portfolio_personal": "a portfolio site", "nonprofit_institution": "a nonprofit or institutional site",
+    "corporate_enterprise": "a corporate site", "unknown": "a site of unknown type",
+}
+
+
+def category_label(category):
+    return CATEGORY_LABEL.get(category, CATEGORY_LABEL["unknown"])

@@ -54,3 +54,12 @@ that tells a business to change a legitimate choice.
 - **Nothing is inferred about a fact from its absence in the sample.** The
   facts file records `absent`, the finding says "not extractable from the
   sampled pages", and the simulation answers "the site does not state it".
+
+## Added after the live pass (Step 19)
+
+| What the probe sees | Why it is not a finding |
+|---|---|
+| A photo whose caption mentions a fact word: "location pins dropping onto a street map", "Thomas Kropf … and colleagues" on a news post | A caption is prose, not a label. `fx.facts.image_only` reads only short alt text (≤ 5 words), filename tokens, and headings of ≤ 4 words, and only on the pages where the fact is expected. |
+| A headline that contains "plans" above an article image | Same rule: "Broadcom plans new vSphere Standard" is a sentence. It is neither a pricing heading nor, for the sampler, a pricing page. |
+| An "hours" or "address" image on a corporate or SaaS site | Only the category's key facts are graded. A corporate site is not asked for opening hours. |
+| A map screenshot with a seven-word caption on a contact page with no text address | The missing address is already `ef.entity.nap_missing_plain_text` and `fx.facts.key_fact_missing`; the image is not a third finding. |

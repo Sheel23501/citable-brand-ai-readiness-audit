@@ -319,3 +319,9 @@ Every finding's `evidence_items` ends with a `computed` item
 `category_override:<sev>`, `non_key_pages:-1`, `blast_radius:+1`,
 `confidence_cap:medium`, `contact_and_about_not_sampled:confidence_medium`.
 A reader can always see why a severity differs from the registry default.
+
+## Refinements after the live pass (Step 19)
+
+- **Open copyright ranges.** `© 2005-now Clearleft` and `© 2005–present` mean "still current": the year counted is the current year, never the opening one. A closed range counts its later year.
+- **NAP for an unclassified site.** When the category is `unknown`, the requirement is the name plus any contact (address, phone or email). The audit does not demand a postal address of a site it could not classify.
+- **A second title in discover mode.** When the site also calls itself by a shorter name (a title segment `Dishoom` beside an `og:site_name` of `Dishoom Indian Restaurants`), a 404 on the long title is followed by exactly one more title lookup on the shortest such name. `work/entity_lookup.json` records every target under `tried`. The bound is two title requests (plus the lookup host's robots.txt, fetched once per run); it is still a title lookup, not a search, and the confidence stays low.

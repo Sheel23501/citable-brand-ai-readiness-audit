@@ -44,7 +44,7 @@ STALE_YEARS = 2
 MISMATCH_DAYS = 30
 
 LEGAL_SUFFIX_RE = re.compile(r"\b(ltd|limited|inc|incorporated|llc|llp|plc|gmbh|ag|sa|s\.a\.|bv|b\.v\.|pty|oy|ab|srl|s\.r\.l\.|spa|s\.p\.a\.|corp|corporation|co|company|group|holdings)\b\.?", re.I)
-COPYRIGHT_YEAR_RE = re.compile(r"(?:©|\(c\)|copyright)[^\d\n]{0,40}?((?:19|20)\d{2})(?:\s*[-–—]\s*((?:19|20)\d{2}))?", re.I)
+COPYRIGHT_YEAR_RE = re.compile(r"(?:©|\(c\)|copyright)[^\d\n]{0,40}?((?:19|20)\d{2})(?:\s*[-–—]\s*((?:19|20)\d{2}|now|present|today|current))?", re.I)
 PRESS_LINK_RE = re.compile(r"\b(press|newsroom|news\s*room|news|media|blog|announcements|updates|in\s+the\s+(press|news)|stories|insights|journal)\b", re.I)
 PRESS_PATH_SEGMENTS = {"press", "news", "newsroom", "media", "blog", "updates", "announcements", "stories", "insights", "journal", "press-releases", "pressroom"}
 MONTHS = {m: i + 1 for i, m in enumerate(("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"))}
@@ -130,7 +130,9 @@ def copyright_years(page):
     out = []
     text = page.doc.body_text or ""
     for m in COPYRIGHT_YEAR_RE.finditer(text):
-        y = int(m.group(2) or m.group(1))
+        end = m.group(2)
+        # "© 2005-now" and "© 2005-present" are open ranges: the site is saying "still current"
+        y = _today().year if end and not end.isdigit() else int(end or m.group(1))
         out.append((y, text[max(0, m.start() - 10):m.end() + 30].strip()))
     return out
 
@@ -218,7 +220,23 @@ def classify_entitydata(data, qid, brand, domain):
     return {"label": label, "aliases": aliases[:5], "website": website, "label_match": label_match, "website_match": website_match}
 
 
-def entity_lookup(ctx, brand, sameas, external, domain):
+def lookup_alternates(brand, candidates):
+    """Shorter distinct names the site also uses for itself (a title segment "Dishoom" beside an og:site_name
+    "Dishoom Indian Restaurants"), shortest first: the second title a discover lookup may try."""
+    base = _norm_name(brand or "")
+    n = len((brand or "").split())
+    alts = {}
+    for val, _src, _url in candidates or []:
+        val = re.sub(r"\s+", " ", (val or "").strip())
+        if not val or len(val.split()) >= n or not re.search(r"[A-Za-z]{2}", val):
+            continue
+        key = _norm_name(val)
+        if key and key != base and key not in alts:
+            alts[key] = val
+    return sorted(alts.values(), key=lambda v: (len(v.split()), len(v)))
+
+
+def entity_lookup(ctx, brand, sameas, external, domain, alternates=None):
     """One robots-allowed request that either verifies the site's own sameAs anchor or looks the brand name up on Wikipedia.
 
     outcome: verified | ambiguous | collision | mismatch | not_found | unavailable | skipped
@@ -251,9 +269,23 @@ def entity_lookup(ctx, brand, sameas, external, domain):
             res["outcome"], res["reason"] = "skipped", "no_brand_name"
             return _save_lookup(ctx, res)
         res["mode"], res["target"] = "discover", "https://%s/wiki/%s" % (WIKIPEDIA_HOST, title)
+    targets = [res["target"]]
+    if res["mode"] == "discover":
+        # one more title when the site also calls itself by a shorter name: still bounded, still a title lookup
+        for alt in (alternates or [])[:1]:
+            t = wikipedia_title_for(alt)
+            if t and "https://%s/wiki/%s" % (WIKIPEDIA_HOST, t) not in targets:
+                targets.append("https://%s/wiki/%s" % (WIKIPEDIA_HOST, t))
     fetcher = ctx.fetcher or Fetcher(workdir=ctx.workdir, site=ctx.site)
     before = fetcher.requests_made
-    r = fetcher.get(res["target"], purpose="entity_lookup", timeout=LOOKUP_TIMEOUT)
+    res["tried"] = []
+    for target in targets:
+        res["target"] = target
+        res["tried"].append(target)
+        r = fetcher.get(target, purpose="entity_lookup", timeout=LOOKUP_TIMEOUT)
+        if r.get("status") == 404 and target != targets[-1]:
+            continue
+        break
     res["requests_made"] = fetcher.requests_made - before
     res["status"] = r.get("status")
     if r.get("skipped"):
@@ -401,7 +433,7 @@ def check_lookup(ctx, out, lookup, brand, sameas):
         ev = "%s is a disambiguation page with about %d entries; the site's sameAs (%s) does not point to any of them." % (target, lookup.get("entries") or 0, ", ".join(sameas[:3]) or "none")
         conf = "medium"
     elif o == "collision":
-        ttl = "The Wikipedia article '%s' is about a different thing called %s" % ((title or brand)[:40], brand)
+        ttl = "Wikipedia's '%s' is not this brand, and the site links no entity of its own" % (title or brand)[:40]
         ev = "%s (Wikidata %s) does not mention %s anywhere, so the best-known entity under this name is not this brand, and the site publishes no sameAs to say which one it is." % (target, qid or "unknown", dom or "the site's domain")
         conf = "medium"
     else:
@@ -440,6 +472,18 @@ def _text_address(text):
     return None
 
 
+def nap_requirement(category):
+    """check_ids.md, ef.entity.nap_missing_plain_text: what must be visible text, by category."""
+    if category == "local_business":
+        return {"name": ["name"], "postal address": ["address"], "phone number": ["phone"]}
+    if category == "portfolio_personal":
+        return {"name": ["name"], "contact (email or phone)": ["email", "phone"]}
+    if category == "unknown":
+        # when the audit cannot tell what the site is, it does not demand a postal address of it
+        return {"name": ["name"], "contact (address, phone or email)": ["address", "phone", "email"]}
+    return {"name": ["name"], "postal address or phone number": ["address", "phone"]}
+
+
 def check_nap(ctx, out, pages, brand):
     anchor = [p for p in pages if p.role in ("home", "contact", "about")] or pages[:3]
     texts = [(p, p.doc.body_text or "") for p in anchor]
@@ -473,13 +517,7 @@ def check_nap(ctx, out, pages, brand):
             m = X.EMAIL_RE.search(t)
             if m:
                 found["email"] = (p, m.group(0))
-    cat = ctx.category
-    if cat == "local_business":
-        need = {"name": ["name"], "postal address": ["address"], "phone number": ["phone"]}
-    elif cat == "portfolio_personal":
-        need = {"name": ["name"], "contact (email or phone)": ["email", "phone"]}
-    else:
-        need = {"name": ["name"], "postal address or phone number": ["address", "phone"]}
+    need = nap_requirement(ctx.category)
     if not name_evaluated:
         need.pop("name", None)
     missing = [label for label, keys in need.items() if not any(k in found for k in keys)]
@@ -776,7 +814,8 @@ def run(ctx, args=None):
     entity.update({"brand_name": brand, "org_node_types": sorted({(X.node_types(n) or ["?"])[0] for _, n, _ in nodes}), "sameas": sameas,
                    "authority_hosts_present": sorted({_host(u) for u in sameas if any(a in _host(u) for a in authority_hosts(ctx.category))})})
     try:
-        lookup = entity_lookup(ctx, brand.get("value"), sameas, external, domain)
+        lookup = entity_lookup(ctx, brand.get("value"), sameas, external, domain,
+                               alternates=lookup_alternates(brand.get("value"), name_candidates(usable)))
     except Exception as e:  # noqa: BLE001
         lookup = {"outcome": "unavailable", "reason": "lookup_failed", "error": "%s: %s" % (type(e).__name__, e)}
     entity["lookup"] = lookup
