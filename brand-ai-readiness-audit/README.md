@@ -337,6 +337,13 @@ findings, alongside `csr-shell`, `js-gate`, `challenge-page`,
 `non-html-seed`, `one-page-portfolio`, `blocked-links`, and four `weak-*` sites.
 Each declares the check ids it must trigger, taken from the registry.
 
+## Working on this
+
+`CONTRIBUTING.md` covers what a new contributor needs: the fast per-stage test
+loop, the six places a check id must be registered, the invariants that must not
+break (replay parity, never-crash, stdlib-only, severity discipline), and the
+traps that have already cost time.
+
 ## Validation
 
 ```bash
