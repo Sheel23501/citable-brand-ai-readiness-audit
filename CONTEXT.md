@@ -537,10 +537,68 @@ sign-up button is what About pages look like. Both are rubric-and-registry chang
 fixture each. Also still open: `cr.access.non_html_seed` reports `pass` when the home page
 returned 403 (it never saw HTML) — should be `not_evaluated`.
 
-## 15. Next step — Step 23 (final compliance sweep)
+## 15. 2026-09-10 — where things stand, and what to do next (read this first)
 
-Read the plan's Step 23 text. Most of it is already asserted by the suite (validator on
-all skills, one entrypoint, stdlib-only, no traceback anywhere) — run it once as a checklist
-against the actual zip, check the zip size and that no scratch or workdir is inside it, and
-decide the two calibrations above before Step 24's dry-run judging. Pull first: Deepak may
-have pushed.
+Everything above is history. This section is the current state.
+
+**Repo:** `main` at `da812bd`, clean, pushed. Steps 1–22 of `BUILD_PLAN.md` ticked;
+23 (compliance sweep) and 24 (dry-run judging) open. Suite: 3,349 checks green
+(`cd brand-ai-readiness-audit && python3 tests/run_tests.py`, >10 min; use `--stage <name>`
+while iterating). 61 checks, 21 fixtures, five skills all pass the validator.
+
+**Two people commit:** Sheel's sessions and Deepak (deepak23188@iiitd.ac.in). Always
+`git pull --ff-only origin main` before starting anything.
+
+**To audit any site:**
+```
+cd brand-ai-readiness-audit
+python3 skills/audit-orchestrator/scripts/run_audit.py https://example.com/ --workdir audit-example
+```
+Read `audit-example/report.md`. `--category <id>` overrides inference, `--offline` re-grades a
+saved workdir, `--verbose` shows each probe. `audit-*` directories are git-ignored.
+
+**Live results so far** (all exit 0, no tracebacks, longest 83 s): Step 19's 13 sites; Deepak's
+38; a 10-site batch on 2026-09-09 (72 defect findings, 0 judged false, ~10 arguable on
+severity); iiitd.ac.in on 2026-09-10 (12 findings: 4 medium, 6 low, 2 info; category
+nonprofit_institution; simulation answered 4 of 5 questions, the unanswerable one — "what
+programs, and where" — matched the key-fact finding exactly).
+
+**An LLM-council session on 2026-09-10** (five advisors + peer review) reached these
+conclusions, which are the plan from here:
+
+1. **Do NOT do the 500-site corpus run.** Judges never see that number; it costs a day.
+2. **Do Step 24 before Step 23.** Give Deepak the zip cold, a clean machine, three sites
+   Sheel never ran — **adobe.com, a bare React SPA, a local business** — one hour. He lists
+   every finding he cannot verify in 60 seconds and every place the README confused him.
+   That list is the real Step 23. Adobe.com has never been run; do it first.
+3. **The two severity calibrations are not optional** (the council's one real clash, resolved
+   4–1): `ef.entity.nap_missing_plain_text` at `medium` on corporate/SaaS sites that simply do
+   not print an address → `low` (or accept email as the contact fact); `en.cta.missing` grading
+   About and Contact pages → info-level non-finding on those roles. Each is a registry +
+   rubric change with a fixture. iiitd.ac.in's F-001 is a live example of the second.
+4. **Make what is already built visible.** Reviewers flagged robots/GET-only compliance, the
+   5-minute wall, and marketplace composition as "unaddressed" — all three are built and
+   tested; the README must *say so in one line each* (request manifest per run; 300 s budget
+   with partial reports; validator on all five skills, composition argument in
+   `coverage_map.md` §3).
+5. **Put the no-JS thesis on page one of the README as the point** ("we show what a
+   non-JavaScript fetcher sees, because that is what AI crawlers see"), not as a limitation.
+6. **Explain the simulation's verbatim-only rule in the report itself**, or it reads as
+   weak next to teams that fake richer answers.
+7. **Move the false-positive history inside the zip** (it lives in BUILD_PLAN.md/CONTEXT.md,
+   outside): expand `CONTRIBUTING.md`'s known traps or add a short mistakes log — nine
+   defects in Step 19, four in Deepak's pass, the edge-block fix.
+8. **Consider sorting findings by verifiability**, not only severity — the first finding a
+   judge reads decides the score. This changes `report_schema.md` §4; decide, don't drift.
+9. Tag a ~90-second smoke subset of the suite; run the full suite once before zipping.
+10. Also open, smaller: `cr.access.non_html_seed` reports `pass` when the home page returned
+    403 (should be `not_evaluated`); check the zip for stray workdirs and its size.
+
+**Decisions the council judged right, keep them:** stdlib-only; no headless browser (fix the
+framing, not the bet); the large suite (it caught 13 real defects); "fix rules, never sites";
+the verbatim-only simulation with its validator; the zero-findings clean-site report as a
+product feature.
+
+**Order for the next session:** pull → run adobe.com and read the first finding as a judge
+would → the two calibrations (with fixtures) → README items 4–7 → Deepak's cold run → fix
+his list → full suite → zip → Step 23 checklist against the zip → Step 24 → submit.
