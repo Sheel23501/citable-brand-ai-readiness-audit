@@ -197,7 +197,9 @@ def check_access(ctx, out):
         ea = ctx.edge_access or {}
         probed = ea.get("agents") or []
         policy = ea.get("policy") or []
-        crawlers_refused = [a for a in probed if (a.get("status") or 0) >= 400 or a.get("error")]
+        # a hung connection is not a refusal: a token that timed out is neither served nor refused, so it never
+        # completes the "every crawler refused" case (measured: adobe.com hangs bot user agents for 25 s and 200s us)
+        crawlers_refused = [a for a in probed if ((a.get("status") or 0) >= 400 or a.get("error")) and not _timed_out(a)]
         probe_items = ([evidence_item(ea.get("url") or home.final_url, "http_status", "%s -> %s" % (a["token"], a.get("error") or a.get("status")),
                                       note="user-agent probe; robots.txt %s" % (a.get("robots_rule") or "has no rule for this path (allowed)")) for a in probed] +
                        [evidence_item(ea.get("url") or home.final_url, "robots_rule", "%s not probed: %s" % (a["token"], a.get("rule") or "disallowed"),
@@ -280,6 +282,11 @@ def check_access(ctx, out):
 
 # ---------------------------------------------------------------- edge-level access checks
 EDGE_IDS = ("cr.access.edge_block", "cr.access.edge_block_training", "cr.access.ua_content_variance")
+TIMEOUT_ERRORS = ("read_timeout", "connect_timeout", "total_timeout", "time_budget")   # hung, not refused
+
+
+def _timed_out(a):
+    return (a.get("error") or "") in TIMEOUT_ERRORS
 
 
 def check_edge_access(ctx, out):
@@ -308,10 +315,12 @@ def check_edge_access(ctx, out):
             out.not_evaluated(cid, reason="no_200_baseline")
         return
     base_bytes = (ea.get("baseline") or {}).get("bytes") or 0
-    refused, served = [], []
+    refused, served, hung = [], [], []
     for a in ea["agents"]:
         st = a.get("status") or 0
-        if a.get("error") or st >= 400:
+        if _timed_out(a):
+            hung.append(a)
+        elif a.get("error") or st >= 400:
             refused.append(a)
         else:
             served.append(a)
@@ -350,6 +359,23 @@ def check_edge_access(ctx, out):
         if every:
             out.findings[-1]["severity"] = "critical"
             out.findings[-1]["suggested_action"]["impact"] = "high"
+    elif [a for a in hung if a["tier"] in ("live_answer", "index")]:
+        # The connection hung for a citation-tier token while the audit's own request was answered. A site that
+        # tarpits bot user agents does exactly this, and so does a slow origin under load; the audit cannot tell
+        # them apart from one request each, so it says what it saw and how to check, and claims no defect.
+        slow = [a for a in hung if a["tier"] in ("live_answer", "index")]
+        out.inconclusive("cr.access.edge_block", reason="probe_timeout",
+                         title="The crawler probe timed out for %s while the audit's own request was served" % (
+                             "every AI crawler tested" if len(slow) == len(probed_cite) else ", ".join(a["token"] for a in slow)),
+                         evidence="GET %s answered the audit user agent with HTTP %s (%d bytes), but %s. A timeout is not a refusal: this may be bot throttling or a slow origin." % (
+                             ea["url"], (ea.get("baseline") or {}).get("status"), base_bytes, "; ".join(_desc(a) for a in slow)),
+                         evidence_items=[evidence_item(ea["url"], "http_status", "audit user agent -> %s (%d bytes)" % (
+                             (ea.get("baseline") or {}).get("status"), base_bytes))] +
+                             [evidence_item(ea["url"], "http_status", _desc(a), note="user-agent probe; robots.txt: %s" % _rule(a)) for a in slow] + policy_items,
+                         why="If the origin deliberately stalls these user agents, the crawlers that fetch pages for AI answers never get the page; if it was a slow moment, nothing is wrong. One request cannot say which.",
+                         action="Time a request as the crawler yourself, and check the CDN's bot-management rules for a challenge or rate limit on these agents.",
+                         detail="curl -A '%s' -m 30 -o /dev/null -w '%%{http_code} %%{time_total}s' %s  — a consistent stall or a 4xx confirms throttling; a quick 200 clears it." % (
+                             next((ua for t, _tier, ua in PROBE_USER_AGENTS if t == slow[0]["token"]), slow[0]["token"]), ea["url"]))
     else:
         out.check("cr.access.edge_block", "pass")
 

@@ -369,3 +369,15 @@ Every finding's `evidence_items` ends with a `computed` item
 `adjustments=...` when the rubric changed the default: `non_key_pages:-1`,
 `blast_radius:+1`, `confidence_cap:medium`, `category_cap:low`. A reader can
 always see why a severity differs from the registry default.
+
+## Where "the first 40%" starts (refined after the dry-run judging)
+
+Every first-viewport rule (`en.cta.missing`, `en.hero.value_prop_unclear`,
+`en.interstitial.blocking`, `en.nav.related_links_missing`) measures position
+in the **content markup**: from the first visible content — text, heading or
+image — to the end, not from `<body>`. A WordPress home page was measured with
+its first link at 60% of the body markup, behind 200 KB of inline SVG and
+style; "the first 40% of the body" held nothing a visitor sees, and four "Book
+a table" buttons were reported as no call to action. Markup position is still
+a proxy for pixel position (see `non_findings.md`, limits); this anchor makes
+it a much better one.

@@ -149,6 +149,11 @@ class _Parser(HTMLParser):
                              "width": _int(a.get("width")), "height": _int(a.get("height")),
                              "role": (a.get("role") or "").lower(), "context": self._ctx(),
                              "loading": a.get("loading"), "pos": len(self.body_text_parts), "mpos": mpos})
+            # an image anchors the content only where a visitor would see it: not a tracking pixel in <noscript>,
+            # not an icon inside an inline <svg> or <template>
+            if d.content_mpos is None and mpos is not None and getattr(self, "cur_noscript", None) is None \
+                    and not any(t in _SKIP_TEXT for t in self.stack):
+                d.content_mpos = mpos
         elif tag == "form":
             d.forms.append({"action": d._abs(a.get("action") or ""), "role": (a.get("role") or "").lower(),
                             "method": (a.get("method") or "get").lower(), "inputs": [], "context": self._ctx(), "mpos": mpos})
@@ -264,6 +269,8 @@ class _Parser(HTMLParser):
         elif tag in ("h1", "h2", "h3", "h4", "h5", "h6") and self.cur_heading is not None:
             t, parts, hm = self.cur_heading
             d.headings.append({"tag": t, "text": _clean(" ".join(parts)), "context": self._ctx(), "pos": len(self.body_text_parts), "mpos": hm})
+            if d.content_mpos is None and hm is not None:
+                d.content_mpos = hm
             self.cur_heading = None
         elif tag == "button" and getattr(self, "cur_button", None):
             a, parts = self.cur_button
@@ -311,6 +318,8 @@ class _Parser(HTMLParser):
         self.text_parts.append(data)
         if self.in_body:
             self.body_text_parts.append(data)
+            if data.strip() and self.doc.content_mpos is None:
+                self.doc.content_mpos = self._mpos()
 
 
 def _int(v):
@@ -353,6 +362,7 @@ class Document:
         self.overlay_candidates = []
         self.empty_root_containers = []
         self.body_mpos = None        # markup fraction where <body> (or the first body-level tag) starts
+        self.content_mpos = None     # markup fraction of the first visible content (text, heading, image): the viewport starts here
         self.stylesheets = []
         self.script_tags = 0         # <script> elements other than ld+json
         self.article_count = 0       # <article> elements (two or more = a listing page)
@@ -381,10 +391,14 @@ class Document:
 
     # -- positions
     def body_frac(self, mpos):
-        """Position within the body markup as a fraction 0..1 (None when unknown). 0.4 = the first 40% of the body markup."""
+        """Position within the content markup as a fraction 0..1 (None when unknown). 0.4 = the first 40% of the content.
+
+        Anchored on the first visible content, not on <body>: a page may open with hundreds of kilobytes of inline
+        SVG, style or script before its first word (measured: a restaurant home whose first link sat at 60% of the
+        body markup), and "the first 40% of the body" would then hold nothing a visitor sees."""
         if mpos is None:
             return None
-        start = self.body_mpos or 0.0
+        start = self.content_mpos if self.content_mpos is not None else (self.body_mpos or 0.0)
         span = max(1.0 - start, 1e-9)
         return max(0.0, min(1.0, (mpos - start) / span))
 

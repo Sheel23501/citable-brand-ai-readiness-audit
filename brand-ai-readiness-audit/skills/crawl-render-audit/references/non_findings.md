@@ -60,3 +60,12 @@ has disallowed, so it cannot report the enforcement as a second finding, and
 it cannot tell the owner to add a WAF allow rule for a crawler they chose to
 refuse. It speaks only when robots.txt allows a crawler and the edge refuses
 it anyway: policy and behaviour disagreeing.
+
+## A crawler probe that times out
+
+adobe.com answered the audit's own request in under a second and let all three
+crawler-token probes hang until the 25-second cap. That is what a tarpit looks
+like, and also what a slow origin looks like. One request each cannot say
+which, so `cr.access.edge_block` reports it as `inconclusive` (`probe_timeout`)
+with the exact `curl` to run, and claims no defect. A hung token never counts
+toward "every crawler refused" in `cr.access.http_error` either.

@@ -503,6 +503,16 @@ def stage_htmldoc(res):
     res.check(cat["value"] == "ecommerce" and cat["confidence"] == "high", "ecommerce: jsonld 3 + nav 2 + prices 2 => high (%s)" % cat["scores"].get("ecommerce"))
     cat = categorize([], {"home": Document("<p>hi</p>", base_url="https://z.example/")}, [], "https://z.example/", 1)
     res.check(cat["value"] == "unknown", "bare page with <=5 pages scores 2 for portfolio, below threshold => unknown")
+    # the first viewport starts at the first visible content, not at <body> (dry-run judging, 2026-09-10)
+    heavy = Document("<html><body><noscript><p><img src='https://t.example/pixel.php?rec=1' style='border:0'></p></noscript>"
+                     + "<svg><title>logo</title><path d='%s'/></svg>" % ("M0 0 L1 1 " * 20000) + "<style>.x{}</style>"
+                     "<header><a href='/'>Skip</a></header><main><h1>Steak</h1><a href='/book/'>Book a table</a>"
+                     + "<p>text</p>" * 200 + "</main></body></html>", base_url="https://s.example/")
+    book = next(l for l in heavy.links if "Book" in l.text)
+    res.check(heavy.content_mpos is not None and heavy.body_frac(book.mpos) is not None and heavy.body_frac(book.mpos) < 0.4,
+              "body_frac: a link behind 200 KB of inline SVG is still in the first viewport of the content (%.2f)" % (heavy.body_frac(book.mpos) or -1))
+    plain = Document("<html><body><h1>T</h1><a href='/a'>A</a></body></html>", base_url="https://s.example/")
+    res.check(plain.content_mpos is not None and plain.body_frac(plain.links[0].mpos) < 0.4, "body_frac: a plain page is unchanged")
     # Step 19 rules: a headline is not a menu label; section names need company; sibling subdomains are nav; ties resolve by rule
     head = lambda body, base="https://s.example/": Document("<html><body><nav>%s</nav></body></html>" % body, base_url=base)  # noqa: E731
     cat = categorize([], {"home": head('<a href="/blogs/">News</a><a href="/psf/newsletter/">Newsletter</a>'
@@ -1387,6 +1397,26 @@ def stage_probe_cr(res, farm):
               "cr/edge-refuses-auditor: a refusal the audit cannot explain is inconclusive, never critical", str(f and (f["status"], f["severity"], f.get("reason"))))
     res.check(f is not None and "disallowed by the site's own robots.txt" in f["evidence"], "cr/edge-refuses-auditor: the evidence says why nothing could be probed")
     res.check(not [x for x in R["edge-refuses-auditor"]["findings"] if x["severity"] == "critical"], "cr/edge-refuses-auditor: no critical finding at all")
+    # a hung crawler probe is inconclusive, never a critical refusal (adobe.com, dry-run judging)
+    import types as _t
+    from auditlib.findings import ProbeOutput as _PO
+    hung = {"url": "https://x/", "baseline": {"user_agent": "audit", "status": 200, "bytes": 45662},
+            "agents": [{"token": "OAI-SearchBot", "tier": "index", "status": None, "bytes": 0, "error": "read_timeout", "challenge": False, "robots_rule": None},
+                       {"token": "Claude-User", "tier": "live_answer", "status": None, "bytes": 0, "error": "read_timeout", "challenge": False, "robots_rule": None},
+                       {"token": "GPTBot", "tier": "training_only", "status": None, "bytes": 0, "error": "read_timeout", "challenge": False, "robots_rule": None}],
+            "policy": [], "reason": None}
+    o = _PO("crawl-render-audit", "https://x", "unknown", [])
+    cp.check_edge_access(_t.SimpleNamespace(edge_access=hung), o)
+    e = next((f for f in o.findings if f["check_id"] == "cr.access.edge_block"), None)
+    res.check(e is not None and e["status"] == "inconclusive" and e["severity"] == "info" and e.get("reason") == "probe_timeout",
+              "cr/edge: three timed-out probes are inconclusive probe_timeout, not a critical refusal", str(e and (e["status"], e["severity"])))
+    res.check(e is not None and "curl -A" in e["suggested_action"]["detail"] and "not a refusal" in e["evidence"], "cr/edge: the timeout note tells the owner how to check")
+    hung["agents"][0].update(error=None, status=403)
+    o = _PO("crawl-render-audit", "https://x", "unknown", [])
+    cp.check_edge_access(_t.SimpleNamespace(edge_access=hung), o)
+    e = next(f for f in o.findings if f["check_id"] == "cr.access.edge_block")
+    res.check(e["status"] == "fail" and "OAI-SearchBot" in e["evidence"] and "Claude-User" not in e["evidence"].split("but", 1)[-1].split(". robots")[0],
+              "cr/edge: a real 403 beside a timeout is a fail that names only the refused token")
     f = fnd("edge-blocked-bots", "cr.access.edge_block")
     res.check(f is not None and f["severity"] == "critical" and "robots.txt allows these agents" in f["evidence"],
               "cr/edge-blocked-bots: the real defect (robots open, edge refuses) is still critical, and its evidence is now true by construction")

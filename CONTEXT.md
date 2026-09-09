@@ -87,7 +87,7 @@ with the code, the handout and the code win. Several of their citations are
 | 4 Hardening | 18–20 | done (Step 20 by Deepak, re-verified 2026-09-09) |
 | 5 Packaging | 21–24 | Steps 21–22 done by Deepak. **Step 23 (compliance sweep) is next**, then dry-run judging |
 
-Suite: **3349 checks, 0 failures, GREEN.** It now takes over ten minutes; run it in the background
+Suite: **3354 checks, 0 failures, GREEN.** It now takes over ten minutes; run it in the background
 or with `--stage <name>` while iterating, and plainly once before ticking a step. All five skills pass the validator.
 
 Code size: ~8,100 lines. Largest pieces: `engagement_probe.py` 1044, `compose.py` 800, `validate.py` 335, `run_audit.py` 210, `finalize.py` 130,
@@ -541,8 +541,8 @@ returned 403 (it never saw HTML) — should be `not_evaluated`.
 
 Everything above is history. This section is the current state.
 
-**Repo:** `main` at `da812bd`, clean, pushed. Steps 1–22 of `BUILD_PLAN.md` ticked;
-23 (compliance sweep) and 24 (dry-run judging) open. Suite: 3,349 checks green
+**Repo:** `main`, clean, pushed. **All 24 steps of `BUILD_PLAN.md` are ticked** (Step 24's
+submission itself is the user's action). Suite: 3,349 checks green
 (`cd brand-ai-readiness-audit && python3 tests/run_tests.py`, >10 min; use `--stage <name>`
 while iterating). 61 checks, 21 fixtures, five skills all pass the validator.
 
@@ -562,6 +562,15 @@ saved workdir, `--verbose` shows each probe. `audit-*` directories are git-ignor
 severity); iiitd.ac.in on 2026-09-10 (12 findings: 4 medium, 6 low, 2 info; category
 nonprofit_institution; simulation answered 4 of 5 questions, the unanswerable one — "what
 programs, and where" — matched the key-fact finding exactly).
+
+**Steps 23–24 done on 2026-09-10.** Zip built with `git archive --format=zip -o
+brand-ai-readiness-audit.zip HEAD:brand-ai-readiness-audit` (516 KB; rebuild after any commit),
+unzipped cold, validator green from the copy, stdlib/GET-only/one-entrypoint/robots all proven.
+The dry run on adobe.com and thehawksmoor.com found two defects, both fixed by rule with tests:
+a hung crawler probe (`read_timeout`) is now `inconclusive probe_timeout`, never a critical
+refusal; and every first-viewport rule measures from the first *visible* content
+(`Document.content_mpos`, ignoring `noscript`/`svg`/`template`), not from `<body>` — a page with
+200 KB of inline SVG before its first link had its four "Book a table" buttons reported as no CTA.
 
 **An LLM-council session on 2026-09-10** (five advisors + peer review) reached these
 conclusions, which are the plan from here:
