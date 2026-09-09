@@ -468,6 +468,15 @@ def build_recommendations(category, facts, checks, findings, sample):
             "difference, so a comparison answer has nothing of this site's own wording to quote. This is an "
             "opportunity, not a defect: it is never reported as a finding.",
             "extract", "low", "medium")
+    diff_fact = _fact(facts, "differentiator")
+    diff_val = diff_fact.get("value") or ""
+    if diff_fact.get("status") == "present" and not re.search(r"\d", diff_val):
+        rec("State at least one concrete number in the site's own words",
+            "Of the content genres measured for how much they shape a generated answer once a page is already "
+            "cited, numbers and statistics carry the largest independent effect (+61.55%), ahead of definitions "
+            "and comparisons. The site's own stated differentiator has no number in it, so there is nothing "
+            "concrete here for an assistant to quote back.",
+            "extract", "low", "medium")
     audience_fact = AUDIENCE_FACT.get(category, "what_it_does")
     if facts_map and _fact(facts, "audience").get("status") != "present":
         rec("Name the audience explicitly on the home page",
@@ -525,9 +534,11 @@ def build_recommendations(category, facts, checks, findings, sample):
             "top saying what the site is, and a link to the parent section, keeps that visitor oriented.",
             "engagement", "medium", "medium", ("en.continuity.h1_title_mismatch", "en.nav.breadcrumbs_missing"))
     rec("Consider publishing a plain-text summary of the site at /llms.txt",
-        "An optional, unproven convention: adoption by assistants is not confirmed by any operator's documentation, "
-        "so it is not graded anywhere in this audit. It costs one file, and the exercise of writing it usually "
-        "exposes facts the site never states plainly.",
+        "Not a confirmed ranking or citation signal for any major search or answer engine, so it is not graded "
+        "anywhere in this audit. Early academic evidence on structured, agent-navigable pages suggests explicit "
+        "machine-readable summaries can help agentic systems that autonomously fetch and follow links, distinct "
+        "from ranking. It costs one file, and the exercise of writing it usually exposes facts the site never "
+        "states plainly.",
         "extract", "low", "low")
     rank = {"high": 0, "medium": 1, "low": 2}
     out.sort(key=lambda r: (rank.get(r["priority"], 3), r["title"]))

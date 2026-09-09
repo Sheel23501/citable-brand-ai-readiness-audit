@@ -57,7 +57,11 @@ Hard rules:
 Apply in this order.
 
 1. **Category gating.** If `site_categories.md` marks the check `not_applicable` for the inferred category, the check is `not_evaluated` with reason `not_applicable_for_category` and emits no finding.
-2. **Page role.** Home page or key page ⇒ default severity. Non-key sampled page ⇒ one level lower (never below `low`).
+2. **Proportion, where a check counts things.** `fx.facts.key_fact_missing` reports `medium` when exactly
+   one of the category's key facts is missing and `high` when two or more are. A rule that returns the same
+   severity whether one fact or every fact is absent stops carrying information; measured across 38 real
+   sites the unscaled rule fired `high` on 47% of them.
+3. **Page role.** Home page or key page ⇒ default severity. Non-key sampled page ⇒ one level lower (never below `low`).
 3. **Blast radius.** The same `fail` on every sampled page (≥ 3 pages) ⇒ one level higher, up to the check's registered maximum.
 4. **Confidence cap.** `confidence: low` ⇒ severity at most `medium`.
 5. **Category overrides** listed in `site_categories.md` (for example NAP missing is `high` for `local_business`, `medium` otherwise) replace the default before steps 2–4 run.

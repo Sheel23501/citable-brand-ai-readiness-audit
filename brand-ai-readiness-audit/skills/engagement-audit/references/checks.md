@@ -122,8 +122,22 @@ One finding lists every key page with no such element.
 and a sample of their texts, so the reader can see what was there instead.
 **Why medium.** A visitor who has just arrived needs one obvious next step;
 with nothing actionable in view, attention has nowhere to go. Medium confidence
-because the vocabulary is English and text-based: an icon button or a
-non-English label is not seen (see `non_findings.md`).
+because the vocabulary is text-based: an icon button with no label is not seen.
+
+**Language.** The page's declared `lang` (`Document.lang`, e.g. `de-CH` -> `de`)
+selects which vocabulary is searched. English is always included; German,
+French, Spanish, Italian, Portuguese and Dutch add their own words
+(`CTA_VOCAB_BY_LANG` in `auditlib/categories.py`) so a German site's
+"Anmelden" or "Abonnement" is recognised as a call to action rather than
+missed because it is not in English. Measured: before this, spiegel.de failed
+this check purely because its buttons are German.
+
+A declared language outside that set (`CTA_LANGS_SUPPORTED`) has no vocabulary
+to search, and the check does not guess: it reports `not_evaluated` with
+reason `language_not_supported` rather than asserting "no call to action"
+using words the page was never going to contain. No `lang` attribute at all
+falls back to the English-only vocabulary, as before -- `en.lang.attribute_missing`
+already reports the missing attribute separately.
 
 ---
 

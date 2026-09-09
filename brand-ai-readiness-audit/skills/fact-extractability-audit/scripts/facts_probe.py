@@ -64,6 +64,7 @@ REFS = {
     "snippet": "https://developers.google.com/search/docs/appearance/snippet",
     "alt": "https://developers.google.com/search/docs/appearance/google-images",
     "faq": "https://schema.org/FAQPage",
+    "absorption": "https://arxiv.org/abs/2604.25707",
 }
 
 
@@ -282,7 +283,16 @@ def check_key_facts(ctx, out, pages, required, facts):
              why="An assistant answers from the text it can extract. A fact that is absent, or present only as a hint, is a question the brand cannot be quoted on, so the answer comes from a competitor or from nowhere. The brand is invisible for that question.",
              action="Add the missing facts as plain text on the pages a visitor would expect them (%s)." % ", ".join(fid.replace("_", " ") for fid, _ in missing[:4]),
              detail=advice + " Mirror each fact in the matching JSON-LD property (offers.price, address, telephone, openingHoursSpecification, description, audience) so both text and structured data agree.",
-             references=[REFS["sd_general"]])
+             references=[REFS["sd_general"]],
+             extra_adjust=["single_missing_fact:medium"] if len(missing) == 1 else None)
+    # Severity scales with how much of the category's fact set is unavailable. One gap is a gap;
+    # two or more is a pattern of facts an assistant cannot quote. Without this the check reported
+    # `high` whether one fact was missing or all of them, which flattens the report: measured across
+    # 38 real sites it fired `high` on 47% of them, so the severity stopped distinguishing anything.
+    if len(missing) == 1 and out.findings[-1]["severity"] == "high":
+        out.findings[-1]["severity"] = "medium"
+        out.findings[-1]["suggested_action"]["priority"] = "medium"
+        out.findings[-1]["suggested_action"]["impact"] = "medium"
 
 
 def check_image_only(ctx, out, pages, facts):
@@ -530,10 +540,10 @@ def check_faq(ctx, out, pages):
              title="No FAQ-shaped content or FAQPage markup on the sampled pages",
              evidence="None of the %d sampled pages has a FAQ heading, three or more question headings, or FAQPage JSON-LD." % len(pages),
              evidence_items=[evidence_item(p.final_url, "computed", "faq_heading=false; question_headings=%d; FAQPage=false" % len([h for h in p.doc.headings if (h["text"] or "").endswith("?")])) for p in pages[:6]],
-             why="Assistants answer questions; content already shaped as question and answer is the easiest to quote verbatim. This is an opportunity rather than a defect.",
-             action="Add a short FAQ (five real questions customers ask, answered in one or two sentences each) on the pricing or product page, with FAQPage JSON-LD.",
-             detail="Use the questions your support inbox actually receives. Put each question in a heading and the answer directly under it, then mirror them in FAQPage mainEntity. Keep answers factual and specific.",
-             references=[REFS["faq"]])
+             why="A page shaped as question and answer can help it match a question-shaped query, but a 23,745-citation measurement study across 602 prompts found Q&A-formatted content has lower influence on the generated answer once selected (-5.74%) than content built around concrete numbers, comparisons, or plain definitions (+41% to +62%). This is an opportunity, not a defect: add FAQ content for retrieval and clarity, and keep stating the same facts as ordinary prose too, not only as isolated Q&A pairs.",
+             action="Add a short FAQ (five real questions customers ask, answered in one or two sentences each) on the pricing or product page, with FAQPage JSON-LD, and state the same facts once more in the page's main prose.",
+             detail="Use the questions your support inbox actually receives. Put each question in a heading and the answer directly under it, then mirror them in FAQPage mainEntity. A stray Q&A pair is not a substitute for the fact being stated plainly elsewhere on the page.",
+             references=[REFS["faq"], REFS["absorption"]])
 
 
 # ---------------------------------------------------------------- facts file

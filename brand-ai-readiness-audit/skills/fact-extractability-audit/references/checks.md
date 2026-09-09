@@ -69,6 +69,8 @@ sales-led path". Sales-led sites are never flagged for withholding prices.
 **Never fires for** the optional facts `audience` and `differentiator`, or for
 `address` and `phone` outside `local_business` (the entity skill owns NAP).
 
+**Severity scales with the count.** Exactly one missing fact is `medium`; two or more is `high`. A rule that answers the same whether one fact or the whole set is absent stops distinguishing anything: measured across 38 real sites the unscaled rule reported `high` on 47% of them, which flattens the report and buries the sites that genuinely state nothing.
+
 ### `fx.facts.image_only` · high, medium when not a key fact · low, medium with two signals · per-page
 **Rule.** A content image (not `role=presentation`, not `alt=""`, not under
 50 px in a declared dimension) whose `alt`, filename, or nearest preceding
@@ -238,11 +240,17 @@ ending in a question mark. `not_evaluated` with reason
 `not_applicable_for_category` for `publisher_media` and `portfolio_personal`
 (`site_categories.md` section 5).
 **Evidence.** A `computed` item per page with the three signals.
-**Why low, medium confidence.** An opportunity rather than a defect:
-assistants answer questions, and content already shaped as question and
-answer is the easiest to quote verbatim. Medium confidence because a site can
-answer its customers' questions in prose without any FAQ shape; the finding
-says what would make that content easier to quote.
+**Why low, medium confidence.** An opportunity rather than a defect, and a
+deliberately hedged one. Q&A shape can help a page match a question-shaped
+query, but the largest published measurement of citation influence (23,745
+citations across 602 prompts, `sources.md` section 3) found Q&A-formatted
+content has *lower* influence on the generated answer once selected (-5.74%)
+than content built around concrete numbers (+61.55%), definitions (+57.33%)
+or comparisons (+55.28%). So the finding asks for FAQ content for retrieval
+and clarity while insisting the same facts also appear as ordinary prose;
+it never claims Q&A is the best shape to be quoted from. Medium confidence
+because a site can answer its customers' questions in prose without any FAQ
+shape, and that is not a defect.
 
 ---
 

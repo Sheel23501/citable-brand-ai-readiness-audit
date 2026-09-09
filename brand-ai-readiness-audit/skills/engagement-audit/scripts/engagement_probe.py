@@ -31,7 +31,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.normpath(os.path.join(HERE, "..", "..", "audit-orchestrator", "scripts")))
 
 from auditlib import extract as X  # noqa: E402
-from auditlib.categories import (CTA_VOCAB, CATEGORY_NOUNS, OFFER_VERBS, TRUST_SIGNALS, TRUST_SIGNALS_DEFAULT,  # noqa: E402
+from auditlib.categories import (CTA_VOCAB, CTA_VOCAB_BY_LANG, CTA_LANGS_SUPPORTED, CATEGORY_NOUNS, OFFER_VERBS, TRUST_SIGNALS, TRUST_SIGNALS_DEFAULT,  # noqa: E402
                                  engagement_cap, is_key_page, category_label)
 from auditlib.cli import probe_main  # noqa: E402
 from auditlib.fetch import Fetcher, normalize_url, registrable_domain  # noqa: E402
@@ -114,8 +114,22 @@ def _noun_re(category):
     return _NOUN_RES[category]
 
 
-def _cta_re(category):
-    vocab = CTA_VOCAB.get(category) or CTA_VOCAB["unknown"]
+def _page_lang(doc):
+    """The page's declared language as a bare subtag ('de-CH' -> 'de'), or None."""
+    raw = (getattr(doc, "lang", None) or "").strip().lower()
+    return raw.split("-")[0] if raw else None
+
+
+def _cta_re(category, lang=None):
+    """CTA matcher for a category, extended with the page language's vocabulary.
+
+    English is the category table; a non-English page is matched against its own words too,
+    because otherwise a German site's "Anmelden" and "Abonnement" read as no call to action.
+    Measured: the English-only version called that a missing CTA on spiegel.de.
+    """
+    vocab = list(CTA_VOCAB.get(category) or CTA_VOCAB["unknown"])
+    if lang and lang != "en":
+        vocab += CTA_VOCAB_BY_LANG.get(lang, [])
     return re.compile(r"\b(?:%s)\b" % "|".join(re.escape(v).replace(r"\ ", r"\s+") for v in vocab), re.I), vocab
 
 
@@ -296,7 +310,14 @@ def check_cta(ctx, out, usable, work):
     pages = [p for p in usable if is_key_page(p.role, ctx.category)]
     if not pages:
         out.not_evaluated(cid, reason="no_key_pages_usable"); return
-    rx, vocab = _cta_re(ctx.category)
+    # Declared page language, if any (the first page that states one). A language outside
+    # CTA_LANGS_SUPPORTED has no vocabulary to search for, and searching it with English or
+    # the wrong language's words would repeat the bug this guards against: reporting "no call
+    # to action" about a page whose buttons are simply in a language we did not check for.
+    lang = next((_page_lang(p.doc) for p in pages if _page_lang(p.doc)), None)
+    if lang and lang not in CTA_LANGS_SUPPORTED:
+        out.not_evaluated(cid, reason="language_not_supported"); return
+    rx, vocab = _cta_re(ctx.category, lang=lang)
     failing, items, seen = [], [], []
     for p in pages:
         hits = cta_hits(p.doc, rx, vocab)

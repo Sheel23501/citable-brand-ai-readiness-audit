@@ -31,15 +31,21 @@ that tells a business to change a legitimate design choice.
 | **Testimonials, badges or policies that exist on a page outside home, about and contact** | The trust check reads the pages a visitor lands on first. | The finding names the pages checked; the action is to surface the signals there. |
 | **Pages that are a JavaScript gate or client-rendered shell** | There is no content to grade; one finding should say so. | Content checks are `not_evaluated` with reason `no_rendered_content`; `cr.render.js_gate` / `cr.render.csr_shell` own the finding (dedupe row 4). Head-level and 404 checks still run. |
 
-## What a non-rendering, English-first audit cannot know
+## What a non-rendering audit cannot know
 
-- **Icon-only and non-English calls to action.** The CTA vocabulary is text
-  and English (with the sampler's non-English page-role words, not action
-  words). A button that is an icon, or a label in another language, is not
-  seen; `en.cta.missing` is therefore `medium` confidence and its evidence
-  lists the link texts that were in the first viewport so the owner can point
-  to the button that was missed. The orchestrator adds a limitation line when
-  the page language is not English.
+- **Icon-only calls to action.** The CTA vocabulary is text: a button that is
+  an icon with no label is not seen. This is why `en.cta.missing` is `medium`
+  confidence, never high, and its evidence lists the link texts that were in
+  the first viewport so the owner can point to the button that was missed.
+- **Calls to action in a language we have no vocabulary for.** English,
+  German, French, Spanish, Italian, Portuguese and Dutch are covered
+  (`CTA_LANGS_SUPPORTED` in `auditlib/categories.py`), selected by the page's
+  declared `lang`. A declared language outside that set makes `en.cta.missing`
+  `not_evaluated` with reason `language_not_supported` instead of asserting
+  absence with the wrong words -- visible in the report's check statuses, not
+  as a separate limitation line. A page with **no** `lang` attribute at all
+  falls back to English only, and `en.lang.attribute_missing` reports the
+  missing attribute as its own, separate finding.
 - **Where things are on screen.** "First 40% of the body markup" and "before
   the `<h1>`" are markup positions, not pixels. Fixed headers, CSS reordering
   and grid layouts can put an element elsewhere than its position in the

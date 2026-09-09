@@ -50,6 +50,15 @@ probe them by hand.
 **Never check the exit code through a pipe.** `run_tests.py | tail` returns
 `tail`'s status, not the runner's, so a failing suite looks like it passed.
 
+**Run the suite on an otherwise idle machine.** The `run_audit` and `scripts`
+stages spawn subprocesses with wall-clock timeouts (60s and 150s), so CPU
+contention makes them fail spuriously. Measured on this project: the
+`bare-metadata` fixture takes **8.9s idle** and **85.8s** while a second heavy
+job runs, and an invalid-URL probe that finishes in **1.9s** idle hit the 150s
+timeout under load. Before believing a timing or timeout failure, re-run that
+one case on its own -- three such failures in this project were contention, none
+were real.
+
 ---
 
 ## Adding a check

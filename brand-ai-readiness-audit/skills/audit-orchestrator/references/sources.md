@@ -60,3 +60,30 @@ Quotations relied on for tier assignment:
 | robots.txt grammar, group merging, longest-match precedence, `$`/`*` semantics | RFC 9309 — https://www.rfc-editor.org/rfc/rfc9309.html |
 | Agent Skills format: frontmatter fields, limits, progressive disclosure | https://agentskills.io/specification |
 | Structured data required properties | https://developers.google.com/search/docs/appearance/structured-data/intro-structured-data |
+
+---
+
+## 3. Citation, ranking and content-influence research
+
+Findings that shaped severity, confidence and the proactive recommendations
+around fact density, structured data and FAQ content.
+
+| Claim | Source |
+|---|---|
+| Per-technique visibility deltas for quotations, statistics, citing sources, fluency, etc.; keyword stuffing reduces visibility; citing sources helps low-ranked sources far more than top-ranked ones | Aggarwal et al., "GEO: Generative Engine Optimization", KDD 2024 — https://arxiv.org/abs/2311.09735 |
+| JSON-LD alone gives a small effect (d=0.18); the same facts *also* stated as visible human-readable text near the structured data gives a large effect (+29.6% accuracy, d=0.60, p<10⁻²¹); the gain is largest where plain HTML previously stated nothing (travel, editorial) and smallest where it already did (e-commerce, ceiling effect) | "Structured Linked Data as a Memory Layer for Agent-Orchestrated Retrieval" — https://arxiv.org/abs/2603.10700 |
+| Citation *selection* (getting retrieved) is gated by domain authority and being an official/news/vertical source (79-88% of citations); citation *absorption* (shaping the generated answer once selected) correlates with page length (top-quartile pages average 11.44x the words of bottom-quartile), heading and list density, and content genre — numbers/statistics (+61.55%), definitions (+57.33%) and comparisons (+55.28%) show the largest influence gains, while Q&A-formatted content shows a small negative effect (-5.74%) | "From Citation Selection to Citation Absorption: A Measurement Framework for Generative Engine Optimization Across AI Search Platforms" — https://arxiv.org/abs/2604.25707 |
+
+**Design consequences drawn from these three papers:**
+- `fx.jsonld.*` findings stay `medium` at most on their own (schema alone is a
+  small effect); the structured-data recommendations push toward materialising
+  the same facts as visible text, not toward JSON-LD as a standalone fix.
+- `fx.content.faq_absent`'s advice no longer claims Q&A format is "the easiest
+  to quote" — the largest independent measurement of citation influence found
+  the opposite for that specific format, even though Q&A framing may still aid
+  initial retrieval for question-shaped queries. The finding now recommends
+  FAQ content for retrieval and clarity while asking that the same facts also
+  appear as ordinary prose.
+- A new proactive recommendation asks for at least one concrete, stated number
+  in the site's own words, reflecting the largest single content-genre effect
+  measured (numbers/statistics, +61.55% absorption influence).

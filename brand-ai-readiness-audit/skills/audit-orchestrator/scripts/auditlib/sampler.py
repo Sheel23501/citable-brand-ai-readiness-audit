@@ -336,10 +336,15 @@ def categorize(pages, docs, sitemap_urls, home_url, internal_pages_estimate, ove
         sc += n
         u = 0
         seen_pat = set()
+        # Every pattern in the table is a *path* pattern ("/cv", "/products/"). Matching them
+        # against the whole URL lets a pattern hit the hostname instead: "/cv" matches
+        # "https://cv.wikipedia.org/" because "//cv." contains "/cv", so a two-letter language
+        # code reads as evidence of a personal CV page. Match the path only.
+        link_paths = [urlsplit(u_).path or "/" for u_ in link_urls]
         for pat in sig["url"]:
             if pat in seen_pat:
                 continue
-            if any(pat in url for url in link_urls):
+            if any(pat in path for path in link_paths):
                 seen_pat.add(pat)
                 u += 1
                 why.append("url:" + pat)
@@ -408,10 +413,16 @@ def probe_edge_access(fetcher, url, home_r):
 
     Read-only GETs under the same budget, delay and robots rules as every other request.
     We announce a token to observe the origin's response; never to get around a refusal.
-    Returns None when there is no usable baseline to compare against.
+
+    This runs even when our own fetch was refused (401/403/429). That case is the one
+    where the comparison matters most: a site that answers 403 to this auditor is not
+    necessarily broken, and without probing we would report a live site as unreachable.
+    Returns None only when there was no HTTP response at all (DNS failure, TLS error,
+    timeout), where there is nothing to compare and three more requests would be waste.
     """
-    if not home_r.ok or home_r.get("challenge") or (home_r.get("status") or 0) != 200:
-        return None
+    status = home_r.get("status") or 0
+    if not status:
+        return None                      # transport failure: no response to compare against
     baseline_bytes = home_r.get("bytes") or 0
     out = {"url": home_r.get("final_url") or url,
            "baseline": {"user_agent": "audit", "status": home_r.get("status"), "bytes": baseline_bytes},

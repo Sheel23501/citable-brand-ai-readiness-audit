@@ -85,6 +85,29 @@ CTA_VOCAB = {
     "unknown": ["contact", "get started", "learn more"],
 }
 
+# Calls to action in the languages we can check. The category vocabulary above is English; on a
+# non-English page it finds nothing and the check would report "no call to action" about a site
+# whose buttons simply are not in English. Measured: spiegel.de leads with "Anmelden" (sign in)
+# and "Abonnement" (subscribe), and the English-only rule called that a missing CTA.
+# A language absent from this table is not guessed at: the check reports not_evaluated instead.
+CTA_VOCAB_BY_LANG = {
+    "de": ["anmelden", "registrieren", "abonnieren", "abonnement", "kontakt", "jetzt", "kaufen",
+           "spenden", "mehr erfahren", "loslegen", "termin", "bestellen", "mitglied werden"],
+    "fr": ["s'inscrire", "inscription", "s'abonner", "abonnement", "contact", "nous contacter",
+           "acheter", "commander", "en savoir plus", "commencer", "faire un don", "adherer"],
+    "es": ["suscribete", "suscribirse", "suscripcion", "iniciar sesion", "registrarse", "contacto",
+           "comprar", "empezar", "mas informacion", "donar", "unete", "reservar"],
+    "it": ["iscriviti", "iscrizione", "abbonati", "accedi", "contatti", "acquista", "inizia",
+           "scopri di piu", "dona", "prenota"],
+    "pt": ["assine", "assinar", "entrar", "registrar", "contato", "contacto", "comprar",
+           "comecar", "saiba mais", "doar", "reservar"],
+    "nl": ["aanmelden", "abonneren", "abonnement", "contact", "kopen", "starten",
+           "meer informatie", "doneren", "bestellen"],
+}
+
+# Languages the CTA vocabulary covers. English is the table above.
+CTA_LANGS_SUPPORTED = frozenset(["en"]) | frozenset(CTA_VOCAB_BY_LANG)
+
 
 def key_pages(category):
     return ["home"] + KEY_PAGES.get(category, KEY_PAGES["unknown"])

@@ -189,13 +189,42 @@ def check_access(ctx, out):
         home_err = any(p.role == "home" for p in errored)
         pages = [p.final_url for p in errored]
         desc = "; ".join("%s: %s" % (p.role, p.error or ("HTTP %s" % p.status)) for p in errored)
-        title = ("Site is unreachable: the home page could not be fetched (%s)" % (home.error or "HTTP %s" % home.status)) if home_err else \
-                "%d sampled page%s return%s an error to a plain fetcher" % (len(errored), "s" if len(errored) != 1 else "", "" if len(errored) != 1 else "s")
+        # A refusal is not an outage. 401/403/429 to this auditor usually means the origin
+        # declines automated clients while serving browsers perfectly well; calling that
+        # "unreachable" would be a confident, critical, false statement about a live site.
+        # The edge probe (which now runs on refusal baselines) decides which case this is.
+        refused_home = home_err and (home.status or 0) in (401, 403, 429)
+        ea = ctx.edge_access or {}
+        probed = ea.get("agents") or []
+        crawlers_refused = [a for a in probed if (a.get("status") or 0) >= 400 or a.get("error")]
+        if refused_home and probed and len(crawlers_refused) == len(probed):
+            title = "The site refuses automated clients: this auditor and every AI crawler tested got HTTP %s" % home.status
+        elif refused_home and probed and not crawlers_refused:
+            out.inconclusive("cr.access.http_error", reason="audit_user_agent_refused",
+                             title="This auditor was refused (HTTP %s) but AI crawlers were served" % home.status,
+                             evidence="GET %s returned HTTP %s to the audit user agent, while %s each received HTTP 200. The refusal applies to this tool, not to the crawlers that matter." % (
+                                 ea.get("url"), home.status, ", ".join(a["token"] for a in probed)),
+                             evidence_items=[evidence_item(ea.get("url"), "http_status", "audit user agent -> %s" % home.status)] +
+                                 [evidence_item(ea.get("url"), "http_status", "%s -> %s" % (a["token"], a.get("status")), note="user-agent probe") for a in probed],
+                             why="The pages could not be read by this audit, so checks needing page content have no verdict. The crawlers assistants use were served normally, so this is not evidence of a discoverability problem.",
+                             action="No action needed for AI visibility. To audit the site fully, allow this tool's user agent through the bot-protection layer and re-run.",
+                             detail="The audit sends one identifying user agent and obeys robots.txt. Allowing it in the WAF for the duration of an audit gives the full report.",
+                             pages=pages)
+            return ok_pages
+        elif refused_home:
+            title = "The site refuses this auditor (HTTP %s); AI crawler access could not be established" % home.status
+        elif home_err:
+            title = "Site is unreachable: the home page could not be fetched (%s)" % (home.error or "HTTP %s" % home.status)
+        else:
+            title = "%d sampled page%s return%s an error to a plain fetcher" % (len(errored), "s" if len(errored) != 1 else "", "" if len(errored) != 1 else "s")
         out.fail("cr.access.http_error", title=title[:90],
                  evidence="Plain GET of %s. %s" % (", ".join(p.role for p in errored), desc),
                  evidence_items=[evidence_item(p.final_url, "http_status", str(p.status) if p.status else "error=%s" % p.error, note=p.fetch.get("error_detail")) for p in errored[:6]],
-                 why="A page that answers with an error to a plain fetcher does not exist for an assistant. If this is the home page, the whole brand is invisible.",
-                 action="Make %s return HTTP 200 to a plain GET from a non-browser client." % ("the home page" if home_err else "these pages"),
+                 why=("Every AI crawler tested was refused the same way, so the pages an assistant would read are unavailable to it, whatever robots.txt permits and however well the site serves browsers."
+                      if refused_home else
+                      "A page that answers with an error to a plain fetcher does not exist for an assistant. If this is the home page, the whole brand is invisible."),
+                 action=("Allow the published AI crawler user agents through the CDN or WAF, then re-run." if refused_home else
+                         "Make %s return HTTP 200 to a plain GET from a non-browser client." % ("the home page" if home_err else "these pages")),
                  detail="Check server logs for the audit user agent. Common causes: user-agent allowlists, geo blocks, expired TLS certificates, DNS misconfiguration. Verify with curl -I from a machine outside your network.",
                  pages=pages, page_roles=[p.role for p in errored],
                  extra_adjust=["home_unreachable:critical"] if home_err else None)
@@ -237,6 +266,14 @@ def check_edge_access(ctx, out):
     if not ea or not ea.get("agents"):
         for cid in EDGE_IDS:
             out.not_evaluated(cid, reason="no_baseline" if ea is None else "network_disabled")
+        return
+    # This check compares a *served* baseline against the crawler probes. When our own fetch was
+    # refused too there is no "served to us but not to them" to report: the blanket refusal is
+    # already stated by cr.access.http_error, and claiming the site was served here would
+    # contradict it. The probe data is still recorded; it is simply not this check's evidence.
+    if ((ea.get("baseline") or {}).get("status") or 0) != 200:
+        for cid in EDGE_IDS:
+            out.not_evaluated(cid, reason="no_200_baseline")
         return
     base_bytes = (ea.get("baseline") or {}).get("bytes") or 0
     refused, served = [], []
