@@ -100,4 +100,4 @@ robots.txt. Pages disallowed for it are not fetched; dependent checks become
 
 - It does not claim any operator ignores robots.txt.
 - It does not claim blocking a `training_only` bot is wrong.
-- It does not detect user-agent-based cloaking: the audit fetches only with its own honest user agent and never impersonates a listed token.
+- It sees user-agent-based refusal only at the home URL and only for the three tokens the edge probe announces (`cr.access.edge_block`), and only where the site's robots.txt allows those tokens. The audit never announces a token the site has disallowed, and never uses one to get past a refusal.

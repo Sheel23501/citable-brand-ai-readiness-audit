@@ -66,12 +66,16 @@ are authoritative regardless of what our own fetch experienced.
 **Rule.** The sampler requests the home URL once per published crawler token
 (`OAI-SearchBot` / index, `Claude-User` / live_answer, `GPTBot` /
 training_only) and compares each response with the baseline fetch made under
-the audit's own user agent. The check fails when the baseline is 200 but a
-`live_answer` or `index` agent gets a transport error or a status ≥ 400.
-Critical when every citation-tier agent probed is refused.
+the audit's own user agent. A token is announced **only where the site's
+robots.txt allows it for that URL**, evaluated for the announced token under
+RFC 9309; a token the site has disallowed is recorded as policy and never
+sent. The check fails when the baseline is 200 but a probed `live_answer` or
+`index` agent gets a transport error or a status ≥ 400. Critical when every
+citation-tier agent probed is refused.
 
 **Evidence.** The baseline status and byte count, then one row per refused
-agent with its token, tier and status.
+agent with its token, tier, status and the robots.txt rule that allowed it,
+and one row per token not probed because the site's policy disallows it.
 
 **Why it matters.** robots.txt states a site's *policy*; this states the
 origin's *behaviour*. A CDN or WAF can refuse an AI crawler no matter what
@@ -87,8 +91,22 @@ observe how the origin responds; we never use one to get around a refusal. A
 refusal is recorded as evidence and the probe stops.
 
 **Not a finding when.** The baseline itself is missing, challenged or non-200
-(there is nothing to compare against, so the check is `not_evaluated`), or the
-run had no network.
+(there is nothing to compare against, so the check is `not_evaluated`); the
+run had no network; every token the audit could announce is disallowed by the
+site's own robots.txt (`not_evaluated`, reason `probe_tokens_disallowed`: the
+edge is enforcing the published policy, which `cr.robots.*` already reports);
+or robots.txt could not be read (`robots_unreachable`), so no permission could
+be decided.
+
+**When the audit itself is refused.** If the home URL answers 401, 403 or 429 to
+the audit's own user agent, `cr.access.http_error` uses the same probes to tell
+two cases apart. Every robots-allowed token refused the same way: a fail,
+critical on the home page, with each probe in the evidence. Every probed token
+served: `inconclusive` (`audit_user_agent_refused`), no action for AI
+visibility. Nothing probeable (all tokens are the site's policy, or robots.txt
+unreadable) or mixed answers: `inconclusive` (`crawler_access_unknown` /
+`crawler_access_mixed`), never a fail, because a refusal the audit cannot
+explain is not knowledge of a defect.
 
 ### `cr.access.edge_block_training` · info · high
 

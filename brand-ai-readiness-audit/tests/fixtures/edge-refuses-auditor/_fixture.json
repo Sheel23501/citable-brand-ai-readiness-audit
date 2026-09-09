@@ -1,0 +1,42 @@
+{
+  "name": "edge-refuses-auditor",
+  "description": "The site returns 403 to the audit's own user agent on every page, and its robots.txt disallows every token the edge probe could announce. Nothing can be probed, so whether AI crawlers are served is unknown: cr.access.http_error is inconclusive (crawler_access_unknown), never a critical finding about a site the audit could not read.",
+  "base": "clean-site",
+  "category": "unknown",
+  "routes": {},
+  "ua_deny": {
+    "match": [
+      "brand-ai-readiness-audit/",
+      "OAI-SearchBot",
+      "Claude-User",
+      "GPTBot"
+    ],
+    "status": 403,
+    "paths": [
+      "/",
+      "/about",
+      "/contact",
+      "/pricing",
+      "/product",
+      "/blog"
+    ],
+    "body": "<!doctype html><title>Forbidden</title><p>Request blocked.</p>"
+  },
+  "expected": {
+    "fail": [
+      "cr.robots.index_bot_blocked",
+      "cr.robots.live_answer_bot_blocked"
+    ],
+    "info": [
+      "cr.access.http_error",
+      "cr.robots.training_bot_blocked",
+      "ef.entity.wikidata_unavailable",
+      "ef.corroboration.offsite_spotcheck"
+    ],
+    "pass_required": [
+      "cr.robots.blanket_disallow",
+      "cr.access.challenge_page"
+    ],
+    "notes": "robots.txt and the sitemap stay readable (paths limits the refusal to the pages), so the policy is known and reported by cr.robots.*. Before Step C this case fell through to a critical 'could not be established' finding. The deny matches the audit's own token with its version slash, so the test harness (\u2026-tests/0.1) still sees the pages. Category is unknown: with no page served to the auditor there is nothing to score, as for challenge-page."
+  }
+}

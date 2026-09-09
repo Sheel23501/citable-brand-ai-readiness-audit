@@ -48,3 +48,15 @@ Refusing `GPTBot` while serving `OAI-SearchBot` and `Claude-User` is a policy
 choice about model training, not a discoverability defect: the site can still
 be fetched and cited when someone asks about it. It is reported as `info` by
 `cr.access.edge_block_training`, exactly as the equivalent robots.txt rule is.
+
+## A site whose edge enforces its own robots.txt
+
+A robots.txt that disallows `OAI-SearchBot`, and a CDN that returns 403 to
+`OAI-SearchBot`, are one decision stated twice. robots.txt is advisory; the
+edge is the only place it is enforced, so a site doing both is doing the
+right thing. The policy is reported once, by `cr.robots.*`, at the severity
+its tier deserves. `cr.access.edge_block` never announces a token the site
+has disallowed, so it cannot report the enforcement as a second finding, and
+it cannot tell the owner to add a WAF allow rule for a crawler they chose to
+refuse. It speaks only when robots.txt allows a crawler and the edge refuses
+it anyway: policy and behaviour disagreeing.

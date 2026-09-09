@@ -287,8 +287,10 @@ not marked `verified` is inert at runtime.
 - Bounded: ≤40 requests per audit, ≥0.5s between requests to the same host, ≤6
   pages sampled, 300s wall clock.
 - The edge-access check announces published crawler tokens to observe how the
-  origin responds. It never uses one to get around a refusal: a 403 is recorded
-  as evidence and the probe stops.
+  origin responds, and only where the site's robots.txt allows that token,
+  evaluated for the announced token exactly as for our own. A token the site
+  has disallowed is never sent. It never uses one to get around a refusal: a
+  403 is recorded as evidence and the probe stops.
 
 ## Layout
 
@@ -334,7 +336,9 @@ Fixtures include a **`clean-site`** false-positive guard that must produce zero
 findings, alongside `csr-shell`, `js-gate`, `challenge-page`,
 `bot-blocking-robots`, `blanket-disallow`, `edge-blocked-bots`,
 `edge-blocked-training-only`, `malformed-jsonld`, `image-only-pricing`,
-`non-html-seed`, `one-page-portfolio`, `blocked-links`, and four `weak-*` sites.
+`non-html-seed`, `one-page-portfolio`, `blocked-links`, three `weak-*` sites, and three edge-policy
+cases (`edge-enforces-policy`, `edge-blocked-mixed`, `edge-refuses-auditor`) that pin the rule that a site
+enforcing its own robots.txt at the edge is never reported as a defect.
 Each declares the check ids it must trigger, taken from the registry.
 
 ## Working on this

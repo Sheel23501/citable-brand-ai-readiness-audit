@@ -37,12 +37,15 @@ AUDIT_TOKEN = _robots.AUDIT_TOKEN
 # Sourced from each operator's own documentation; see references/sources.md.
 # Tier annotations mirror bot_tiers.md so severity stays consistent with the robots checks.
 PROBE_USER_AGENTS = (
+    # OpenAI publishes the full strings (developers.openai.com/api/docs/bots, checked 2026-09-09): version 1.4.
     ("OAI-SearchBot", "index",
-     "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; OAI-SearchBot/1.0; +https://openai.com/searchbot)"),
+     "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot"),
+    # Anthropic documents the token, not a full string (support.claude.com article 8896518, checked 2026-09-09); the
+    # surrounding format is the common `compatible;` form. Only the token matters for a robots.txt or WAF rule.
     ("Claude-User", "live_answer",
-     "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-User/1.0; +Claude-User@anthropic.com)"),
+     "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; Claude-User/1.0; +Claude-User@anthropic.com"),
     ("GPTBot", "training_only",
-     "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GPTBot/1.1; +https://openai.com/gptbot)"),
+     "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.4; +https://openai.com/gptbot"),
 )
 
 DEFAULT_HEADERS = {
@@ -307,22 +310,50 @@ class Fetcher:
             self._record(r, purpose)
             return r
 
-    def get_as(self, url, user_agent, purpose="ua_probe", timeout=None):
+    def get_as(self, url, user_agent, purpose="ua_probe", timeout=None, token=None):
         """GET `url` announcing a different User-Agent, then restore the default.
 
         Used only by the edge-level access check (`cr.access.edge_block`), which
         asks a question robots.txt cannot answer: does the server actually serve
         this page to a declared AI crawler, or does a CDN/WAF refuse it?
 
-        Still a plain GET under the same budget, politeness delay and robots
-        rules as every other request. We announce a crawler's published token to
-        observe how the origin responds; we never use it to get around a refusal.
-        A non-200 here is recorded as evidence and the probe stops.
+        The announced token is held to the site's robots.txt as if it were the
+        real crawler: a token robots.txt disallows for this URL is never sent.
+        The call returns a skipped result (`skipped=robots_disallow_for_token`,
+        with the matched rule) and makes no request, whoever the caller is.
+        `token` names the crawler; when omitted it is inferred from the
+        published strings in PROBE_USER_AGENTS, and an agent that cannot be
+        named is not sent at all (`skipped=unknown_token`). When robots.txt
+        could not be read, no permission can be decided and the request is
+        skipped as `robots_unreachable`.
+
+        Still a plain GET under the same budget and politeness delay as every
+        other request. We announce a crawler's published token to observe how
+        the origin responds; we never use it to get around a refusal.
         """
+        url = normalize_url(url)
+        if token is None:
+            token = next((t for t, _tier, ua in PROBE_USER_AGENTS if ua == user_agent or t.lower() in (user_agent or "").lower()), None)
+        r = self._result(url)
+        r["announced_token"] = token
+        if not token:
+            r["skipped"] = "unknown_token"
+            self._record(r, purpose); return r
+        if not self.offline:
+            rob = self.robots(origin_of(url))
+            if rob.state not in ("ok", "missing"):
+                r["skipped"] = "robots_unreachable"
+                self._record(r, purpose); return r
+            if not rob.is_allowed(url, token):
+                r["skipped"] = "robots_disallow_for_token"
+                r["skipped_rule"] = rob.matching_rule(url, token)
+                self._record(r, purpose); return r
         previous = self.headers.get("User-Agent")
         self.headers["User-Agent"] = user_agent
         try:
-            return self.get(url, purpose=purpose, timeout=timeout)
+            r = self.get(url, purpose=purpose, timeout=timeout)
+            r["announced_token"] = token
+            return r
         finally:
             if previous is None:
                 self.headers.pop("User-Agent", None)

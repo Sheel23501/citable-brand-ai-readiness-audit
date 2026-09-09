@@ -1,0 +1,36 @@
+{
+  "name": "edge-enforces-policy",
+  "description": "Clean site whose robots.txt disallows the three probe tokens AND whose edge returns 403 to them: one decision stated twice, enforced correctly. The policy is reported once, by cr.robots.*; the edge probe must not announce a disallowed token, so cr.access.edge_block is not_evaluated and never a second finding.",
+  "base": "clean-site",
+  "category": "saas_software",
+  "routes": {},
+  "ua_deny": {
+    "match": [
+      "OAI-SearchBot",
+      "Claude-User",
+      "GPTBot"
+    ],
+    "status": 403,
+    "body": "<!doctype html><title>Forbidden</title><p>Request blocked.</p>"
+  },
+  "expected": {
+    "fail": [
+      "cr.robots.index_bot_blocked",
+      "cr.robots.live_answer_bot_blocked"
+    ],
+    "info": [
+      "cr.robots.training_bot_blocked",
+      "ef.entity.wikidata_unavailable",
+      "ef.corroboration.offsite_spotcheck"
+    ],
+    "pass_required": [
+      "cr.robots.blanket_disallow",
+      "cr.robots.key_page_disallowed",
+      "cr.access.http_error",
+      "cr.access.challenge_page",
+      "cr.render.js_gate",
+      "cr.render.csr_shell"
+    ],
+    "notes": "Before the robots filter this fixture produced a critical cr.access.edge_block on top of the robots findings, with evidence claiming robots.txt was not the cause. Now no token is announced (edge_access.policy lists all three with their rules) and the three edge checks are not_evaluated with reason probe_tokens_disallowed. Everything else matches clean-site because the audit's own user agent is served normally."
+  }
+}

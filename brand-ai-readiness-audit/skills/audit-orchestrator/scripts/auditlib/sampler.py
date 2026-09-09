@@ -403,7 +403,10 @@ def _page_entry(role, url, source, r, doc=None):
 
 
 
-def probe_edge_access(fetcher, url, home_r):
+PROBE_TOKEN_STATES = ("ok", "missing")   # robots.txt states under which a token's permission can be decided
+
+
+def probe_edge_access(fetcher, url, home_r, robots):
     """Ask what robots.txt cannot answer: does the origin actually serve a declared AI crawler?
 
     robots.txt states a site's policy. A CDN or WAF can refuse an AI crawler regardless of
@@ -411,14 +414,22 @@ def probe_edge_access(fetcher, url, home_r):
     announcing each crawler's published token and compare the response with the baseline
     fetch made under our own user agent.
 
-    Read-only GETs under the same budget, delay and robots rules as every other request.
-    We announce a token to observe the origin's response; never to get around a refusal.
+    A token is announced only where the site's robots.txt allows that token for this URL
+    (RFC 9309, longest match). A token the site has disallowed is never announced: the site
+    has already said what it wants, `cr.robots.*` reports that policy, and an edge that
+    refuses the same token is enforcing it, not contradicting it. Those tokens are recorded
+    under `policy` with the matched rule so the reader can see why they were not probed.
+    With no robots.txt every token is allowed (the RFC's default). When robots.txt could not
+    be read, no permission can be decided, so nothing is probed and `reason` says so.
+
+    Read-only GETs under the same budget and delay as every other request. We announce a
+    token to observe the origin's response; never to get around a refusal.
 
     This runs even when our own fetch was refused (401/403/429). That case is the one
     where the comparison matters most: a site that answers 403 to this auditor is not
     necessarily broken, and without probing we would report a live site as unreachable.
     Returns None only when there was no HTTP response at all (DNS failure, TLS error,
-    timeout), where there is nothing to compare and three more requests would be waste.
+    timeout), where there is nothing to compare and more requests would be waste.
     """
     status = home_r.get("status") or 0
     if not status:
@@ -426,13 +437,25 @@ def probe_edge_access(fetcher, url, home_r):
     baseline_bytes = home_r.get("bytes") or 0
     out = {"url": home_r.get("final_url") or url,
            "baseline": {"user_agent": "audit", "status": home_r.get("status"), "bytes": baseline_bytes},
-           "agents": []}
+           "robots_state": getattr(robots, "state", None),
+           "agents": [], "policy": [], "reason": None}
+    if out["robots_state"] not in PROBE_TOKEN_STATES:
+        # robots.txt unreachable (or served a challenge): no token's permission can be decided
+        out["reason"] = "robots_unreachable"
+        return out
     for token, tier, ua in PROBE_USER_AGENTS:
-        r = fetcher.get_as(out["url"], ua, purpose="ua_probe")
+        rule = robots.matching_rule(out["url"], token)
+        if not robots.is_allowed(out["url"], token):
+            out["policy"].append({"token": token, "tier": tier, "rule": rule})
+            continue
+        r = fetcher.get_as(out["url"], ua, purpose="ua_probe", token=token)
         out["agents"].append({"token": token, "tier": tier, "status": r.get("status"),
                               "bytes": r.get("bytes") or 0, "error": r.get("error"),
-                              "challenge": bool(r.get("challenge"))})
+                              "challenge": bool(r.get("challenge")), "robots_rule": rule})
+    if not out["agents"]:
+        out["reason"] = "probe_tokens_disallowed"
     return out
+
 
 def _sample(fetcher, url, category_override, save, manifest):
     url = normalize_url(url)
@@ -452,7 +475,7 @@ def _sample(fetcher, url, category_override, save, manifest):
         home_doc = Document(home_r.text, base_url=home_r["final_url"])
         docs["home"] = home_doc
     manifest["pages"].append(_page_entry("home", url, "input", home_r, home_doc))
-    manifest["edge_access"] = probe_edge_access(fetcher, url, home_r)
+    manifest["edge_access"] = probe_edge_access(fetcher, url, home_r, robots)
 
     # sitemap (bounded to 2 requests)
     sm = discover_sitemap(fetcher, site_origin, robots)

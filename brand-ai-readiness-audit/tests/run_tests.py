@@ -151,6 +151,17 @@ def stage_manifest(res):
         mentioned = set(re.findall(r"`((?:\.\./)*[\w./-]*references/[\w.-]+\.md)`", skill_md))
         dangling = sorted(m for m in mentioned if not os.path.exists(os.path.normpath(os.path.join(skill_dir, m))))
         res.check(not dangling, "%s: every references/*.md path named in SKILL.md exists" % skill, ", ".join(dangling))
+    # the edge probe announces crawler tokens; no document may still promise that it never does
+    retired = ("never impersonates a listed token", "never uses the token of any bot listed")
+    stale = []
+    for dirpath, _dirs, files in os.walk(ROOT):
+        for fn in files:
+            if fn.endswith(".md"):
+                text = open(os.path.join(dirpath, fn), encoding="utf-8", errors="replace").read()
+                stale += ["%s: %r" % (os.path.relpath(os.path.join(dirpath, fn), ROOT), r) for r in retired if r in text]
+    res.check(not stale, "no document still claims the audit never announces a crawler token", "; ".join(stale))
+    for needle in ("robots.txt allows", "never sent"):
+        res.check(needle in open(os.path.join(ROOT, "README.md"), encoding="utf-8").read(), "README Safety states the robots rule for announced tokens (%s)" % needle)
     orch = open(os.path.join(ROOT, "skills", "audit-orchestrator", "SKILL.md"), encoding="utf-8").read()
     for needle in ("run_audit.py", "finalize.py", "compose.py", "validate.py", "references/simulation_rules.md",
                    "offsite_spotcheck.md", "extracted_facts.json", "WebSearch", "--final"):
@@ -356,6 +367,53 @@ def stage_fetch(res, farm):
     # bot-blocking: our UA is under '*', so pages are fetched
     f = Fetcher(site=u["bot-blocking-robots"])
     res.check(f.get(u["bot-blocking-robots"] + "/pricing", purpose="page").ok, "bot-blocking-robots: audit UA allowed via '*'")
+    from auditlib.robots import load_bot_tiers
+    tiers = load_bot_tiers()
+    from auditlib.fetch import PROBE_USER_AGENTS
+    for token, tier, agent in PROBE_USER_AGENTS:
+        row = tiers.get(token.lower())
+        res.check(row is not None and row["tier"] == tier, "probe token %s: tier %s agrees with bot_tiers.md" % (token, tier), str(row))
+        res.check(token in agent, "probe token %s: its published user-agent string carries the token" % token)
+    # get_as holds the announced token to robots.txt as if it were the real crawler (edge-probe guard):
+    # a token the site disallowed is never sent, whoever asks, and the budget is untouched
+    from auditlib.fetch import PROBE_USER_AGENTS
+    ua = {t: agent for t, _tier, agent in PROBE_USER_AGENTS}
+    base = u["bot-blocking-robots"]
+    n = f.requests_made
+    r = f.get_as(base + "/", ua["GPTBot"], token="GPTBot")
+    res.check(r["skipped"] == "robots_disallow_for_token" and r["status"] is None and r["skipped_rule"] == "Disallow: /"
+              and f.requests_made == n, "get_as: a token robots.txt disallows is not sent and costs no request")
+    r = f.get_as(base + "/", ua["GPTBot"])
+    res.check(r.get("announced_token") == "GPTBot" and r["skipped"] == "robots_disallow_for_token" and f.requests_made == n,
+              "get_as: the token is inferred from the published user-agent string when not named")
+    r = f.get_as(base + "/pricing", ua["Claude-User"], token="Claude-User")
+    res.check(r["skipped"] == "robots_disallow_for_token" and r["skipped_rule"] == "Disallow: /pricing" and f.requests_made == n,
+              "get_as: the rule is evaluated for the announced token and the exact path")
+    r = f.get_as(base + "/", ua["Claude-User"], token="Claude-User")
+    res.check(r["status"] == 200 and r.get("announced_token") == "Claude-User" and f.requests_made == n + 1,
+              "get_as: the same token on an allowed path is sent once")
+    res.check(f.headers.get("User-Agent") is not None and "brand-ai-readiness-audit" in f.headers["User-Agent"],
+              "get_as: the audit's own user agent is restored afterwards")
+    r = f.get_as(base + "/", "SomeUnknownAgent/1.0")
+    res.check(r["skipped"] == "unknown_token" and f.requests_made == n + 1, "get_as: an agent that cannot be named is not sent")
+    # the sampler passes the token and records the policy decision with its rule
+    from auditlib.sampler import probe_edge_access
+    f2 = Fetcher(site=base)
+    home = f2.get(base + "/", purpose="page")
+    ea = probe_edge_access(f2, base + "/", home, f2.robots())
+    res.check([a["token"] for a in ea["policy"]] == ["GPTBot"] and ea["policy"][0]["rule"] == "Disallow: /",
+              "edge probe: a disallowed token is recorded as policy with its rule", str(ea.get("policy")))
+    rules = {a["token"]: a["robots_rule"] for a in ea["agents"]}
+    res.check(sorted(rules) == ["Claude-User", "OAI-SearchBot"] and ea["reason"] is None,
+              "edge probe: only allowed tokens are probed", str(ea.get("agents")))
+    # RFC 9309 semantics recorded honestly: a token with no group falls to '*' (Allow: /); a token whose own
+    # group has no rule for this path is allowed by absence, and no rule is invented for it
+    res.check(rules.get("OAI-SearchBot") == "Allow: /" and rules.get("Claude-User") is None,
+              "edge probe: the matched rule is recorded, and 'allowed by absence' is recorded as no rule", str(rules))
+    f3 = Fetcher(site=u["clean-site"])
+    home = f3.get(u["clean-site"] + "/", purpose="page")
+    ea = probe_edge_access(f3, u["clean-site"] + "/", home, f3.robots())
+    res.check(len(ea["agents"]) == 3 and not ea["policy"], "edge probe: a robots.txt that allows everyone probes all three tokens")
     # non-html seed
     f = Fetcher(site=u["non-html-seed"])
     r = f.get(u["non-html-seed"] + "/", purpose="page")
@@ -1308,6 +1366,30 @@ def stage_probe_cr(res, farm):
     print("\n== stage: crawl-render probe on every fixture")
     cp = _load_probe("crawl-render-audit", "crawl_probe.py")
     R = run_probe_on_fixtures(res, farm, "cr.", cp, "cr")
+    # policy is not behaviour: the edge probe never announces a token robots.txt disallows, and never grades one
+    st = lambda name, cid: next(((c["status"], c.get("reason")) for c in R[name]["checks"] if c["check_id"] == cid), None)  # noqa: E731
+    fnd = lambda name, cid: next((f for f in R[name]["findings"] if f["check_id"] == cid), None)  # noqa: E731
+    res.check(all(st("edge-enforces-policy", cid) == ("not_evaluated", "probe_tokens_disallowed") for cid in
+                  ("cr.access.edge_block", "cr.access.edge_block_training", "cr.access.ua_content_variance")),
+              "cr/edge-enforces-policy: every edge check is not_evaluated with reason probe_tokens_disallowed",
+              str([st("edge-enforces-policy", c) for c in ("cr.access.edge_block", "cr.access.edge_block_training")]))
+    res.check(fnd("edge-enforces-policy", "cr.access.edge_block") is None, "cr/edge-enforces-policy: enforcing one's own robots.txt is never a second finding")
+    f = fnd("edge-blocked-mixed", "cr.access.edge_block")
+    res.check(f is not None and f["severity"] == "critical", "cr/edge-blocked-mixed: the two robots-allowed citation-tier tokens refused at the edge is critical",
+              str(f and f["severity"]))
+    res.check(f is not None and "GPTBot not probed" in json.dumps(f["evidence_items"]) and "robots.txt allows these agents" in f["evidence"],
+              "cr/edge-blocked-mixed: the evidence names the policy token as not probed and says robots.txt allows the probed ones")
+    res.check(f is not None and "GPTBot" not in f["evidence"].split("but", 1)[-1].split(". robots")[0],
+              "cr/edge-blocked-mixed: the policy token is not counted among the refused crawlers")
+    res.check(st("edge-blocked-mixed", "cr.access.edge_block_training") == ("pass", None), "cr/edge-blocked-mixed: a training token that was policy is not an edge note")
+    f = fnd("edge-refuses-auditor", "cr.access.http_error")
+    res.check(f is not None and f["status"] == "inconclusive" and f["severity"] == "info" and f.get("reason") == "crawler_access_unknown",
+              "cr/edge-refuses-auditor: a refusal the audit cannot explain is inconclusive, never critical", str(f and (f["status"], f["severity"], f.get("reason"))))
+    res.check(f is not None and "disallowed by the site's own robots.txt" in f["evidence"], "cr/edge-refuses-auditor: the evidence says why nothing could be probed")
+    res.check(not [x for x in R["edge-refuses-auditor"]["findings"] if x["severity"] == "critical"], "cr/edge-refuses-auditor: no critical finding at all")
+    f = fnd("edge-blocked-bots", "cr.access.edge_block")
+    res.check(f is not None and f["severity"] == "critical" and "robots.txt allows these agents" in f["evidence"],
+              "cr/edge-blocked-bots: the real defect (robots open, edge refuses) is still critical, and its evidence is now true by construction")
     sev = lambda name, cid: next((f["severity"] for f in R[name]["findings"] if f["check_id"] == cid), None)
     conf = lambda name, cid: next((f["confidence"] for f in R[name]["findings"] if f["check_id"] == cid), None)
     pages = lambda name, cid: next((len(f["affected_pages"]) for f in R[name]["findings"] if f["check_id"] == cid), 0)

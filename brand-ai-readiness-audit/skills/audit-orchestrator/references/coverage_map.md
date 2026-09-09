@@ -89,6 +89,7 @@ Rules:
 - Rows that fold *entries* rather than whole findings (8, 9) fold the finding only when every entry it reports is covered by the primary; on a partial overlap both findings stay and the note is still appended.
 - Suppressed findings still appear in the Markdown under "Folded into other findings" with one line each, so the reader loses nothing.
 - Design-level dedupe (no table row needed): `fx.facts.key_fact_missing` does not evaluate `address`/`phone` except for `local_business` (row 8 covers that case); `en.*` never grades robots or JSON-LD.
+- Design-level dedupe: `cr.access.edge_block` never grades a token the site's robots.txt disallows for the home URL. Such a token is the site's stated policy, reported by `cr.robots.*`; an edge that refuses it is enforcing that policy, not contradicting it. One token can therefore be a policy finding or a behaviour finding, never both.
 
 ## 5. What the audit does not cover (say this in every report's `limitations`)
 

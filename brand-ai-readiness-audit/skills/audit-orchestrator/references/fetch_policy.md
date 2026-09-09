@@ -22,9 +22,17 @@ Accept-Language: en,*;q=0.5
 Accept-Encoding: gzip, deflate
 ```
 
-The audit never impersonates a browser beyond the compatibility prefix, and
-never uses the token of any bot listed in `bot_tiers.md`. The `+URL` is
-replaced with the real repository URL in Step 21.
+The audit never impersonates a browser beyond the compatibility prefix. The
+one place it announces another agent's token is the edge-access probe
+(`cr.access.edge_block`): at most three GETs of the home URL, each announcing
+one published crawler token from `bot_tiers.md`, to observe whether the origin
+serves that crawler. A token is announced only where the site's robots.txt
+allows it for that URL, evaluated for the announced token exactly as for the
+audit's own (RFC 9309, longest match). A token the site has disallowed is never
+sent, and the fetcher itself refuses to send it whoever asks
+(`Fetcher.get_as`, `skipped=robots_disallow_for_token`). A refusal is recorded
+as evidence and the probe stops; a token is never used to get past one. The
+`+URL` is replaced with the real repository URL in Step 21.
 
 ## 3. Limits
 

@@ -20,7 +20,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.normpath(os.path.join(HERE, "..", "..", "audit-orchestrator", "scripts")))
 from auditlib.context import AuditContext  # noqa: E402
 from auditlib.findings import ProbeOutput, Registry, evidence_item, validate_probe_output  # noqa: E402
-from auditlib.fetch import registrable_domain, normalize_url  # noqa: E402
+from auditlib.fetch import registrable_domain, normalize_url, PROBE_USER_AGENTS  # noqa: E402
 from auditlib.robots import load_bot_tiers, grade_tokens  # noqa: E402
 from auditlib.categories import is_key_page  # noqa: E402
 from auditlib.render import THIN_WORDS, js_gate_signals, csr_signals  # noqa: E402
@@ -196,9 +196,16 @@ def check_access(ctx, out):
         refused_home = home_err and (home.status or 0) in (401, 403, 429)
         ea = ctx.edge_access or {}
         probed = ea.get("agents") or []
+        policy = ea.get("policy") or []
         crawlers_refused = [a for a in probed if (a.get("status") or 0) >= 400 or a.get("error")]
+        probe_items = ([evidence_item(ea.get("url") or home.final_url, "http_status", "%s -> %s" % (a["token"], a.get("error") or a.get("status")),
+                                      note="user-agent probe; robots.txt %s" % (a.get("robots_rule") or "has no rule for this path (allowed)")) for a in probed] +
+                       [evidence_item(ea.get("url") or home.final_url, "robots_rule", "%s not probed: %s" % (a["token"], a.get("rule") or "disallowed"),
+                                      note="the site's own policy; reported by cr.robots.*") for a in policy])
         if refused_home and probed and len(crawlers_refused) == len(probed):
             title = "The site refuses automated clients: this auditor and every AI crawler tested got HTTP %s" % home.status
+            desc += "; crawler probes (each allowed by robots.txt): " + "; ".join(
+                "%s -> %s" % (a["token"], a.get("error") or a.get("status")) for a in probed)
         elif refused_home and probed and not crawlers_refused:
             out.inconclusive("cr.access.http_error", reason="audit_user_agent_refused",
                              title="This auditor was refused (HTTP %s) but AI crawlers were served" % home.status,
@@ -212,14 +219,35 @@ def check_access(ctx, out):
                              pages=pages)
             return ok_pages
         elif refused_home:
-            title = "The site refuses this auditor (HTTP %s); AI crawler access could not be established" % home.status
+            # No probe could settle whether crawlers are served (every token was the site's own policy, robots.txt was
+            # unreadable, or the probes disagreed). That is not knowledge of a defect, so it is never a critical finding.
+            if not probed:
+                why_unknown = {"probe_tokens_disallowed": "every crawler token the audit could test is disallowed by the site's own robots.txt, so none was announced",
+                               "robots_unreachable": "robots.txt could not be read, so no crawler token could be announced"}.get(
+                    ea.get("reason"), "no crawler token could be announced")
+                reason = "crawler_access_unknown"
+            else:
+                why_unknown = "the crawlers tested were answered differently (%s)" % "; ".join(
+                    "%s -> %s" % (a["token"], a.get("error") or a.get("status")) for a in probed)
+                reason = "crawler_access_mixed"
+            out.inconclusive("cr.access.http_error", reason=reason,
+                             title="This auditor was refused (HTTP %s); whether AI crawlers are served could not be established" % home.status,
+                             evidence="GET %s returned HTTP %s to the audit user agent, and %s. The refusal may apply only to this tool." % (
+                                 home.final_url, home.status, why_unknown),
+                             evidence_items=[evidence_item(home.final_url, "http_status", "audit user agent -> %s" % home.status)] + probe_items,
+                             why="The pages could not be read by this audit, so checks needing page content have no verdict. Nothing here shows that the crawlers assistants use are refused; it shows only that this audit was.",
+                             action="Allow this tool's user agent through the bot-protection layer and re-run to get the full report.",
+                             detail="The audit sends one identifying user agent and obeys robots.txt for itself and for every crawler token it announces. Where the site's robots.txt disallows those tokens, their access is the site's stated policy and is reported under cr.robots.*.",
+                             pages=pages)
+            return ok_pages
         elif home_err:
             title = "Site is unreachable: the home page could not be fetched (%s)" % (home.error or "HTTP %s" % home.status)
         else:
             title = "%d sampled page%s return%s an error to a plain fetcher" % (len(errored), "s" if len(errored) != 1 else "", "" if len(errored) != 1 else "s")
         out.fail("cr.access.http_error", title=title[:90],
                  evidence="Plain GET of %s. %s" % (", ".join(p.role for p in errored), desc),
-                 evidence_items=[evidence_item(p.final_url, "http_status", str(p.status) if p.status else "error=%s" % p.error, note=p.fetch.get("error_detail")) for p in errored[:6]],
+                 evidence_items=[evidence_item(p.final_url, "http_status", str(p.status) if p.status else "error=%s" % p.error, note=p.fetch.get("error_detail")) for p in errored[:6]]
+                                + (probe_items if refused_home else []),
                  why=("Every AI crawler tested was refused the same way, so the pages an assistant would read are unavailable to it, whatever robots.txt permits and however well the site serves browsers."
                       if refused_home else
                       "A page that answers with an error to a plain fetcher does not exist for an assistant. If this is the home page, the whole brand is invisible."),
@@ -264,8 +292,12 @@ def check_edge_access(ctx, out):
     """
     ea = ctx.edge_access
     if not ea or not ea.get("agents"):
+        # Nothing was probed. Either there was no response to compare against, or every token the audit could
+        # announce is disallowed by the site's own robots.txt (its policy, already reported by cr.robots.*), or
+        # robots.txt could not be read so no token could be announced. None of these is a verdict on the edge.
+        reason = (ea or {}).get("reason") or ("no_baseline" if not ea else "network_disabled")
         for cid in EDGE_IDS:
-            out.not_evaluated(cid, reason="no_baseline" if ea is None else "network_disabled")
+            out.not_evaluated(cid, reason=reason)
         return
     # This check compares a *served* baseline against the crawler probes. When our own fetch was
     # refused too there is no "served to us but not to them" to report: the blanket refusal is
@@ -288,23 +320,31 @@ def check_edge_access(ctx, out):
     train = [a for a in refused if a["tier"] == "training_only"]
     probed_cite = [a for a in ea["agents"] if a["tier"] in ("live_answer", "index")]
 
+    policy = ea.get("policy") or []
+
     def _desc(a):
         return "%s (%s): %s" % (a["token"], a["tier"], a.get("error") or "HTTP %s" % a.get("status"))
 
+    def _rule(a):
+        return a.get("robots_rule") or "no rule for this path (allowed by absence)"
+
+    policy_items = [evidence_item(ea["url"], "robots_rule", "%s not probed: %s" % (a["token"], a.get("rule") or "disallowed"),
+                                  note="the site's own policy; reported by cr.robots.*") for a in policy]
     if cite:
         every = len(cite) == len(probed_cite) and probed_cite
         out.fail("cr.access.edge_block",
                  title="The site is served to this audit but refused to %s" % (
                      "every AI crawler tested" if every else "%d AI crawler%s" % (len(cite), "" if len(cite) == 1 else "s")),
-                 evidence="GET %s returned HTTP %s (%d bytes) to the audit's own user agent, but %s. robots.txt is not the cause: this is the origin or its CDN answering differently by user agent." % (
+                 evidence="GET %s returned HTTP %s (%d bytes) to the audit's own user agent, but %s. robots.txt allows these agents at this URL, so the refusal is the origin's or its CDN's, answering by user agent." % (
                      ea["url"], (ea.get("baseline") or {}).get("status"), base_bytes, "; ".join(_desc(a) for a in cite)),
                  evidence_items=[evidence_item(ea["url"], "http_status", "audit user agent -> %s (%d bytes)" % (
                      (ea.get("baseline") or {}).get("status"), base_bytes))] +
-                     [evidence_item(ea["url"], "http_status", _desc(a), note="user-agent probe") for a in cite],
+                     [evidence_item(ea["url"], "http_status", _desc(a), note="user-agent probe; robots.txt: %s" % _rule(a)) for a in cite] +
+                     policy_items,
                  why="These are the crawlers that fetch and index pages for AI answers. A page they cannot retrieve cannot be quoted or cited, no matter what robots.txt permits. Because the block is at the network edge, it is invisible to every audit that only reads robots.txt.",
                  action="Allow the published AI crawler user agents through the CDN or WAF, then re-run this check.",
                  detail="In Cloudflare, Akamai, Fastly or your WAF, find the bot-management or firewall rule matching these user agents and add an allow rule (most vendors ship a verified-bot list). Confirm with: curl -A '%s' -I %s and check for HTTP 200." % (
-                     "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; OAI-SearchBot/1.0; +https://openai.com/searchbot)", ea["url"]),
+                     next((ua for t, _tier, ua in PROBE_USER_AGENTS if t == cite[0]["token"]), cite[0]["token"]), ea["url"]),
                  references=[REFS["robots"]],
                  extra_adjust=["edge_block_all_citation_tiers:critical"] if every else None)
         if every:
@@ -318,7 +358,7 @@ def check_edge_access(ctx, out):
                         title="Training-only crawlers are refused at the edge (policy note, not a defect)",
                         evidence="%s refused while the audit's own user agent received HTTP %s. No live-answer or index crawler was refused." % (
                             "; ".join(_desc(a) for a in train), (ea.get("baseline") or {}).get("status")),
-                        evidence_items=[evidence_item(ea["url"], "http_status", _desc(a), note="user-agent probe") for a in train],
+                        evidence_items=[evidence_item(ea["url"], "http_status", _desc(a), note="user-agent probe; robots.txt: %s" % _rule(a)) for a in train] + policy_items,
                         why="Blocking training crawlers keeps content out of future model training. It does not stop the site being fetched or cited when someone asks about it today, so it is recorded as a choice rather than a problem.",
                         action="No action needed unless you intended these crawlers to have access.",
                         detail="If the block was not deliberate, check the CDN or WAF bot rules for these user agents.")

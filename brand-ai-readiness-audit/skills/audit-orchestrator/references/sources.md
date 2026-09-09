@@ -50,8 +50,16 @@ Quotations relied on for tier assignment:
 | `cohere-ai` | Cohere publishes no crawler documentation. |
 | `YouBot` | You.com publishes no crawler documentation; third-party directories disagree on the exact user-agent string, so a row would risk a false match. |
 | `Diffbot` | Documented, but Diffbot's own docs state it does not crawl for generative-AI training. It is a structured-data extraction service, not an answer-engine crawler, so blocking it does not affect AI visibility. |
+| `OAI-AdsBot` | Documented by OpenAI (added to its bots page by 2026-09) as an ad-validation fetcher. It neither indexes for search answers nor fetches on a user's behalf, so it has no tier here and blocking it does not affect AI visibility. |
 
 ---
+
+### Probe user-agent strings (`auditlib/fetch.py`, `PROBE_USER_AGENTS`)
+
+The edge probe announces three tokens. OpenAI publishes the complete strings (`OAI-SearchBot/1.4`, `GPTBot/1.4`,
+checked 2026-09-09) and those are used verbatim. Anthropic's article documents the `Claude-User` token but no full
+string, so the audit sends the token in the common `compatible;` format; a robots.txt group or a WAF rule matches
+on the token, which is the documented part. The strings are re-checked whenever the tier table is.
 
 ## 2. Protocol and format references
 
@@ -71,8 +79,9 @@ around fact density, structured data and FAQ content.
 | Claim | Source |
 |---|---|
 | Per-technique visibility deltas for quotations, statistics, citing sources, fluency, etc.; keyword stuffing reduces visibility; citing sources helps low-ranked sources far more than top-ranked ones | Aggarwal et al., "GEO: Generative Engine Optimization", KDD 2024 — https://arxiv.org/abs/2311.09735 |
-| JSON-LD alone gives a small effect (d=0.18); the same facts *also* stated as visible human-readable text near the structured data gives a large effect (+29.6% accuracy, d=0.60, p<10⁻²¹); the gain is largest where plain HTML previously stated nothing (travel, editorial) and smallest where it already did (e-commerce, ceiling effect) | "Structured Linked Data as a Memory Layer for Agent-Orchestrated Retrieval" — https://arxiv.org/abs/2603.10700 |
-| Citation *selection* (getting retrieved) is gated by domain authority and being an official/news/vertical source (79-88% of citations); citation *absorption* (shaping the generated answer once selected) correlates with page length (top-quartile pages average 11.44x the words of bottom-quartile), heading and list density, and content genre — numbers/statistics (+61.55%), definitions (+57.33%) and comparisons (+55.28%) show the largest influence gains, while Q&A-formatted content shows a small negative effect (-5.74%) | "From Citation Selection to Citation Absorption: A Measurement Framework for Generative Engine Optimization Across AI Search Platforms" — https://arxiv.org/abs/2604.25707 |
+| JSON-LD alone gives a small effect (Δ=+0.17, d=0.18); an *enhanced entity page* — a natural-language summary of the structured data, the JSON-LD block, visible entity links and llms.txt-style agent instructions together — gives a large one (+29.6% accuracy for standard RAG, d=0.60, p<10⁻²¹); the gain is largest where plain HTML previously stated little (travel: 2.19 → 4.92) and smallest where it already scored near the ceiling (e-commerce, 4.92 → 4.99). Re-read against the paper's HTML on 2026-09-09; every figure is in the text | "Structured Linked Data as a Memory Layer for Agent-Orchestrated Retrieval" — https://arxiv.org/abs/2603.10700 |
+| Citation *selection* (getting retrieved) is gated by domain authority and being an official/news/vertical source (79-88% of citations); citation *absorption* (shaping the generated answer once selected) correlates with page length (top-quartile pages average 11.44x the words of bottom-quartile), heading and list density, and content genre — numbers/statistics (+61.55%), definitions (+57.33%) and comparisons (+55.28%) show the largest influence gains, while Q&A-formatted content shows a small negative effect (-5.74%) | "From Citation Selection to Citation Absorption: A Measurement Framework for Generative Engine Optimization Across AI Search Platforms" — https://arxiv.org/abs/2604.25707 Re-read against the paper's HTML on 2026-09-09: 23,745 records, 602 prompts, 79.12–87.52%, 11.44×, +61.55 / +57.33 / +55.28 / −5.74% are all printed as quoted |
+
 
 **Design consequences drawn from these three papers:**
 - `fx.jsonld.*` findings stay `medium` at most on their own (schema alone is a

@@ -1,0 +1,37 @@
+{
+  "name": "edge-blocked-mixed",
+  "description": "Clean site whose robots.txt disallows only GPTBot, while the edge returns 403 to all three probe tokens. GPTBot is policy (not probed); OAI-SearchBot and Claude-User are allowed by robots.txt and refused by the edge, which is the real defect: critical cr.access.edge_block for the two citation-tier agents, with GPTBot listed as policy in the evidence.",
+  "base": "clean-site",
+  "category": "saas_software",
+  "routes": {},
+  "ua_deny": {
+    "match": [
+      "OAI-SearchBot",
+      "Claude-User",
+      "GPTBot"
+    ],
+    "status": 403,
+    "body": "<!doctype html><title>Forbidden</title><p>Request blocked.</p>"
+  },
+  "expected": {
+    "fail": [
+      "cr.access.edge_block"
+    ],
+    "info": [
+      "cr.robots.training_bot_blocked",
+      "ef.entity.wikidata_unavailable",
+      "ef.corroboration.offsite_spotcheck"
+    ],
+    "pass_required": [
+      "cr.robots.blanket_disallow",
+      "cr.robots.index_bot_blocked",
+      "cr.robots.live_answer_bot_blocked",
+      "cr.access.http_error",
+      "cr.access.challenge_page",
+      "cr.access.edge_block_training",
+      "cr.render.js_gate",
+      "cr.render.csr_shell"
+    ],
+    "notes": "Proves the robots filter is per token, not all-or-nothing. cr.access.edge_block_training passes because GPTBot was never probed: its refusal is the site's policy, reported as the cr.robots.training_bot_blocked note."
+  }
+}
