@@ -537,19 +537,19 @@ sign-up button is what About pages look like. Both are rubric-and-registry chang
 fixture each. Also still open: `cr.access.non_html_seed` reports `pass` when the home page
 returned 403 (it never saw HTML) — should be `not_evaluated`.
 
-## 15. 2026-09-10 — where things stand, and what to do next (read this first)
+## 15. 2026-09-10 — current state and the plan (read this first; everything above is history)
 
-Everything above is history. This section is the current state.
-
-**Repo:** `main`, clean, pushed. **All 24 steps of `BUILD_PLAN.md` are ticked** (Step 24's
-submission itself is the user's action). Suite: 3,349 checks green
-(`cd brand-ai-readiness-audit && python3 tests/run_tests.py`, >10 min; use `--stage <name>`
-while iterating). 61 checks, 21 fixtures, five skills all pass the validator.
+**Repo:** `main` at `e9f6be7`, clean, pushed. **All 24 steps of `BUILD_PLAN.md` are ticked**;
+submitting is the user's action. Suite: **3,354 checks green**
+(`cd brand-ai-readiness-audit && python3 tests/run_tests.py`, >10 min; `--stage <name>` while
+iterating). 61 checks, 24 fixtures, five skills pass the validator. Submission zip at
+`/Users/sheelgautam/adobe-hackathon/brand-ai-readiness-audit.zip` (519 KB) — rebuild after any
+commit with `git archive --format=zip -o brand-ai-readiness-audit.zip HEAD:brand-ai-readiness-audit`.
 
 **Two people commit:** Sheel's sessions and Deepak (deepak23188@iiitd.ac.in). Always
-`git pull --ff-only origin main` before starting anything.
+`git pull --ff-only origin main` first.
 
-**To audit any site:**
+**Audit any site:**
 ```
 cd brand-ai-readiness-audit
 python3 skills/audit-orchestrator/scripts/run_audit.py https://example.com/ --workdir audit-example
@@ -557,57 +557,79 @@ python3 skills/audit-orchestrator/scripts/run_audit.py https://example.com/ --wo
 Read `audit-example/report.md`. `--category <id>` overrides inference, `--offline` re-grades a
 saved workdir, `--verbose` shows each probe. `audit-*` directories are git-ignored.
 
-**Live results so far** (all exit 0, no tracebacks, longest 83 s): Step 19's 13 sites; Deepak's
-38; a 10-site batch on 2026-09-09 (72 defect findings, 0 judged false, ~10 arguable on
-severity); iiitd.ac.in on 2026-09-10 (12 findings: 4 medium, 6 low, 2 info; category
-nonprofit_institution; simulation answered 4 of 5 questions, the unanswerable one — "what
-programs, and where" — matched the key-fact finding exactly).
+**Steps 23–24 (2026-09-10).** Zip built from tracked files, unzipped cold, validator green from
+the copy; one entrypoint of five, stdlib-only, no non-GET method, robots proven from a live run's
+request manifest, runtime confirmed from the unzipped copy on adobe.com (59 s) and
+thehawksmoor.com (25 s). The dry run found two defects, both fixed by rule with tests: a hung
+crawler probe (`read_timeout`) is now `inconclusive probe_timeout`, never a critical refusal; and
+every first-viewport rule measures from the first *visible* content (`Document.content_mpos`,
+ignoring `noscript`/`svg`/`template`), not from `<body>`.
 
-**Steps 23–24 done on 2026-09-10.** Zip built with `git archive --format=zip -o
-brand-ai-readiness-audit.zip HEAD:brand-ai-readiness-audit` (516 KB; rebuild after any commit),
-unzipped cold, validator green from the copy, stdlib/GET-only/one-entrypoint/robots all proven.
-The dry run on adobe.com and thehawksmoor.com found two defects, both fixed by rule with tests:
-a hung crawler probe (`read_timeout`) is now `inconclusive probe_timeout`, never a critical
-refusal; and every first-viewport rule measures from the first *visible* content
-(`Document.content_mpos`, ignoring `noscript`/`svg`/`template`), not from `<body>` — a page with
-200 KB of inline SVG before its first link had its four "Book a table" buttons reported as no CTA.
+---
 
-**An LLM-council session on 2026-09-10** (five advisors + peer review) reached these
-conclusions, which are the plan from here:
+### THE OPEN WORK: absence findings overstate (second council, 2026-09-10)
 
-1. **Do NOT do the 500-site corpus run.** Judges never see that number; it costs a day.
-2. **Do Step 24 before Step 23.** Give Deepak the zip cold, a clean machine, three sites
-   Sheel never ran — **adobe.com, a bare React SPA, a local business** — one hour. He lists
-   every finding he cannot verify in 60 seconds and every place the README confused him.
-   That list is the real Step 23. Adobe.com has never been run; do it first.
-3. **The two severity calibrations are not optional** (the council's one real clash, resolved
-   4–1): `ef.entity.nap_missing_plain_text` at `medium` on corporate/SaaS sites that simply do
-   not print an address → `low` (or accept email as the contact fact); `en.cta.missing` grading
-   About and Contact pages → info-level non-finding on those roles. Each is a registry +
-   rubric change with a fixture. iiitd.ac.in's F-001 is a live example of the second.
-4. **Make what is already built visible.** Reviewers flagged robots/GET-only compliance, the
-   5-minute wall, and marketplace composition as "unaddressed" — all three are built and
-   tested; the README must *say so in one line each* (request manifest per run; 300 s budget
-   with partial reports; validator on all five skills, composition argument in
-   `coverage_map.md` §3).
-5. **Put the no-JS thesis on page one of the README as the point** ("we show what a
-   non-JavaScript fetcher sees, because that is what AI crawlers see"), not as a limitation.
-6. **Explain the simulation's verbatim-only rule in the report itself**, or it reads as
-   weak next to teams that fake richer answers.
-7. **Move the false-positive history inside the zip** (it lives in BUILD_PLAN.md/CONTEXT.md,
-   outside): expand `CONTRIBUTING.md`'s known traps or add a short mistakes log — nine
-   defects in Step 19, four in Deepak's pass, the edge-block fix.
-8. **Consider sorting findings by verifiability**, not only severity — the first finding a
-   judge reads decides the score. This changes `report_schema.md` §4; decide, don't drift.
-9. Tag a ~90-second smoke subset of the suite; run the full suite once before zipping.
-10. Also open, smaller: `cr.access.non_html_seed` reports `pass` when the home page returned
-    403 (should be `not_evaluated`); check the zip for stray workdirs and its size.
+Two real reports (adobe.com, iiitd.ac.in) were read finding by finding. A five-advisor council
+plus peer review found one disease behind every false positive, and the code claims below were
+**verified in the source**:
 
-**Decisions the council judged right, keep them:** stdlib-only; no headless browser (fix the
-framing, not the bet); the large suite (it caught 13 real defects); "fix rules, never sites";
-the verbatim-only simulation with its validator; the zero-findings clean-site report as a
-product feature.
+> The tool cannot distinguish **"absent from the site"** from **"absent from what I sampled"**,
+> and states both in the same voice. Presence findings (image-only h1, no JSON-LD on a page it
+> fully parsed) are page-local and cannot be false. **Every false positive is an absence claim.**
 
-**Order for the next session:** pull → run adobe.com and read the first finding as a judge
-would → the two calibrations (with fixtures) → README items 4–7 → Deepak's cold run → fix
-his list → full suite → zip → Step 23 checklist against the zip → Step 24 → submit.
+Evidence on the two sites:
+- **adobe.com** (the likeliest judge site): JS-rendered nav → 2 pages sampled. "No newsroom"
+  (medium; news.adobe.com exists), "no address on home" (medium, the quick win) and "2 of 4 key
+  facts missing" (**high**) are claims about 2 pages printed as claims about the site.
+- **iiitd.ac.in**: the only "quick win" is a vocabulary miss (`CTA_VOCAB["nonprofit_institution"]`
+  lacks "admissions"), and "location absent" is an i18n miss — the contact page says
+  "Okhla Industrial Estate, Phase III … New Delhi, India - 110020" but the address detectors know
+  only UK postcodes and US city-state-ZIP. The same report elsewhere says contact details **are**
+  visible: it contradicts itself.
+
+Verified code facts:
+- `auditlib/sampler.py:218` fetches only `locs[0]` — the **first child** of a sitemap index.
+  adobe.com's index has 91 children, so the report's "137 URLs" is one child's count, not the site's.
+- `auditlib/sampler.py:268` matches sitemap URLs to roles by **exact path**, so
+  `/products/.../contact-us.html` never matches `/contact`. It never fires on `.html`-suffixed or
+  compound slugs, i.e. most corporate sites. The sampler *held* Adobe's contact URL and discarded it.
+- **Three vocabularies disagree**: `extract.py:49` `PARTICIPATE_RE` has `admissions?`;
+  `categories.py` `CTA_VOCAB` does not; `sampler.py` role keywords do. The sampler found iiitd's
+  Admissions page while the CTA check denied one existed.
+- `compose.py` already computes `missing_roles` and prints it in `limitations` — **findings never
+  consult it**. That is the cheapest fix and the highest-value one.
+- Budget: 40 requests / 300 s per site. Reading all 91 sitemap children would break it; cap needed.
+
+**The plan (about two days, two people):**
+
+*Person A — `auditlib/sampler.py`:* list all children of a sitemap index, capped at ~5 (record
+"91 children, read 5, URLs seen N"); match roles by path token, not exact path (`contact-us.html`
+→ contact, `newsroom` → news); when nav yields <3 roles, fill roles from sitemap candidates
+within budget.
+
+*Person B — `compose.py` + detectors:* **the absence gate** — any "no X page" finding whose role
+is in `missing_roles` becomes `not_evaluated` (`role_page_not_sampled`) or a low-confidence
+"X not reachable to a non-JS fetcher; N of M sampled"; a **consistency pass** (if any finding's
+evidence shows X present, suppress "no X"); one **shared vocabulary module** imported by extract,
+categories and sampler (add admissions/admission/apply/programs/courses/enquire); **Indian address
+grammar** (6-digit PIN, "<City>, India - <PIN>", +91, state names) with low confidence and the
+grammars tried printed when nothing matches.
+
+*Both, day 2:* fixtures from the iiitd and adobe HTML asserting zero false findings (named for
+the false positive, e.g. `test_adobe_unsampled_role_not_absent`); a validator check rejecting a
+report that claims absence while another finding shows presence; report header
+"Pages sampled: N of M URLs seen; nav JS-rendered: yes"; body capped at ~8 findings with the rest
+in an appendix, "what is working" ≤6 lines; cold re-run on iiitd, adobe, one Indian mid-size brand
+and one more `.ac.in`, every finding hand-verified, and the honest number in the README
+("N findings across 4 sites, 0 falsified").
+
+**No new detectors. Nothing else.** The first council's still-open items (no-JS thesis on the
+README's first screen, the verbatim-only simulation explained in the report, the false-positive
+history moved inside the zip) stay valid but rank below the absence gate.
+
+**Also open, small:** `cr.access.non_html_seed` reports `pass` when the home page returned 403
+(should be `not_evaluated`); a ~90-second smoke subset of the suite.
+
+**Start here:** the absence gate in `compose.py`. It is vocabulary-independent and guarantees that
+however much the sampler misses, a judge's own site never gets a wrong `high`. Judges forgive
+"I could not see"; they do not forgive "it isn't there" about a site they know.
