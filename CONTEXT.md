@@ -67,7 +67,8 @@ with the code, the handout and the code win. Several of their citations are
       fixtures/<name>/                        16 static mini-sites, each with _fixture.json
 ```
 
-- Git remote: `https://github.com/Sheel23501/potential-winner.git`, branch `main`.
+- Git remote: `https://github.com/Sheel23501/potential-winner.git`, branch `main`. **Two people commit here**: Sheel's
+  sessions and Deepak (deepak23188@iiitd.ac.in). Pull with `--ff-only` before every step; keep commits small.
   `gh` is authenticated as Sheel23501. Commits so far: `e25fdfd` initial,
   `4214fa1` Step 11, `aff6ca2` Step 12, `6bb7ca1` CONTEXT.md, then Step 13. Working tree clean, everything pushed.
 - Skill validator: `~/.local/bin/agentskills validate <skill-dir>` (not on PATH).
@@ -83,17 +84,17 @@ with the code, the handout and the code win. Several of their citations are
 | 1 Fetch layer | 4–5 | done: fetch helper + robots, sampler + categorizer |
 | 2 Probes | 6–13 | done |
 | 3 Orchestrator | 14–17 | done: compose.py, validate.py, run_audit.py, finalize.py, the entrypoint SKILL.md and simulation_rules.md |
-| 4 Hardening | 18–20 | Steps 18–19 done. **Step 20 (source verification) is next** |
-| 5 Packaging | 21–24 | not started: README, demo, sweep, dry-run judging |
+| 4 Hardening | 18–20 | done (Step 20 by Deepak, re-verified 2026-09-09) |
+| 5 Packaging | 21–24 | Steps 21–22 done by Deepak. **Step 23 (compliance sweep) is next**, then dry-run judging |
 
-Suite: **2717 checks, 0 failures, GREEN.** It now takes over ten minutes; run it in the background
+Suite: **3349 checks, 0 failures, GREEN.** It now takes over ten minutes; run it in the background
 or with `--stage <name>` while iterating, and plainly once before ticking a step. All five skills pass the validator.
 
 Code size: ~8,100 lines. Largest pieces: `engagement_probe.py` 1044, `compose.py` 800, `validate.py` 335, `run_audit.py` 210, `finalize.py` 130,
 `entity_probe.py` 820, `extract.py` 702, `facts_probe.py` 624, `fetch.py` 528,
 `htmldoc.py` 522, `run_tests.py` 1640.
 
-Registry: 58 checks — 16 `cr.*`, 12 `fx.*`, 12 `ef.*`, 16 `en.*`, 2 `or.*`.
+Registry: 61 checks — 19 `cr.*` (three edge-access checks added by Deepak), 12 `fx.*`, 12 `ef.*`, 16 `en.*`, 2 `or.*`.
 
 Reference files written so far:
 
@@ -117,7 +118,7 @@ in a probe or a SKILL.md may invent a rule that belongs in one of these:
 |---|---|
 | `report_schema.md` | Probe output, Finding, Evidence, final report floor + superset, ordering, run layout, Markdown rendering |
 | `severity_confidence_rubric.md` | Severity, confidence, effort, the 5 adjustment rules in order, quick-win rule |
-| `check_ids.md` | `check_id` naming + the registry of all 58 checks with defaults |
+| `check_ids.md` | `check_id` naming + the registry of all 61 checks with defaults |
 | `coverage_map.md` | Handout A–F ↔ our 7 stages, the 12-row dedupe table, derived tags, non-coverage |
 | `site_categories.md` | 9 categories, inference scoring, page roles, key facts, engagement caps, severity overrides, the 5 simulation questions |
 | `bot_tiers.md` | AI bot tokens by tier (live_answer / index / training_only) |
@@ -480,13 +481,66 @@ text gives nothing to score, and its 18 findings are true of the page), and Clea
 of navigation chrome ("…Donate ≡ Menu Search…"); the detector should prefer the matching
 link's text. It is a fact excerpt, not a finding, so it was out of Step 19's scope.
 
-## 14. Next step — Step 20 (source verification)
+## 14. 2026-09-09 — Deepak's Steps 20–24 work, and the edge-block fix
 
-Read the plan's Step 20 text first: open every citation and every Adobe fact with a web
-tool, keep only what is confirmed with URLs in `audit-orchestrator/references/sources.md`,
-and **remove** anything unconfirmed from code, references and README — never soften it.
-The list to verify is in the plan text (bot_tiers.md rows, the two arXiv papers, the
-studies and statistics from the strategy PDFs, the URLs in every probe's `REFS` dict).
-Grep for `REFS = {` in each probe and for `http` in every references file to build the
-inventory before opening anything. Invariant 11 has held so far only because Step 20 was
-always going to do this; it is the step that makes the README's claims safe to print.
+Deepak pushed three commits (`947b2a2`, `b35db53`, `77144ae`): a new **edge-level access
+check** (`cr.access.edge_block` and two info siblings — the sampler announces three
+published crawler tokens at the home URL and compares with the baseline, catching a CDN
+that 403s crawlers a clean robots.txt permits), `references/sources.md` with every bot-tier
+row verified and three research papers, a rewritten README, the demo report in `examples/`,
+`CONTRIBUTING.md`, and four false-positive fixes from a 38-site gauntlet (refused sites
+reported as unreachable; URL patterns matching the hostname; `key_fact_missing` always
+`high`; English-only CTA vocabulary). All three papers were re-fetched on 2026-09-09 and
+every figure quoted is in their text.
+
+**The edge check had one real defect**, found by building a site that disallows the three
+tokens in robots.txt *and* 403s them at the edge — a site enforcing its own policy
+correctly. It was reported as a **critical** `edge_block` on top of the robots findings,
+with evidence saying "robots.txt is not the cause" (false), and an action telling the owner
+to undo the policy. Also: the probe announced tokens the site had disallowed, and an
+unexplained refusal of the auditor fell through to a confident critical.
+
+**The fix, in one commit, all uncommitted work of that day:**
+
+- *Sampler* (`probe_edge_access`): a token is announced only where robots.txt allows it
+  for the home URL (RFC 9309, evaluated for the announced token); disallowed tokens are
+  recorded under `edge_access.policy` with the matched rule; nothing probed → `reason`.
+- *Fetcher* (`get_as`): the same rule enforced where the request is made — a disallowed
+  token is never sent, `skipped=robots_disallow_for_token`, whoever calls.
+- *Crawl probe*: `edge_block` grades probed tokens only; nothing probed → `not_evaluated`
+  (`probe_tokens_disallowed` / `robots_unreachable`), no finding. A refusal of the auditor
+  that no probe can explain is `inconclusive` (`crawler_access_unknown` /
+  `crawler_access_mixed`), never critical; only "every robots-allowed token refused too"
+  stays a critical fail, with each probe in the evidence sentence.
+- *Documents*: `bot_tiers.md` §4 no longer promises the audit "never impersonates a listed
+  token"; `fetch_policy.md`, `check_ids.md`, `coverage_map.md` (a design-level-dedupe
+  bullet: one token is a policy finding or a behaviour finding, never both), the
+  crawl-render `checks.md` and `non_findings.md`, and the README Safety section all agree.
+  A hygiene test asserts the retired sentence appears nowhere.
+- *Fixtures*: `edge-enforces-policy`, `edge-blocked-mixed`, `edge-refuses-auditor`, plus a
+  test that each probe token's tier matches `bot_tiers.md`. `edge-blocked-bots` (the real
+  defect) stays critical.
+- *Step F*: probe strings on OpenAI's documented 1.4; Anthropic documents only the
+  `Claude-User` token, said so in `sources.md`; `OAI-AdsBot` excluded with a reason; the
+  JSON-LD paper's sentence tightened to its own definition of an enhanced entity page.
+
+**Live proof**, ten sites the same day: nytimes (all three tokens policy → no edge finding,
+robots findings only), bbc (per-token: two policy, one probed and served), redcross (robots
+allows, edge refuses all → critical, correct), khanacademy (client-rendered shell →
+critical, correct). Batch workdirs under the scratchpad `batch10/`.
+
+**Two calibration candidates from that batch, not yet acted on:**
+`ef.entity.nap_missing_plain_text` fired on 7 of 10 sites at `medium` for corporate and
+SaaS sites that simply do not print a postal address (true, but arguably `low` there); and
+`en.cta.missing` graded *About* pages (stripe, notion at `medium`) — an About page without a
+sign-up button is what About pages look like. Both are rubric-and-registry changes with a
+fixture each. Also still open: `cr.access.non_html_seed` reports `pass` when the home page
+returned 403 (it never saw HTML) — should be `not_evaluated`.
+
+## 15. Next step — Step 23 (final compliance sweep)
+
+Read the plan's Step 23 text. Most of it is already asserted by the suite (validator on
+all skills, one entrypoint, stdlib-only, no traceback anywhere) — run it once as a checklist
+against the actual zip, check the zip size and that no scratch or workdir is inside it, and
+decide the two calibrations above before Step 24's dry-run judging. Pull first: Deepak may
+have pushed.
