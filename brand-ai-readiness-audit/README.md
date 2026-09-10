@@ -69,8 +69,17 @@ python3 skills/engagement-audit/scripts/engagement_probe.py --workdir audit-exam
 ```
 
 Python 3.8+. **No dependencies** — standard library only, no API keys, no
-external service. Every skill folder is independently valid and independently
-runnable.
+external service.
+
+Every skill folder is independently *valid* — each carries its own spec-compliant
+`SKILL.md`, its own checks and its own `references/` — and each probe runs on its
+own against a live URL or a saved sample. They are not independently
+*distributable*: the four sub-skills import the shared fetch/parse/severity
+library from `skills/audit-orchestrator/scripts/auditlib`, and read the shared
+schema and rubric from the orchestrator's `references/`. That is deliberate — one
+fetch policy, one severity rubric and one report schema, rather than four drifting
+copies — but it means a sub-skill folder lifted out of the marketplace on its own
+will not run.
 
 A finished report from a real run is in [`examples/`](examples/) — 10 findings
 from 61 checks in 16.7 seconds, including the facts file so every quoted

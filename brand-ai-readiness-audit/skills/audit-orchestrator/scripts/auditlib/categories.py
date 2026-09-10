@@ -80,7 +80,11 @@ CTA_VOCAB = {
     "professional_services": ["contact", "talk to us", "get a quote", "schedule", "consultation", "book"],
     "publisher_media": ["subscribe", "read", "sign up", "newsletter"],
     "portfolio_personal": ["contact", "hire", "email", "view work"],
-    "nonprofit_institution": ["donate", "apply", "volunteer", "join", "register"],
+    # "admission(s)", "enquire" and course words added after a live run on a university home page
+    # reported "no call to action" while <a href="/admission">Admission</a> sat at 17.9% of the markup.
+    # extract.py PARTICIPATE_RE already had admissions?; the three vocabularies had drifted apart.
+    "nonprofit_institution": ["donate", "apply", "volunteer", "join", "register", "admission", "admissions",
+                              "enquire", "enquiry", "courses", "programmes", "programs", "enrol", "enroll"],
     "corporate_enterprise": ["contact", "learn more", "explore", "careers"],
     "unknown": ["contact", "get started", "learn more"],
 }

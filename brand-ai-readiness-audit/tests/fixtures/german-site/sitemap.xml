@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>{{BASE}}/</loc></url>
+  <url><loc>{{BASE}}/ueber-uns</loc></url>
+  <url><loc>{{BASE}}/funktionen</loc></url>
+  <url><loc>{{BASE}}/preise</loc></url>
+  <url><loc>{{BASE}}/blog</loc></url>
+  <url><loc>{{BASE}}/presse</loc></url>
+  <url><loc>{{BASE}}/kontakt</loc></url>
+  <url><loc>{{BASE}}/registrieren</loc></url>
+  <url><loc>{{BASE}}/impressum</loc></url>
+  <url><loc>{{BASE}}/datenschutz</loc></url>
+</urlset>

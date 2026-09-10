@@ -1470,6 +1470,43 @@ def stage_extract(res):
     res.check(X.find_audience([mk("<p>We ship on Tuesdays.</p>")]) is None, "audience: no false match")
     us = mk("<p>Contact: 500 Market St, San Francisco, CA 94105</p>")
     res.check(X.find_address([us]) is not None, "address: US street/city/state/zip found")
+
+    # Non-Anglo address formats. A grammar that cannot match one of these does not report "I could not
+    # check"; it reports "the address is not there", which is a false claim about the site.
+    intl = [("Okhla Industrial Estate, Phase III, New Delhi, India - 110020", "IN pin after country"),
+            ("No. 42, 4th Cross, Indiranagar, Bengaluru, Karnataka 560038", "IN pin after state"),
+            ("Adresse: Hauptstrasse 12, 10115 Berlin, Deutschland", "DE street-then-number"),
+            ("Musterstraße 5, 80331 München", "DE eszett street"),
+            ("Sitz der Gesellschaft:\n50667 Köln", "DE postcode with cue, no street"),
+            ("Am Markt, 04109 Leipzig, Deutschland", "DE postcode with country adjacent"),
+            ("Kerkweg 118, 3512 Utrecht", "NL street-then-number"),
+            ("Via Montenapoleone 8, 20121 Milano", "IT via-then-number"),
+            ("Calle de Alcala 45, 28014 Madrid", "ES calle-then-number"),
+            ("12 Rue de Rivoli, 75001 Paris, France", "FR number-then-rue"),
+            ("〒100-0005 東京都千代田区", "JP postal mark")]
+    for text, what in intl:
+        res.check(X.find_address([mk("<p>%s</p>" % text)]) is not None, "address: %s" % what)
+
+    # A postcode-and-city shape is the same shape as a statistic. Without a postal cue nearby it must not count.
+    for text, what in [("Trusted by 40000 Developers worldwide", "headline count"),
+                       ("We processed 12000 orders, 45000 Requests handled", "stat after comma"),
+                       ("Set your IP address. Limits: 10000 calls, 60000 Requests daily", "IP address is not a postal cue"),
+                       ("Download the zip; 45000 Downloads so far", "zip file is not a postcode cue"),
+                       ("Founded 1998, 2015 Series B closed", "years")]:
+        res.check(X.find_address([mk("<p>%s</p>" % text)]) is None, "address: not an address, %s" % what)
+
+    # Opening hours beyond English. The last two must not match: a day name alone is not opening hours.
+    for text, want, what in [("Monday to Friday, 9am - 5pm", True, "EN am/pm range"),
+                             ("Mo-Fr 09:00-17:30", True, "DE compact day range"),
+                             ("Montag bis Freitag von 9 bis 18 Uhr", True, "DE words"),
+                             ("Öffnungszeiten unserer Filiale", True, "DE label"),
+                             ("Lun-Ven 9h-18h", True, "FR compact"),
+                             ("Ouvert du lundi au vendredi, 9h30 à 18h00", True, "FR h-minutes"),
+                             ("Lunes a viernes de 9:00 a 14:00", True, "ES words"),
+                             ("Maandag t/m vrijdag 08:30 - 17:00", True, "NL words"),
+                             ("Black Friday sale, save 20 percent", False, "Black Friday is not opening hours"),
+                             ("So we do 10-15 projects a year", False, "prose that looks like a range")]:
+        res.check((X.find_hours([mk("<p>%s</p>" % text)]) is not None) == want, "hours: %s" % what)
     ld = mk('<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","name":"Acme","url":"https://x.example/","logo":"l.png"},{"@type":"BlogPosting","headline":"Hi","publisher":{"@type":"Organization","name":"Acme"}},{"@type":"SoftwareApplication","applicationCategory":"BusinessApplication"}]}</script>')
     nodes = X.doc_top_nodes(ld.doc)
     res.check(len(nodes) == 3, "top_level_nodes: @graph members only, nested publisher excluded (%d)" % len(nodes))

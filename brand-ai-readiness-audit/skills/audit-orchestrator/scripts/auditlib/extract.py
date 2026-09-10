@@ -28,10 +28,53 @@ STREET_RE = re.compile(
     r"(?:Street|St\.?|Road|Rd\.?|Avenue|Ave\.?|Lane|Ln\.?|Drive|Dr\.?|Boulevard|Blvd\.?|Way|Place|Pl\.?|Square|Sq\.?|Court|Ct\.?|"
     r"Terrace|Crescent|Close|Parade|Highway|Hwy\.?|Route|Row|Gardens|Walk|Quay|Wharf|Broadway|Esplanade|Straße|Strasse|Str\.|Rue|Calle|Via|Avenida|Plaza|Platz|Weg|Allee)\b")
 POSTAL_CUE_RE = re.compile(r"\b(suite|floor|fl\.|building|bldg|unit|level|po\s+box|p\.o\.\s+box)\s+\w+", re.I)
-HOURS_RE = re.compile(
-    r"\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun|weekdays|weekends|daily|every\s+day)\b"
-    r"[^.\n]{0,60}?\b\d{1,2}(?::\d{2})?\s?(?:am|pm|a\.m\.|p\.m\.|h|uhr)?\s?(?:-|–|—|to|until|till|bis|à|a)\s?\d{1,2}(?::\d{2})?\b"
-    r"|\bopen\s+24\s+hours\b|\b24/7\b|\bopening\s+hours\b|\bhours\s+of\s+operation\b|\bwe\s+are\s+open\b", re.I)
+# Anglo grammars above assume number-then-street-word ("12 Harbour Street"). Much of the world does not
+# write addresses that way, and a grammar that cannot match is indistinguishable from a site with no
+# address on it -- the audit then reports "it isn't there" when the truth is "I could not read it".
+# The patterns below cover the orders and postcode shapes that were silently invisible.
+STREET_REVERSED_RE = re.compile(  # "Hauptstrasse 12", "Via Montenapoleone 8", "Rue du Marche 27"
+    r"\b[A-ZÄÖÜ][\wÄÖÜäöüß'’\-]*(?:stra(?:ss|ß)e|str\.|gasse|weg|allee|platz|ring|damm)\s+\d{1,4}\s*[a-z]?\b"
+    r"|\b(?:rue|avenue|boulevard|via|viale|calle|carrer|plaza|praca|praça)\s+[\w'’\-\s]{2,40}?\s+\d{1,4}\b", re.I)
+IN_STATES = (r"andhra\s+pradesh|karnataka|kerala|maharashtra|tamil\s+nadu|telangana|gujarat|rajasthan|punjab|"
+             r"haryana|west\s+bengal|uttar\s+pradesh|madhya\s+pradesh|bihar|odisha|assam|goa|delhi|chandigarh")
+IN_PIN_RE = re.compile(  # a bare six-digit run is far too common to trust; require country, state or a PIN label
+    r"\b(?:india|bharat)\b\s*[-–,]?\s*\d{6}\b|\b\d{6}\b\s*,?\s*(?:india|bharat)\b"
+    r"|\bpin(?:\s*code)?\s*[-:]?\s*\d{6}\b|\b(?:" + IN_STATES + r")\b\s*[-,]?\s*\d{6}\b", re.I)
+EU_POSTCODE_CITY_RE = re.compile(  # "10115 Berlin", "1010 Wien" -- ambiguous on its own, see ADDRESS_GUARDS
+    r"(?:^|[,;:]\s*)\d{4,5}\s+[A-ZÄÖÜÀ-Ý][\wäöüßà-ÿ'\-]{2,}\b", re.M)
+JP_POSTCODE_RE = re.compile(r"〒\s*\d{3}-?\d{4}\b")
+
+# Corroboration for the shapes a statistic can imitate: "45000 Requests handled" has the same shape as
+# "45000 Zurich", and only nearby context separates them. Bare "address" is not a cue -- IP address, email
+# address and addressable market all outnumber postal addresses on a typical marketing page.
+ADDRESS_CUE_RE = re.compile(
+    r"(?:postal|mailing|registered|office|our|head|business|company|visiting)\s+address|\baddress\s*[:\n]"
+    r"|sitz\b|adress|anschrift|\bpost\s?code\b|headquarter|si[eè]ge|\bsede\b|direcci[oó]n|indirizzo|hoofdkantoor", re.I)
+_COUNTRY = (r"deutschland|germany|[oö]sterreich|austria|schweiz|switzerland|suisse|france|nederland|netherlands|"
+            r"belgi\w*|espa[nñ]a|spain|italia|italy|portugal|polska|poland|sverige|sweden|danmark|denmark|norge|norway")
+COUNTRY_AFTER_RE = re.compile(r"^[\s,.;·|/-]{0,4}(?:%s)\b" % _COUNTRY, re.I)
+COUNTRY_BEFORE_RE = re.compile(r"\b(?:%s)[\s,.;·|/-]{0,4}$" % _COUNTRY, re.I)
+# Opening hours in the languages the fixtures and the live pass have actually met. Three things the
+# original English-only version got wrong: it knew day names in one language, it could not read the
+# day-then-range form "Mo-Fr", and its trailing \b could never match after "5pm" or "18h" because there is
+# no word boundary between a digit and a letter -- so "Monday to Friday, 9am - 5pm" was invisible too.
+_HOURS_DAYS = (r"monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun|"
+               r"weekdays|weekends|daily|every\s+day|"
+               r"montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonnabend|sonntag|werktags|t[aä]glich|"
+               r"lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|"
+               r"lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo|"
+               r"luned[iì]|marted[iì]|mercoled[iì]|gioved[iì]|venerd[iì]|sabato|domenica|"
+               r"maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag")
+# Short day forms are only safe inside a range: bare "do", "so", "mar" and "fr" are ordinary words.
+_HOURS_ABBR = r"(?:lun|mar|mer|jeu|ven|sam|dim|mo|di|mi|do|fr|sa|so|lu|ma|me|je|ve)"
+_HOURS_DAY_RANGE = r"\b%s\s*[-–—/]\s*%s\b" % (_HOURS_ABBR, _HOURS_ABBR)
+_HOURS_TIME = r"\d{1,2}(?:\s?h\s?\d{2}|[:.]\d{2})?(?:\s?(?:am|pm|a\.m\.|p\.m\.|h|uhr))?"   # 9, 09:00, 9.00, 9h30, 5pm
+_HOURS_RANGE = r"\b%s\s?(?:-|–|—|to|until|till|bis|à|a|y)\s?%s(?!\d)" % (_HOURS_TIME, _HOURS_TIME)
+_HOURS_LABEL = (r"\bopen\s+24\s+hours\b|\b24/7\b|\bopening\s+hours\b|\bhours\s+of\s+operation\b|\bwe\s+are\s+open\b|"
+                r"\b[oö]ffnungszeiten\b|\bgesch[aä]ftszeiten\b|\bhoraires?\s+d[’']ouverture\b|"
+                r"\bhorario\s+de\s+atenci[oó]n\b|\bhorario\s+comercial\b|\borari\s+di\s+apertura\b|\bopeningstijden\b")
+HOURS_RE = re.compile(r"(?:\b(?:%s)\b|%s)[^.\n]{0,60}?%s|%s"
+                      % (_HOURS_DAYS, _HOURS_DAY_RANGE, _HOURS_RANGE, _HOURS_LABEL), re.I)
 AUD_NOUNS = (r"freelancers?|designers?|developers?|engineers?|marketers?|founders?|creators?|teams?|businesses|business\s+owners|companies|startups?|"
              r"enterprises?|agencies|studios|students?|teachers?|schools|universities|families|parents|kids|children|homeowners|renters|"
              r"professionals|clients|customers|shoppers|small\s+businesses|smbs?|nonprofits?|charities|organi[sz]ations|individuals|people|users|brands|"
@@ -54,7 +97,16 @@ LEADERSHIP_RE = re.compile(r"\b(ceo|chief\s+executive(\s+officer)?|chief\s+(oper
 SIZE_RE = re.compile(r"\b(\d[\d,.]*\s?(?:k|\+)?|hundreds\s+of|thousands\s+of|dozens\s+of|over\s+\d[\d,]*|more\s+than\s+\d[\d,]*)\s+(employees|people|staff|team\s+members|colleagues|engineers|specialists)\b", re.I)
 SIGNUP_RE = re.compile(r"\b(sign\s*up|get\s+started|start\s+(now|free|your\s+free|today|a\s+free)|create\s+(an\s+)?account|try\s+(it\s+)?(for\s+)?free|"
                        r"book\s+a\s+demo|request\s+a\s+demo|start\s+free\s+trial|free\s+trial|join\s+now|subscribe|download)\b", re.I)
-PRESS_RE = re.compile(r"\b(press|media|newsroom|news\s*room|media\s+(enquiries|inquiries|relations|kit)|press\s+(kit|office|releases?|contact)|pr\s+contact|journalists?)\b", re.I)
+# The sampler already recognises "presse"/"aktuelles"/"noticias" as blog-role nav labels; this pattern did
+# not, so a German press page was found as a page and then judged not to be a press surface. Note that
+# \bpress\b cannot match "Presse" -- the trailing "e" is a word character -- so each form is spelled out.
+PRESS_RE = re.compile(r"\b(press|media|newsroom|news\s*room|media\s+(enquiries|inquiries|relations|kit)|"
+                      r"press\s+(kit|office|releases?|contact)|pr\s+contact|journalists?|"
+                      r"presse|pressemitteilung(en)?|pressekontakt|pressemappe|medien|medienmitteilung(en)?|"
+                      r"presse-?kit|salle\s+de\s+presse|communiqu[eé]s?\s+de\s+presse|"
+                      r"prensa|sala\s+de\s+prensa|notas?\s+de\s+prensa|"
+                      r"ufficio\s+stampa|comunicati\s+stampa|"
+                      r"persbericht(en)?|perskit)\b", re.I)
 PRESS_EMAIL_RE = re.compile(r"\b(press|media|pr|news|comms|communications)@", re.I)
 SHIPPING_RETURNS_RE = re.compile(r"\b(shipping|delivery|deliver(y|ies)|returns?|refunds?|exchanges?|return\s+policy|money[\s\-]back)\b", re.I)
 DIFFERENTIATOR_RE = re.compile(r"\b(unlike|the\s+only|the\s+first|first\s+and\s+only|no\s+other|what\s+sets\s+us\s+apart|why\s+choose|why\s+us|our\s+difference|"
@@ -377,6 +429,44 @@ def find_contact(pages):
     return find_email(pages) or find_phone(pages) or find_contact_form(pages)
 
 
+def _guard_word_before(text, m):
+    """A UK-postcode shape with no word before it is usually a product code or a reference number."""
+    return bool(re.search(r"[A-Za-z]{3,}", text[max(0, m.start() - 40):m.start()]))
+
+
+def _guard_address_context(text, m):
+    """A postcode-and-city shape needs corroboration: a postal-address cue nearby, or a country name adjacent."""
+    if ADDRESS_CUE_RE.search(text[max(0, m.start() - 60):m.end() + 40]):
+        return True
+    return bool(COUNTRY_AFTER_RE.search(text[m.end():m.end() + 30])
+                or COUNTRY_BEFORE_RE.search(text[max(0, m.start() - 30):m.start()]))
+
+
+# Order matters only for which label is reported; every pattern is tried before giving up.
+ADDRESS_PATTERNS = ((STREET_RE, "street"), (STREET_REVERSED_RE, "street"),
+                    (UK_POSTCODE_RE, "uk_postcode"), (US_CITY_STATE_ZIP_RE, "us_city_state_zip"),
+                    (IN_PIN_RE, "in_pin"), (EU_POSTCODE_CITY_RE, "eu_postcode_city"),
+                    (JP_POSTCODE_RE, "jp_postcode"))
+ADDRESS_GUARDS = {"uk_postcode": _guard_word_before, "eu_postcode_city": _guard_address_context}
+
+
+def address_match(text):
+    """First address-shaped span in text as (match, label), or None.
+
+    Shared by find_address here and the entity probe's plain-text NAP check so the two cannot drift apart.
+    Guarded patterns scan every occurrence: the first candidate may be a statistic while a later one on the
+    same page is the real footer address.
+    """
+    t = text or ""
+    for rx, label in ADDRESS_PATTERNS:
+        guard = ADDRESS_GUARDS.get(label)
+        for m in rx.finditer(t):
+            if guard and not guard(t, m):
+                continue
+            return m, label
+    return None
+
+
 def find_address(pages, prefer=("contact", "about", "home")):
     for p in _ordered(pages, prefer):
         for n, _ in doc_top_nodes(p.doc):
@@ -388,12 +478,10 @@ def find_address(pages, prefer=("contact", "about", "home")):
                     return _found(a, p, "jsonld:address")
     for p in _ordered(pages, prefer):
         t = p.doc.body_text or ""
-        for rx, label in ((STREET_RE, "street"), (UK_POSTCODE_RE, "uk_postcode"), (US_CITY_STATE_ZIP_RE, "us_city_state_zip")):
-            m = rx.search(t)
-            if m:
-                if label == "uk_postcode" and not re.search(r"[A-Za-z]{3,}", t[max(0, m.start() - 40):m.start()]):
-                    continue
-                return _found(_ctx(t, m, 40, 30), p, "text:" + label)
+        hit = address_match(t)
+        if hit:
+            m, label = hit
+            return _found(_ctx(t, m, 40, 30), p, "text:" + label)
     return None
 
 

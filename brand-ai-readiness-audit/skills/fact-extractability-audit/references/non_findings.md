@@ -37,9 +37,14 @@ that tells a business to change a legitimate choice.
   detection in the sampler covers six languages, but fact phrasing does not).
   On a non-English site a fact may be reported `absent` when it is present.
   This is the main reason `fx.facts.key_fact_missing` is `medium` confidence
-  and why its evidence lists exactly which pages were searched. The
-  orchestrator adds a limitation line whenever the page language is not
-  English.
+  and why its evidence lists exactly which pages were searched. When the
+  sampled pages declare a language this audit has no vocabulary for,
+  `compose.apply_language_gate` caps the finding at `medium` severity and
+  `low` confidence, stamps `language_scope` on it, and the orchestrator adds a
+  limitation line naming the English-only checks. Address, phone, email, dates
+  and structured data are read the same way in every language and are not
+  gated. `en.cta.missing` carries its own vocabulary for German, French,
+  Spanish, Italian, Portuguese and Dutch and is only gated outside those.
 - **Only sampled pages are searched.** Home plus up to five role pages, chosen
   by navigation labels and sitemap patterns. A fact on an unsampled page is
   invisible to this audit; every finding lists the pages it applies to.

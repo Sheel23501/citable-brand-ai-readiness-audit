@@ -63,9 +63,16 @@ CATEGORY_SIGNALS = {
     },
     "saas_software": {
         "jsonld": ["SoftwareApplication", "WebApplication", "MobileApplication", "SoftwareSourceCode"],
+        # The e-commerce row above carries warenkorb/panier/tienda; this row was English-only, so a German or
+        # French SaaS site scored zero here and fell through to "unknown".
         "nav": ["pricing", "features", "docs", "documentation", "api", "integrations", "sign up", "signup", "log in",
-                "login", "demo", "free trial", "trial", "start free", "developers", "changelog"],
-        "url": ["/pricing", "/docs", "/api", "/integrations", "/signup", "/login", "/features"],
+                "login", "demo", "free trial", "trial", "start free", "developers", "changelog",
+                "preise", "funktionen", "anmelden", "registrieren", "dokumentation", "kostenlos testen",
+                "tarifs", "fonctionnalites", "fonctionnalités", "connexion", "s'inscrire", "essai gratuit",
+                "precios", "funciones", "iniciar sesion", "registrarse", "prueba gratuita",
+                "prezzi", "funzionalita", "funzionalità", "accedi"],
+        "url": ["/pricing", "/docs", "/api", "/integrations", "/signup", "/login", "/features",
+                "/preise", "/funktionen", "/anmelden", "/registrieren", "/tarifs", "/precios", "/prezzi"],
         "tld": ["io", "app", "dev"],
     },
     "local_business": {

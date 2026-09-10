@@ -21,6 +21,7 @@ for the orchestrator agent (Step 17). Standard library only. Never raises: on an
 still writes a valid report whose only finding is `or.run.probe_error`.
 """
 import argparse
+import collections
 import datetime as _dt
 import json
 import os
@@ -32,10 +33,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 from auditlib import __version__  # noqa: E402
-from auditlib.categories import (AUDIENCE_FACT, AUDIENCE_PHRASE, SIMULATION_QUESTIONS,  # noqa: E402
-                                 category_label, key_pages)
+from auditlib.categories import (AUDIENCE_FACT, AUDIENCE_PHRASE, CTA_LANGS_SUPPORTED,  # noqa: E402
+                                 SIMULATION_QUESTIONS, category_label, key_pages)
 from auditlib.findings import (SEVERITIES, Registry, ProbeOutput, evidence_item,  # noqa: E402
-                               impact_for, priority_for)
+                               impact_for, priority_for, _title)
 
 REFERENCES_DIR = os.path.normpath(os.path.join(HERE, "..", "references"))
 COVERAGE_MAP_MD = os.path.join(REFERENCES_DIR, "coverage_map.md")
@@ -364,6 +365,157 @@ def dedupe(findings, sample, category=None):
     return kept, folded
 
 
+# ---------------------------------------------------------------- the absence gate
+# An absence finding is a claim about a *site*, made from a *sample* of it. When the page where
+# the missing thing would live was never fetched, "absent from the site" and "absent from the
+# pages I read" are different statements, and the audit must not make them in the same voice.
+# The sampler already records the roles it could not reach in sample.missing_roles; until this
+# gate existed nothing consulted them, so a two-page sample of a JS-navigated site produced
+# high-confidence "no newsroom" and "key fact missing" findings about pages that were never read.
+# Presence findings (an image-only h1, malformed JSON-LD on a page that was fully parsed) are
+# page-local and cannot be wrong this way, so they are not listed here.
+#
+# check_id -> the roles that could have carried the thing. Roles: about, contact, pricing, product, blog.
+# Only checks whose evidence can live *nowhere else* than an unsampled role page belong here. Two checks
+# were wrongly listed: press_page_missing is decided from the navigation links of every page that was read,
+# and no_visible_dates reads the date on each sampled page. Neither needs the blog fetched to have a
+# verdict, and gating them made the audit answer "I could not check" about pages it had in hand.
+ABSENCE_ROLES = {
+    "ef.entity.nap_missing_plain_text": ("contact", "about"),
+    "fx.facts.key_fact_missing": ("contact", "about", "pricing", "product"),
+    "fx.content.faq_absent": ("pricing", "product", "about"),
+    "en.cta.missing": ("contact", "product", "pricing"),
+}
+
+
+def _resync_action(f):
+    """Keep suggested_action in step after a gate lowers severity or confidence.
+
+    report_schema.md requires priority to be the impact of the severity, lowered one level when confidence
+    is low. A gate that changes either without recomputing this writes a report the validator rejects.
+    """
+    act = f.setdefault("suggested_action", {})
+    act["impact"] = impact_for(f.get("severity"))
+    act["priority"] = priority_for(f.get("severity"), f.get("confidence"))
+
+
+def _role_phrase(roles):
+    roles = list(roles)
+    if len(roles) == 1:
+        return "%s page was" % roles[0]
+    return "%s and %s pages were" % (", ".join(roles[:-1]), roles[-1])
+
+
+def apply_absence_gate(findings, checks, sample):
+    """Scope every absence claim to what was actually read. Mutates findings and their checks in place.
+
+    Fully blind (no role that could have carried it was fetched) -> the check cannot be decided:
+    status not_evaluated, severity info, reason role_page_not_sampled.
+    Partly blind -> the finding stands but is a sample claim: confidence low, severity capped at
+    medium, and the evidence says which pages were missing.
+    """
+    missing = set(sample.get("missing_roles") or [])
+    if not missing:
+        return
+    n_read = len([p for p in (sample.get("pages") or []) if not (p.get("fetch") or {}).get("skipped")])
+    for f in findings:
+        roles = ABSENCE_ROLES.get(f.get("check_id"))
+        if not roles or f.get("status") != "fail":
+            continue
+        blind = [r for r in roles if r in missing]
+        if not blind:
+            continue
+        if len(blind) == len(roles):
+            f["status"] = "not_evaluated"
+            f["reason"] = "role_page_not_sampled"
+            f["severity"] = "info"
+            f["effort"] = "n/a"
+            act = f.setdefault("suggested_action", {})
+            act["impact"], act["effort"], act["priority"] = "low", "n/a", "low"
+            f["title"] = _title("Not checked: the %s not reached in this sample" % _role_phrase(blind))
+            f["evidence"] = ("The %s not reached from the home page's links or the sitemap, so this check has no "
+                             "verdict: %d page%s were read. This is not a finding that the site lacks it."
+                             % (_role_phrase(blind), n_read, "s" if n_read != 1 else ""))[:300]
+            c = checks.get(f["check_id"])
+            if c is not None:
+                c["status"] = "not_evaluated"
+                c["reason"] = "role_page_not_sampled"
+        else:
+            f["confidence"] = "low"
+            if f.get("severity") in ("critical", "high"):
+                f["severity"] = "medium"
+            _resync_action(f)
+            f["absence_scope"] = "sample"
+            note = (" The %s not reached in this sample, so this describes the %d page%s read, not the whole site."
+                    % (_role_phrase(blind), n_read, "s" if n_read != 1 else ""))
+            f["evidence"] = (f.get("evidence", "")[:300 - len(note)] + note)[:300]
+
+
+# Checks whose verdict rests on matching English phrases. The value is the set of languages whose
+# vocabulary the code actually carries; anything outside it is a guess, not a reading. Address, phone,
+# email, dates and structured data are language-neutral and are deliberately absent from this table.
+LANG_DEPENDENT = {
+    "fx.facts.key_fact_missing": frozenset(["en"]),
+    "fx.content.faq_absent": frozenset(["en"]),
+    "ef.corroboration.press_page_missing": frozenset(["en"]),
+    "en.hero.value_prop_unclear": frozenset(["en"]),
+    "en.trust.signals_missing": frozenset(["en"]),
+    "en.cta.missing": CTA_LANGS_SUPPORTED,
+}
+
+
+def sample_language(sample):
+    """The language the sampled pages are actually written in, as a bare subtag, or None if unclear.
+
+    The declared lang attribute is the stated answer and the word counts are the observed one. Real sites
+    get this wrong often enough to matter -- lemonde.fr serves lang="en" on pages that are entirely French
+    -- so where the text disagrees with the attribute, the text wins: it is what an assistant reading the
+    page would see. Majority across sampled pages, so one stray consent page cannot flip a site.
+    """
+    declared, detected = [], []
+    for pg in sample.get("pages") or []:
+        summary = pg.get("summary") or {}
+        raw = (summary.get("lang") or "").strip().lower()
+        if raw:
+            declared.append(raw.split("-")[0])
+        if summary.get("lang_detected"):
+            detected.append(summary["lang_detected"])
+    for votes in (detected, declared):
+        if votes:
+            return collections.Counter(votes).most_common(1)[0][0]
+    return None
+
+
+def apply_language_gate(findings, checks, sample):
+    """Scope English-vocabulary claims to the language the audit can actually read. Mutates in place.
+
+    A page that says lang="de" and whose buttons read "Jetzt spenden" has a call to action. Searching it
+    with an English word list and reporting "no call to action" is not a weak finding, it is a false one.
+    Where no vocabulary exists for the declared language the finding survives as a low-confidence signal
+    with the reason stated, rather than being asserted at full strength or dropped silently.
+
+    Returns the language that was gated on, or None.
+    """
+    lang = sample_language(sample)
+    if not lang or lang == "en":
+        return None
+    gated = []
+    for f in findings:
+        supported = LANG_DEPENDENT.get(f.get("check_id"))
+        if supported is None or f.get("status") != "fail" or lang in supported:
+            continue
+        f["confidence"] = "low"
+        if f.get("severity") in ("critical", "high"):
+            f["severity"] = "medium"
+        _resync_action(f)
+        f["language_scope"] = lang
+        note = (" Pages declare lang=\"%s\"; the phrases this check searches for are English, so the site may "
+                "state this in its own language where the audit did not look." % lang)
+        f["evidence"] = (f.get("evidence", "")[:300 - len(note)] + note)[:300]
+        gated.append(f["check_id"])
+    return lang
+
+
 # ---------------------------------------------------------------- ordering and tags
 def sort_findings(findings):
     """report_schema.md section 4 rule 3, stable."""
@@ -635,7 +787,7 @@ def non_coverage_lines():
     return lines
 
 
-def build_limitations(sample, probes, checks):
+def build_limitations(sample, probes, checks, gated_lang=None):
     """report_schema.md section 3b: the boilerplate that applies, then section 5 non-coverage."""
     pages = sample.get("pages") or []
     out = ["This report reflects a single point-in-time fetch of %d sampled page%s; personalised or A/B-tested "
@@ -660,6 +812,14 @@ def build_limitations(sample, probes, checks):
         if probe.get("error"):
             out.append("%s reported an internal error and its checks may be incomplete: %s"
                        % (probe.get("probe"), probe["error"]))
+    if gated_lang:
+        covered = sorted(c for c, langs in LANG_DEPENDENT.items() if gated_lang in langs)
+        out.append("The sampled pages declare lang=\"%s\". Address, phone, email, dates and structured data are read "
+                   "the same way in any language, but the phrase lists behind %s are English%s. Findings from those "
+                   "checks are reported at low confidence: the site may state the thing in its own words where this "
+                   "audit did not look."
+                   % (gated_lang, ", ".join(sorted(set(LANG_DEPENDENT) - set(covered))),
+                      " (the call-to-action check does cover %s)" % gated_lang if covered else ""))
     out.append("This audit reads served HTML only and does not execute JavaScript or query live assistants.")
     out.extend(non_coverage_lines())
     return out
@@ -753,6 +913,14 @@ def compose(workdir, wall_clock=None, input_url=None, category_override=None):
         f["_max_severity"] = "info"
         findings.append(f)
 
+    checks = collect_checks(probes, registry)
+    for c in orch.checks:
+        checks[c["check_id"]] = {"check_id": c["check_id"], "status": c["status"], "reason": c.get("reason"),
+                                 "pages": c.get("pages") or [], "source_skill": "audit-orchestrator"}
+    # scope absence claims to what was actually read, before ordering assigns ids and ranks
+    apply_absence_gate(findings, checks, sample)
+    gated_lang = apply_language_gate(findings, checks, sample)
+
     kept, folded = dedupe(findings, sample, category)
     kept = sort_findings(kept)
     for i, f in enumerate(kept, start=1):
@@ -775,10 +943,6 @@ def compose(workdir, wall_clock=None, input_url=None, category_override=None):
         for k in ("_suppressed", "_merged_into_key", "_notes", "_max_severity"):
             f.pop(k, None)
 
-    checks = collect_checks(probes, registry)
-    for c in orch.checks:
-        checks[c["check_id"]] = {"check_id": c["check_id"], "status": c["status"], "reason": c.get("reason"),
-                                 "pages": c.get("pages") or [], "source_skill": "audit-orchestrator"}
     counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
     for f in kept:
         counts[f.get("severity", "info")] = counts.get(f.get("severity", "info"), 0) + 1
@@ -812,7 +976,7 @@ def compose(workdir, wall_clock=None, input_url=None, category_override=None):
         "proactive_recommendations": build_recommendations(category, facts, checks, kept, sample),
         "ai_answer_simulation": simulation,
         "narrative_summary": "",
-        "limitations": build_limitations(sample, probes, checks),
+        "limitations": build_limitations(sample, probes, checks, gated_lang),
         "suppressed_findings": folded,
         "run": {"wall_clock_seconds": wall_clock, "requests_made": sample.get("requests_made"),
                 "probe_errors": [{"probe": p.get("probe"), "error": p["error"]} for p in probes if p.get("error")]

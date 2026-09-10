@@ -8,10 +8,49 @@ Extracts what the sampler and probes need from the *served* HTML. It never
 executes scripts or fetches sub-resources; that is the point of the audit.
 Never raises on malformed HTML (html.parser is tolerant; we guard the rest).
 """
+import collections
 import json
 import re
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlsplit, urldefrag
+
+
+# Function words are the cheapest reliable language signal: they are short, extremely frequent, and mostly
+# distinct between these languages. This is not a general language identifier -- it only has to answer
+# "is this page written in a language whose vocabulary the audit carries", and it only votes when the
+# margin is decisive, so an English page quoting a French sentence does not flip.
+STOPWORDS = {
+    "en": ("the", "and", "for", "with", "you", "your", "our", "that", "this", "from", "are", "have", "more", "about"),
+    "de": ("und", "der", "die", "das", "mit", "für", "fuer", "sie", "ist", "auf", "den", "von", "nicht", "wir", "auch"),
+    "fr": ("les", "des", "une", "pour", "avec", "vous", "nous", "que", "qui", "dans", "sur", "est", "pas", "plus", "sont"),
+    "es": ("los", "las", "una", "para", "con", "que", "por", "más", "mas", "como", "pero", "sus", "este", "son"),
+    "it": ("gli", "che", "per", "con", "una", "non", "sono", "come", "anche", "nel", "alla", "dei", "delle", "questo"),
+    "pt": ("dos", "das", "uma", "para", "com", "que", "por", "mais", "como", "sua", "seu", "não", "nao", "são"),
+    "nl": ("het", "een", "van", "met", "voor", "zijn", "niet", "ook", "maar", "deze", "onze", "wordt", "aan", "bij"),
+}
+_WORD_RE = re.compile(r"[a-zà-ÿA-ZÀ-Ý]{2,}")
+
+
+def language_from_text(text, min_words=120, margin=1.6):
+    """The language the words themselves suggest, or None when nothing wins clearly.
+
+    Real sites lie: lemonde.fr serves lang="en" on pages that are entirely French. A gate that trusts the
+    attribute alone is inert exactly where it is needed, so the attribute is corroborated against this.
+    Returns None on short text or a close call -- an uncertain guess is worse than no guess here, because
+    the caller uses it to decide whether a finding may be asserted at full strength.
+    """
+    words = [w.lower() for w in _WORD_RE.findall(text or "")]
+    if len(words) < min_words:
+        return None
+    counts = collections.Counter(words)
+    scores = {lang: sum(counts[w] for w in ws) for lang, ws in STOPWORDS.items()}
+    ranked = sorted(scores.items(), key=lambda kv: -kv[1])
+    top, second = ranked[0], ranked[1]
+    if top[1] < 8:
+        return None
+    if second[1] and top[1] < second[1] * margin:
+        return None
+    return top[0]
 
 _SKIP_TEXT = {"script", "style", "noscript", "template", "svg", "head"}
 _BLOCK = {"p", "div", "li", "h1", "h2", "h3", "h4", "h5", "h6", "section", "article", "header", "footer", "nav",
@@ -503,6 +542,7 @@ class Document:
 
     def summary(self):
         return {"title": self.title, "lang": self.lang, "canonical": self.canonical, "h1s": self.h1s,
+                "lang_detected": language_from_text(self.body_text),
                 "description": self.meta("description"), "word_count": self.word_count, "links": len(self.links),
                 "internal_links": len(self.internal_links), "images": len(self.images), "jsonld_types": self.jsonld_types,
                 "jsonld_blocks": len(self.jsonld_raw), "script_bytes": self.script_bytes,

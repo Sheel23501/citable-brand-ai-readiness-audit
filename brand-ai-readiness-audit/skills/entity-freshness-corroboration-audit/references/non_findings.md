@@ -46,11 +46,19 @@ that tells a business to change a legitimate choice.
   publish anchors; it does not judge the name.
 - **Phone and address recognition is pattern-based.** A bare number without
   `+` or a cue word ("0117 496 0123" on its own line) is not recognised as a
-  phone; an address without a street word from the English, German, French,
-  Spanish or Italian lists, or without a UK postcode or US ZIP, is not
-  recognised. Both must be missed before `ef.entity.nap_missing_plain_text`
-  fires on a non-local site, and the evidence names the pages searched so
-  the owner can point to the line that has it.
+  phone. An address is recognised in either word order -- number-then-street
+  ("12 Harbour Street", "12 Rue de Rivoli") and street-then-number
+  ("Hauptstrasse 12", "Via Montenapoleone 8") -- plus UK postcodes, US
+  city/state/ZIP, Indian PINs qualified by a state or by "India", Japanese
+  postal marks, and a European postcode-and-city line. That last shape is the
+  same shape as a statistic ("45000 Requests"), so it counts only when a
+  postal cue sits near it or a country name sits next to it; a page that says
+  only "Trusted by 40000 Developers" is correctly not an address. What is
+  still missed: a postcode format outside these, and an address written only
+  in a non-Latin script without its country's postal mark. Both name and
+  address must be missed before `ef.entity.nap_missing_plain_text` fires on a
+  non-local site, and the evidence names the pages searched so the owner can
+  point to the line that has it.
 - **Dates are read in ISO and English written forms.** Numeric `07/09/2026`
   and non-English month names are not parsed; this is why
   `ef.freshness.no_visible_dates` is medium confidence.

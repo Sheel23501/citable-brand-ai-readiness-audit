@@ -1,0 +1,38 @@
+{
+  "name": "german-site",
+  "description": "A well-built nine-page German SaaS site (Kontor Analytik GmbH), lang=\"de\" throughout. The non-English coverage fixture: German call-to-action words, a street-then-number address (Hauptstrasse 12, 10115 Berlin), German opening hours, a Presse page, and German navigation labels. Guards the rule that a site written in another language must not be reported as missing the things this audit only knows how to look for in English.",
+  "base": null,
+  "category": "saas_software",
+  "routes": {},
+  "expected": {
+    "fail": [
+      "fx.facts.key_fact_missing",
+      "fx.content.faq_absent",
+      "en.nav.breadcrumbs_missing",
+      "en.nav.site_search_missing"
+    ],
+    "info": [
+      "ef.entity.wikidata_unavailable",
+      "ef.corroboration.offsite_spotcheck"
+    ],
+    "pass_required": [
+      "en.cta.missing",
+      "ef.entity.nap_missing_plain_text",
+      "ef.corroboration.press_page_missing",
+      "ef.freshness.no_visible_dates",
+      "en.hero.value_prop_unclear",
+      "en.trust.signals_missing",
+      "en.lang.attribute_missing",
+      "en.mobile.viewport_missing",
+      "en.links.broken_sampled",
+      "cr.index.sitemap_missing",
+      "cr.robots.blanket_disallow",
+      "fx.identity.title_missing_or_generic",
+      "fx.identity.meta_description_missing",
+      "fx.identity.og_missing",
+      "fx.identity.h1_missing_or_multiple",
+      "ef.freshness.stale_copyright_year"
+    ],
+    "notes": "The point of this fixture is what PASSES; every entry in pass_required below would have fired before the non-English work.\nen.cta.missing passes only because CTA_VOCAB_BY_LANG['de'] matches 'Jetzt registrieren' / 'Kostenlos testen' / 'Anmelden'. nap_missing_plain_text passes only because STREET_REVERSED_RE reads 'Hauptstrasse 12' -- the Anglo number-then-street grammar could never match it. press_page_missing passes only because PRESS_RE learned 'Presse' (note \bpress\b cannot match 'Presse': the trailing 'e' is a word character). no_visible_dates passes off the ISO datetime attributes on /blog and /presse -- German written dates like '14.05.2026' are still not parsed, which is why the time elements carry datetime. The category resolves to saas_software from German nav labels (preise, funktionen, anmelden, registrieren).\nThe two language-gated fails are the honest half. The audience phrase is 'Software fuer Steuerberaterinnen und Steuerberater' and the English AUDIENCE_RE cannot see it, so fx.facts.key_fact_missing still fires -- but apply_language_gate caps it at medium severity / low confidence, resyncs suggested_action.priority to low, and the report carries a limitation line naming the English-only checks. fx.content.faq_absent is the same case. If either ever reports high severity or high confidence here, the gate has broken.\nbreadcrumbs_missing and site_search_missing are genuine and language-neutral: the site has neither."
+  }
+}

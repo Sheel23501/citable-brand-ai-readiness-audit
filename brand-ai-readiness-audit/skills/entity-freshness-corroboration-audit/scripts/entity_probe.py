@@ -462,14 +462,14 @@ def _text_phone(text):
 
 
 def _text_address(text):
+    """Postal address as visible text. Grammars and their corroboration guards live in auditlib.extract so
+    this check and find_address recognise exactly the same set of address formats."""
     t = text or ""
-    for rx, label in ((X.STREET_RE, "street"), (X.UK_POSTCODE_RE, "uk_postcode"), (X.US_CITY_STATE_ZIP_RE, "us_city_state_zip")):
-        m = rx.search(t)
-        if m:
-            if label == "uk_postcode" and not re.search(r"[A-Za-z]{3,}", t[max(0, m.start() - 40):m.start()]):
-                continue
-            return t[max(0, m.start() - 30):m.end() + 10].strip(), label
-    return None
+    hit = X.address_match(t)
+    if not hit:
+        return None
+    m, label = hit
+    return t[max(0, m.start() - 30):m.end() + 10].strip(), label
 
 
 def nap_requirement(category):
@@ -537,7 +537,7 @@ def check_nap(ctx, out, pages, brand):
              evidence_items=items,
              why="Name, address and phone are the three facts every directory, register and knowledge graph holds about a business. When the site itself does not state them as text, the assistant cannot confirm it has the right entity, and inconsistent copies elsewhere win.",
              action="State the organisation name, postal address and phone number as visible text in the site footer or on the contact page.",
-             detail="Use the same spelling and format everywhere (footer, contact page, JSON-LD PostalAddress and telephone, Google Business Profile, LinkedIn). A footer line is enough: 'Ledgerly Software Ltd · 12 Harbour Street, Bristol BS1 4QA · +44 117 496 0123'.",
+             detail="Use the same spelling and format everywhere (footer, contact page, JSON-LD PostalAddress and telephone, Google Business Profile, LinkedIn). A footer line is enough: the registered name, the street address in the country's own postal format, and a phone number in international form (+<country code>).",
              pages=[p.final_url for p in anchor], page_roles=[p.role for p in anchor], references=[REFS["org"]])
 
 
