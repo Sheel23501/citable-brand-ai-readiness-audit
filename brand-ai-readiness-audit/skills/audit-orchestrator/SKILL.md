@@ -100,7 +100,7 @@ reorder steps 3 and 4, and never edit `report.json` by hand: step 7 does that.
    three to six sentences, grouped invisible → stale → bouncing, naming the
    worst finding of each group by id, stating how many simulation questions
    were answerable, and closing with what to do first (the `quick_wins` ids
-   when there are any). Every sentence must trace to a finding id, a passed
+   when there are any, otherwise `summary.start_with`). Every sentence must trace to a finding id, a passed
    check, a coverage line or the simulation. If any probe did not finish, the
    first sentence says the run was incomplete.
 
@@ -141,8 +141,9 @@ containing nothing the JSON does not (`references/report_schema.md` section
 3). The floor is the handout's required shape: `site`, `audited_at`, a
 `summary` of counts by severity, and `findings` each with `id`, `title`,
 `severity`, `evidence` and a `suggested_action` with `summary` and `priority`.
-On top of it: the site category and sampled pages, `quick_wins`, every
-`passed_checks` entry with a positive title, `coverage` of the handout's
+On top of it: the site category and sampled pages, `quick_wins` plus a
+one-sentence `summary.headline` and `summary.start_with` naming where to
+begin, every `passed_checks` entry with a positive title, `coverage` of the handout's
 concepts A–F and of the seven audit stages, `proactive_recommendations` that
 never restate a finding, the `ai_answer_simulation` with its facts-only
 basis, the `narrative_summary`, `limitations` that always open with the

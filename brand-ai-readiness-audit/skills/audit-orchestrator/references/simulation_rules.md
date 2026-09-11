@@ -142,7 +142,8 @@ Structure, in this order, skipping a group that has nothing in it:
 3. **Bouncing** (`round2_mode: bouncing`: engagement). Once a visitor
    arrives, do they stay? Name the worst finding by id.
 4. **One closing sentence** on what to do first: the quick wins by id if
-   there are any, otherwise the top-ranked finding.
+   there are any, otherwise `summary.start_with` (compose has already chosen
+   it by rule; do not pick a different finding).
 
 Rules:
 

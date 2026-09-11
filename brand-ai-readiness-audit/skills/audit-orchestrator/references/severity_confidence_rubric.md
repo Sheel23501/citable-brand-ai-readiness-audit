@@ -112,6 +112,17 @@ A finding is a `quick_win` when **all** hold:
 
 Compose lists quick wins in rank order. Nothing else may be labelled a quick win.
 
+**Where to start.** The rule above is strict on purpose, so a report can carry
+defects and no quick win: a `medium` at `low` confidence, or a certain `low`,
+qualifies for neither. The report still names a first move.
+`summary.start_with` is the first quick win when there is one; otherwise the
+finding above `info` with the highest `suggested_action.priority` (priority
+already folds severity and confidence, so a certain medium outranks a guessed
+high), then the lowest `effort`, then the highest `confidence`, then rank. It
+is `null` only when nothing is above `info`. `summary.headline` states it in
+one sentence, and the Markdown's Quick wins section names it whenever it is
+set. Neither loosens the quick-win rule; the validator recomputes `start_with`.
+
 ---
 
 ## 6. Wording rules that follow from the rubric

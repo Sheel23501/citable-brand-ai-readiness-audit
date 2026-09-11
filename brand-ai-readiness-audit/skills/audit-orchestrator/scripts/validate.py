@@ -218,6 +218,22 @@ def _quick_win(f):
             and f.get("confidence") != "low" and f.get("status") == "fail")
 
 
+def _start_with(findings, quick_wins):
+    """report_schema.md section 3b, mirrored from compose.start_with: first quick win, else top priority,
+    lowest effort, highest confidence, rank."""
+    if quick_wins:
+        return quick_wins[0]
+    prio = {"high": 0, "medium": 1, "low": 2}
+    effort = {"low": 0, "medium": 1, "high": 2}
+    conf = {"high": 0, "medium": 1, "low": 2}
+    cands = [(i, f) for i, f in enumerate(findings) if f.get("severity") != "info" and f.get("status") == "fail"]
+    if not cands:
+        return None
+    i, best = min(cands, key=lambda x: (prio.get((x[1].get("suggested_action") or {}).get("priority"), 3),
+                                        effort.get(x[1].get("effort"), 3), conf.get(x[1].get("confidence"), 3), x[0]))
+    return best.get("id")
+
+
 def check_superset(r, problems, warnings, reg, facts=None, final=False):
     p = lambda msg: problems.append("superset: " + msg)  # noqa: E731
     w = warnings.append
@@ -253,6 +269,14 @@ def check_superset(r, problems, warnings, reg, facts=None, final=False):
         p("findings are not in schema order (severity, confidence, page count, check_id)")
     if r.get("quick_wins") != [f.get("id") for f in findings if f.get("quick_win")]:
         p("quick_wins does not list exactly the flagged findings in rank order")
+    # where to start: compose decides by rule, the report states it, the validator recomputes it
+    s = r.get("summary") or {}
+    if isinstance(s, dict):
+        if not isinstance(s.get("headline"), str) or not s["headline"].strip():
+            p("summary.headline missing or empty")
+        expected = _start_with(findings, r.get("quick_wins") or [])
+        if "start_with" not in s or s.get("start_with") != expected:
+            p("summary.start_with must name the finding to act on first (expected %s)" % expected)
 
     # summary check counts
     s = r.get("summary") or {}

@@ -806,6 +806,33 @@ def stage_compose_units(res, C):
     res.check(C.is_quick_win(_mkf("cr.x.y", "medium")) and not C.is_quick_win(_mkf("cr.x.y", "info"))
               and not C.is_quick_win(_mkf("cr.x.y", "medium", confidence="low")), "quick win rule matches the rubric")
 
+    # where to start (rubric section 5, schema 3b): the first quick win, else top priority at the lowest effort
+    def _fs(cid, sev, conf, effort, prio, rank):
+        f = _mkf(cid, sev, confidence=conf)
+        f.update(id="F-%03d" % rank, rank=rank, effort=effort)
+        f["suggested_action"]["priority"] = prio
+        return f
+    fs = [_fs("a.b.c", "medium", "low", "medium", "low", 1), _fs("a.b.d", "low", "high", "low", "low", 2),
+          _fs("a.b.e", "low", "high", "medium", "low", 3)]
+    res.check(C.start_with(fs, ["F-003"]) == "F-003", "start_with: the first quick win wins")
+    res.check(C.start_with(fs, []) == "F-002", "start_with: equal priority resolves to the lowest effort", str(C.start_with(fs, [])))
+    fs2 = [_fs("a.b.c", "medium", "medium", "medium", "medium", 1)] + fs[1:]
+    res.check(C.start_with(fs2, []) == "F-001", "start_with: a higher priority outranks a lower effort")
+    info = _mkf("or.x.y", "info", status="not_evaluated")
+    info.update(id="F-001", rank=1)
+    res.check(C.start_with([info], []) is None, "start_with: nothing above info means nowhere to start")
+    pgs = [{"status": 200, "challenge": False}, {"status": 200, "challenge": False}, {"status": 404, "challenge": False}]
+    chk = {"x": {"reason": "role_page_not_sampled"}, "y": {"reason": None}}
+    h = C.build_headline(fs, pgs, chk, [], "F-002")
+    res.check("2 pages read" in h and "1 medium and 2 low" in h and "Start with F-002" in h and "1 check had no verdict" in h,
+              "headline: counts, pages read, where to start, and the gated clause", h)
+    res.check(C.build_headline([], pgs, {}, [], None).startswith("No defects on the 2 pages read"), "headline: a clean site says so")
+    res.check(C.build_headline(fs, pgs, {}, [{"probe": "x", "error": "boom"}], None).startswith("The run was incomplete"),
+              "headline: an incomplete run leads with that")
+    crit = [_fs("a.b.f", "critical", "high", "high", "high", 1)] + fs
+    res.check(C.build_headline(crit, pgs, {}, [], "F-001").startswith("1 critical finding on the 2 pages read. Start with F-001"),
+              "headline: a critical finding leads", C.build_headline(crit, pgs, {}, [], "F-001"))
+
     # ---- the absence gate (rubric section 3 rule 6): a sample claim is never voiced as a site claim
     def _smp(category, read, missing, links=10):
         pages = [{"role": r, "fetch": {"final_url": "http://s/%s" % r, "status": 200, "is_html": True}} for r in read]
@@ -993,6 +1020,25 @@ def stage_compose(res, farm):
                       "compose/%s: %s carries its source skill and opportunity type" % (name, f["id"]))
             res.check("_suppressed" not in f and "_max_severity" not in f, "compose/%s: %s has no internal fields" % (name, f["id"]))
         res.check(report["quick_wins"] == [f["id"] for f in fnds if f["quick_win"]], "compose/%s: quick_wins lists the flagged ids" % name)
+        # where to start: the headline is in the JSON and the Markdown; the Quick wins section never vanishes while defects exist
+        res.check(isinstance(s.get("headline"), str) and s["headline"].strip() and s["headline"] in md,
+                  "compose/%s: the summary opens with a headline the Markdown carries" % name)
+        sw = s.get("start_with")
+        res.check("start_with" in s and sw == C.start_with(fnds, report["quick_wins"]),
+                  "compose/%s: start_with follows the rule" % name, str(sw))
+        if sw:
+            qsec = md.split("## Quick wins")[1].split("## Findings")[0] if "## Quick wins" in md else ""
+            res.check(sw in {f["id"] for f in fnds if f["severity"] != "info"} and sw in qsec,
+                      "compose/%s: the Quick wins section names where to start (%s)" % (name, sw))
+            if not report["quick_wins"]:
+                res.check("None qualify" in qsec, "compose/%s: an empty quick-win list says so instead of vanishing" % name)
+        else:
+            res.check("## Quick wins" not in md, "compose/%s: no Quick wins section when nothing is above info" % name)
+        if name == "unsampled-contact-nonprofit":
+            kf = next((f["id"] for f in fnds if f["check_id"] == "fx.facts.key_fact_missing"), None)
+            res.check(not report["quick_wins"] and sw == kf,
+                      "compose/unsampled-contact-nonprofit: no quick win qualifies, so start_with is the confirmed key-fact finding",
+                      str((report["quick_wins"], sw, kf)))
         res.check(all(f.get("merged_into") for f in report["suppressed_findings"]),
                   "compose/%s: every folded finding names the finding it went into" % name)
         res.check(report["ai_answer_simulation"]["basis"] == "extracted_facts_only", "compose/%s: simulation basis is fixed" % name)
@@ -1159,6 +1205,9 @@ def stage_validate(res, farm):
     broken("rank wrong", setf(["findings", 0, "rank"], 7), "rank must be", expect_floor=False)
     broken("quick_win flag contradicts the rubric", setf(["findings", 0, "quick_win"], not base["findings"][0]["quick_win"]), "quick_win", expect_floor=False)
     broken("quick_wins list wrong", setf(["quick_wins"], []), "quick_wins", expect_floor=False)
+    broken("headline missing", setf(["summary", "headline"], ""), "headline", expect_floor=False)
+    broken("start_with wrong", setf(["summary", "start_with"], "F-099"), "start_with", expect_floor=False)
+    broken("start_with absent", delf(["summary", "start_with"]), "start_with", expect_floor=False)
     broken("impact not derived from severity", setf(["findings", 0, "suggested_action", "impact"], "low"), "impact must be derived", expect_floor=False)
     broken("dedupe_key wrong", setf(["findings", 0, "dedupe_key"], "x|y"), "dedupe_key", expect_floor=False)
     broken("no evidence items", setf(["findings", 0, "evidence_items"], []), "evidence_items", expect_floor=False)

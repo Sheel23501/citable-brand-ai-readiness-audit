@@ -165,7 +165,9 @@ The validate script rejects any report missing them.
     {"role": "home", "url": "https://example.com/", "status": 200, "snapshot": "snapshots/home.html", "challenge": false}
   ],
   "summary": {"total_findings": 7, "critical": 0, "high": 1, "medium": 2, "low": 3, "info": 1,
-              "checks_run": 40, "checks_passed": 31, "checks_failed": 6, "checks_inconclusive": 1, "checks_not_evaluated": 2},
+              "checks_run": 40, "checks_passed": 31, "checks_failed": 6, "checks_inconclusive": 1, "checks_not_evaluated": 2,
+              "headline": "1 high finding on the 6 pages read. Start with F-002: Pricing exists only as an image.",
+              "start_with": "F-002"},
   "findings": [ /* Finding + id, source_skill, quick_win, rank */ ],
   "quick_wins": ["F-002", "F-004"],
   "passed_checks": [{"check_id": "cr.robots.blanket_disallow", "title": "robots.txt does not blanket-disallow crawlers", "source_skill": "crawl-render-audit"}],
@@ -207,6 +209,19 @@ Extra fields on each final Finding, added by compose:
 | `merged_from` | string[] | `dedupe_key`s folded into this finding, if any. |
 | `absence_scope` | enum | Optional. `sample` when the orchestrator's absence gate (rubric rule 6) scoped a site-level absence claim to the pages read: confidence is `low`, severity at most `medium`, and the evidence names the pages not reached. Absent on every other finding. |
 | `language_scope` | string | Optional. The bare language subtag when the language gate (rubric rule 7) scoped an English-phrase-list check on a non-English site. Absent otherwise. |
+
+`summary.headline` is one deterministic sentence for the reader who opens
+nothing else: how many findings at which severities on how many pages were
+read, which finding to start with, whether any checks had no verdict because
+parts of the site were not reached, and, first of all, whether the run was
+incomplete. `summary.start_with` is the id of the finding to act on first:
+the first quick win when there is one, otherwise the finding above `info`
+with the highest `suggested_action.priority` (priority already folds severity
+and confidence), then the lowest `effort`, then the highest `confidence`,
+then rank; `null` when nothing is above `info`. Both are computed by compose
+and never written by the agent; the validator recomputes `start_with` and
+rejects a report whose value differs (`severity_confidence_rubric.md`
+section 5, "Where to start").
 
 `limitations` always begins with the boilerplate lines that apply (compose adds
 them, the agent never removes them): the single point-in-time fetch statement
@@ -258,6 +273,7 @@ question cannot be answered from the facts file, `answerable` is `false` and
 ## 6. Markdown rendering rules
 
 - Title line: `# AI-readiness audit: <site>` then category, date, and the counts line.
-- Section order: Summary counts → Narrative → Quick wins → Findings (grouped by severity, each with evidence as a code block) → What is working (passed checks) → AI answer simulation → Proactive recommendations → Coverage and limitations.
+- Section order: Summary (the `headline` sentence, then the counts) → Narrative → Quick wins → Findings (grouped by severity, each with evidence as a code block) → What is working (passed checks) → AI answer simulation → Proactive recommendations → Coverage and limitations.
+- The Quick wins section is present whenever `summary.start_with` is set. It lists the quick wins in rank order or, when none qualifies, says so and names `start_with` with its action, effort and confidence, so a report with defects always tells the reader where to begin. It is absent only when nothing is above `info`.
 - Every finding shows: id, title, severity, confidence, effort, affected pages, the evidence sentence, the evidence items as a code block, why it matters, suggested action summary, detail, priority.
 - No content appears in the Markdown that is absent from the JSON.

@@ -668,6 +668,57 @@ def is_quick_win(f):
             and f.get("confidence") != "low" and f.get("status") == "fail")
 
 
+def start_with(findings, quick_wins):
+    """report_schema.md section 3b: the one finding to act on first, or None when nothing is above info.
+
+    The first quick win when there is one. Otherwise the finding above `info` with the highest
+    suggested_action.priority (priority already folds severity and confidence: a certain medium outranks a
+    guessed high), then the lowest effort, then the highest confidence, then rank. The quick-win rule stays
+    strict; this is what the report says when that rule leaves the reader with defects and no first move.
+    """
+    if quick_wins:
+        return quick_wins[0]
+    prio = {"high": 0, "medium": 1, "low": 2}
+    effort = {"low": 0, "medium": 1, "high": 2}
+    conf = {"high": 0, "medium": 1, "low": 2}
+    cands = [f for f in findings if f.get("severity") != "info" and f.get("status") == "fail"]
+    if not cands:
+        return None
+    best = min(cands, key=lambda f: (prio.get((f.get("suggested_action") or {}).get("priority"), 3),
+                                     effort.get(f.get("effort"), 3), conf.get(f.get("confidence"), 3),
+                                     f.get("rank") or 0))
+    return best.get("id")
+
+
+def build_headline(findings, pages_sampled, checks, probe_errors, start_id):
+    """One deterministic sentence for the reader who opens nothing else: what, on how much, where to begin."""
+    n_read = len([p for p in pages_sampled if p.get("status") == 200 and not p.get("challenge")])
+    pages = "%d page%s read" % (n_read, "" if n_read == 1 else "s")
+    counts = collections.Counter(f.get("severity") for f in findings)
+
+    def phrase(*levels):
+        return " and ".join("%d %s" % (counts[l], l) for l in levels if counts[l])
+
+    if counts["critical"] or counts["high"]:
+        n = counts["critical"] + counts["high"]
+        head = "%s finding%s on the %s." % (phrase("critical", "high"), "" if n == 1 else "s", pages)
+    elif counts["medium"] or counts["low"]:
+        head = "No critical or high findings on the %s; %s." % (pages, phrase("medium", "low"))
+    else:
+        head = "No defects on the %s." % pages
+    by_id = {f.get("id"): f for f in findings}
+    if start_id in by_id:
+        head += " Start with %s: %s." % (start_id, (by_id[start_id].get("title") or "").rstrip("."))
+    gated = [cid for cid, c in checks.items() if c.get("reason") in GATE_REASONS]
+    if gated:
+        head += (" %d check%s had no verdict because parts of the site were not reached; see Coverage and limitations."
+                 % (len(gated), "" if len(gated) == 1 else "s"))
+    if probe_errors:
+        head = "The run was incomplete: %d probe%s did not finish. %s" % (
+            len(probe_errors), "" if len(probe_errors) == 1 else "s", head)
+    return head
+
+
 # ---------------------------------------------------------------- AI-answer simulation
 def _fact(facts, fid):
     return ((facts or {}).get("facts") or {}).get(fid) or {}
@@ -1081,6 +1132,15 @@ def compose(workdir, wall_clock=None, input_url=None, category_override=None):
                "source_skill": checks[cid]["source_skill"], "stage": registry[cid]["stage"] if cid in registry else None}
               for cid in sorted(checks) if checks[cid]["status"] == "pass"]
 
+    pages_sampled = [{"role": p.get("role"), "url": (p.get("fetch") or {}).get("final_url") or p.get("url"),
+                      "status": (p.get("fetch") or {}).get("status"),
+                      "snapshot": (p.get("fetch") or {}).get("body_path"),
+                      "challenge": bool((p.get("fetch") or {}).get("challenge"))} for p in pages]
+    probe_errors = ([{"probe": p.get("probe"), "error": p["error"]} for p in probes if p.get("error")]
+                    + [{"probe": None, "error": e} for e in data["load_errors"]])
+    quick_wins = [f["id"] for f in kept if f["quick_win"]]
+    start = start_with(kept, quick_wins)
+
     report = {
         "site": _host(site_url) or site_url or "unknown",
         "site_url": site_url,
@@ -1091,15 +1151,13 @@ def compose(workdir, wall_clock=None, input_url=None, category_override=None):
                           "confidence": "high" if category_override else (sample.get("site_category") or {}).get("confidence", "low"),
                           "signals": ["override:command_line"] if category_override
                                      else (sample.get("site_category") or {}).get("signals", [])},
-        "pages_sampled": [{"role": p.get("role"), "url": (p.get("fetch") or {}).get("final_url") or p.get("url"),
-                           "status": (p.get("fetch") or {}).get("status"),
-                           "snapshot": (p.get("fetch") or {}).get("body_path"),
-                           "challenge": bool((p.get("fetch") or {}).get("challenge"))} for p in pages],
+        "pages_sampled": pages_sampled,
         "summary": dict({"total_findings": len(kept)}, **counts, **{
             "checks_run": len(checks), "checks_passed": status_counts["pass"], "checks_failed": status_counts["fail"],
-            "checks_inconclusive": status_counts["inconclusive"], "checks_not_evaluated": status_counts["not_evaluated"]}),
+            "checks_inconclusive": status_counts["inconclusive"], "checks_not_evaluated": status_counts["not_evaluated"],
+            "headline": build_headline(kept, pages_sampled, checks, probe_errors, start), "start_with": start}),
         "findings": kept,
-        "quick_wins": [f["id"] for f in kept if f["quick_win"]],
+        "quick_wins": quick_wins,
         "passed_checks": passed,
         "coverage": build_coverage(checks, registry, sample),
         "proactive_recommendations": build_recommendations(category, facts, checks, kept, sample),
@@ -1108,8 +1166,7 @@ def compose(workdir, wall_clock=None, input_url=None, category_override=None):
         "limitations": build_limitations(sample, probes, checks, gated_lang, category),
         "suppressed_findings": folded,
         "run": {"wall_clock_seconds": wall_clock, "requests_made": sample.get("requests_made"),
-                "probe_errors": [{"probe": p.get("probe"), "error": p["error"]} for p in probes if p.get("error")]
-                + [{"probe": None, "error": e} for e in data["load_errors"]]},
+                "probe_errors": probe_errors},
     }
     return report
 
@@ -1138,6 +1195,9 @@ def render_markdown(report):
     L.append("")
     L.append("## Summary")
     L.append("")
+    if s.get("headline"):
+        L.append(s["headline"])
+        L.append("")
     L.append("**%d finding%s** — %d critical, %d high, %d medium, %d low, %d informational."
              % (s.get("total_findings", 0), "" if s.get("total_findings") == 1 else "s", s.get("critical", 0),
                 s.get("high", 0), s.get("medium", 0), s.get("low", 0), s.get("info", 0)))
@@ -1147,11 +1207,21 @@ def render_markdown(report):
                 s.get("checks_inconclusive", 0), s.get("checks_not_evaluated", 0)))
     if report.get("narrative_summary"):
         L += ["", "## What this means", "", report["narrative_summary"]]
+    start = s.get("start_with")
+    first = next((f for f in report.get("findings") or [] if f.get("id") == start), None) if start else None
     if report.get("quick_wins"):
         L += ["", "## Quick wins", "", "Low effort, real impact, high enough confidence to act on today.", ""]
         for f in report["findings"]:
             if f["id"] in report["quick_wins"]:
                 L.append("- **%s** %s — %s" % (f["id"], f["title"], f["suggested_action"]["summary"]))
+    elif first is not None:
+        # defects but no qualifying quick win: the section still tells the reader where to begin, never vanishes
+        L += ["", "## Quick wins", "",
+              "None qualify: a quick win needs medium-or-higher severity, low effort and at least medium confidence "
+              "(severity_confidence_rubric.md section 5), and no finding here meets all three. Start instead with "
+              "**%s** %s — %s (%s effort, %s confidence)."
+              % (first["id"], first["title"], ((first.get("suggested_action") or {}).get("summary") or "").rstrip("."),
+                 first.get("effort"), first.get("confidence"))]
     if report.get("findings"):
         L += ["", "## Findings", ""]
         for sev in SEVERITIES:
@@ -1311,7 +1381,9 @@ def _fallback_report(workdir, error, site_url=None, title=None, action=None):
             "pages_sampled": [],
             "summary": {"total_findings": 1, "critical": 0, "high": 0, "medium": 0, "low": 0, "info": 1,
                         "checks_run": 1, "checks_passed": 0, "checks_failed": 1, "checks_inconclusive": 0,
-                        "checks_not_evaluated": 0},
+                        "checks_not_evaluated": 0,
+                        "headline": "The run was incomplete: 1 probe did not finish. Nothing was evaluated: %s." % str(error)[:160].rstrip("."),
+                        "start_with": None},
             "findings": [f], "quick_wins": [], "passed_checks": [],
             "coverage": {"handout_concepts": {l: "not_evaluated" for l in "ABCD"},
                          "stages": {s: "not_evaluated" for s in STAGE_ORDER},
