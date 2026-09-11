@@ -1685,6 +1685,41 @@ def stage_extract(res):
                              ("Black Friday sale, save 20 percent", False, "Black Friday is not opening hours"),
                              ("So we do 10-15 projects a year", False, "prose that looks like a range")]:
         res.check((X.find_hours([mk("<p>%s</p>" % text)]) is not None) == want, "hours: %s" % what)
+
+    # Phone numbers in national groupings behind a cue in the site's language. The last four must not count:
+    # a cue word alone, or digits with no cue, is not a stated phone number.
+    for text, want, what in [("Telefon: 0211 - 63 55 33 55", True, "DE pairs with spaced dash"),
+                             ("Tél. : 01 23 45 67 89", True, "FR pairs"),
+                             ("Teléfono: 91 123 45 67", True, "ES groups"),
+                             ("Tel 030/5557-0199", True, "DE slash"),
+                             ("Phone: (617) 555-0123", True, "US, unchanged"),
+                             ("Call us today for a demo", False, "cue with no number"),
+                             ("Telefonische Beratung ab 2024", False, "cue-like word and a year"),
+                             ("Tel: 12 34", False, "too few digits"),
+                             ("Mobile app version 10.2.3 released 2026-05-14", False, "version and date")]:
+        res.check((X.find_phone([mk("<p>%s</p>" % text)]) is not None) == want, "phone: %s" % what)
+
+    # Included page fragments never stand in for a page role.
+    from auditlib.sampler import is_page_part
+    res.check(is_page_part("https://www.adobe.com/homepage/fragments/loggedout/redesign/default/news/news"),
+              "sampler: a /fragments/ path is a page part, not a page")
+    res.check(not is_page_part("https://x.example/blog/fragmented-teams") and not is_page_part("https://x.example/components/"),
+              "sampler: a slug that merely contains 'fragment', and 'components', stay pages")
+
+    from auditlib.fetch import Fetcher as _F
+    _f = _F(site="https://x.example/")
+    res.check(_f.host_allowed("de.wikipedia.org") and _f.host_allowed("zh-yue.wikipedia.org"),
+              "fetch: every Wikipedia language edition is allowed")
+    res.check(not _f.host_allowed("evil.wikipedia.org.attacker.example") and not _f.host_allowed("wikipedia.org.example"),
+              "fetch: look-alike hosts are not")
+
+    # A redirect to a language edition is named in limitations; a seed that already named the edition is not.
+    _C = _load_compose()
+    res.check(_C.language_edition({"url": "https://www.lemonde.fr/", "final_url": "https://www.lemonde.fr/en/"}) == "en",
+              "compose: a redirect to /en/ is a language edition")
+    res.check(_C.language_edition({"url": "https://x.example/en/", "final_url": "https://x.example/en/"}) is None
+              and _C.language_edition({"url": "https://x.example/", "final_url": "https://x.example/blog/"}) is None,
+              "compose: no edition when the seed named it, or the path is not a language")
     ld = mk('<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","name":"Acme","url":"https://x.example/","logo":"l.png"},{"@type":"BlogPosting","headline":"Hi","publisher":{"@type":"Organization","name":"Acme"}},{"@type":"SoftwareApplication","applicationCategory":"BusinessApplication"}]}</script>')
     nodes = X.doc_top_nodes(ld.doc)
     res.check(len(nodes) == 3, "top_level_nodes: @graph members only, nested publisher excluded (%d)" % len(nodes))

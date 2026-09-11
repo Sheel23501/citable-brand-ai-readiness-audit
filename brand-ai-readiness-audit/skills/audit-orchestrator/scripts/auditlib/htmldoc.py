@@ -28,7 +28,7 @@ STOPWORDS = {
     "pt": ("dos", "das", "uma", "para", "com", "que", "por", "mais", "como", "sua", "seu", "não", "nao", "são"),
     "nl": ("het", "een", "van", "met", "voor", "zijn", "niet", "ook", "maar", "deze", "onze", "wordt", "aan", "bij"),
 }
-_WORD_RE = re.compile(r"[a-zà-ÿA-ZÀ-Ý]{2,}")
+_LANG_WORD_RE = re.compile(r"[a-zà-ÿA-ZÀ-Ý]{2,}")  # own name: _WORD_RE below is the word counter
 
 
 def language_from_text(text, min_words=120, margin=1.6):
@@ -39,7 +39,7 @@ def language_from_text(text, min_words=120, margin=1.6):
     Returns None on short text or a close call -- an uncertain guess is worse than no guess here, because
     the caller uses it to decide whether a finding may be asserted at full strength.
     """
-    words = [w.lower() for w in _WORD_RE.findall(text or "")]
+    words = [w.lower() for w in _LANG_WORD_RE.findall(text or "")]
     if len(words) < min_words:
         return None
     counts = collections.Counter(words)

@@ -313,7 +313,7 @@ skills/
   crawl-render-audit/     fact-extractability-audit/
   entity-freshness-corroboration-audit/     engagement-audit/
 tests/
-  run_tests.py            2947 assertions across 18 synthetic fixture sites
+  run_tests.py            3959 assertions across 24 synthetic fixture sites
   serve_fixtures.py       one local server per fixture
   fixtures/<name>/        static mini-sites + the check ids each must trigger
 ```

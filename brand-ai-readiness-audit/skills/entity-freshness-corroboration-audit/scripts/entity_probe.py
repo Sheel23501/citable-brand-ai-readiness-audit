@@ -452,12 +452,18 @@ def _domain(ctx):
 
 
 def _text_phone(text):
-    for m in X.PHONE_TEXT_RE.finditer(text or ""):
-        digits = sum(c.isdigit() for c in m.group(0))
-        if 9 <= digits <= 15:
-            before = text[max(0, m.start() - 30):m.start()]
-            if m.group(0).strip().startswith("+") or X.PHONE_CUE_RE.search(before):
-                return m.group(0).strip()
+    """Phone number as visible text; the grammar lives in auditlib.extract so find_phone and this check agree."""
+    hit = X.text_phone(text)
+    return hit.strip() if hit else None
+
+
+def _tel_link_text(page):
+    """The visible text of a tel: link, when it is the number itself. That is plain text a reader sees, and the
+    href is a stronger cue than any label word: sipgate.de shows "0211 - 63 55 33 55" in its header this way,
+    with no "Telefon" in front of it, and was told its phone number was not visible."""
+    for l in page.doc.links:
+        if l.href.lower().startswith("tel:") and sum(c.isdigit() for c in (l.text or "")) >= 7:
+            return l.text.strip()
     return None
 
 
@@ -510,7 +516,7 @@ def check_nap(ctx, out, pages, brand):
             if a:
                 found["address"] = (p, a[0])
         if "phone" not in found:
-            ph = _text_phone(t)
+            ph = _text_phone(t) or _tel_link_text(p)
             if ph:
                 found["phone"] = (p, ph)
         if "email" not in found:
@@ -541,7 +547,10 @@ def check_nap(ctx, out, pages, brand):
              pages=[p.final_url for p in anchor], page_roles=[p.role for p in anchor], references=[REFS["org"]])
 
 
-def name_candidates(pages):
+def name_candidates(pages, category=None):
+    """Names the site calls itself. A Person node is the brand only on a personal site: elsewhere Person nodes are
+    article authors and staff, and counting them reported "sipgate vs Steffen Penzel" as a naming inconsistency."""
+    allow_person = category == "portfolio_personal"
     cands = []
     for p in X._ordered(pages, ("home", "about")):
         sn = p.doc.meta("og:site_name", "application-name")
@@ -549,7 +558,7 @@ def name_candidates(pages):
             cands.append((sn.strip(), "meta:og:site_name", p.final_url)); break
     for p in X._ordered(pages, ("home", "about")):
         for n, _ in X.doc_top_nodes(p.doc):
-            if X.is_org_node(n, allow_person=True) and isinstance(n.get("name"), str) and n["name"].strip():
+            if X.is_org_node(n, allow_person=allow_person) and isinstance(n.get("name"), str) and n["name"].strip():
                 cands.append((n["name"].strip(), "jsonld:%s.name" % (X.node_types(n) or ["?"])[0], p.final_url))
     segs = {}
     for p in pages:
@@ -564,7 +573,7 @@ def name_candidates(pages):
 
 
 def check_name_consistency(ctx, out, pages):
-    cands = name_candidates(pages)
+    cands = name_candidates(pages, ctx.category)
     distinct = {}
     for val, src, url in cands:
         distinct.setdefault(_norm_name(val), (val, src, url))
@@ -815,11 +824,11 @@ def run(ctx, args=None):
                    "authority_hosts_present": sorted({_host(u) for u in sameas if any(a in _host(u) for a in authority_hosts(ctx.category))})})
     try:
         lookup = entity_lookup(ctx, brand.get("value"), sameas, external, domain,
-                               alternates=lookup_alternates(brand.get("value"), name_candidates(usable)))
+                               alternates=lookup_alternates(brand.get("value"), name_candidates(usable, ctx.category)))
     except Exception as e:  # noqa: BLE001
         lookup = {"outcome": "unavailable", "reason": "lookup_failed", "error": "%s: %s" % (type(e).__name__, e)}
     entity["lookup"] = lookup
-    entity["name_candidates"] = [{"value": v, "source": s, "page": u} for v, s, u in name_candidates(usable)]
+    entity["name_candidates"] = [{"value": v, "source": s, "page": u} for v, s, u in name_candidates(usable, ctx.category)]
     for name, fn, a in (("lookup", check_lookup, (ctx, out, lookup, brand.get("value"), sameas)),
                         ("sameas", check_sameas, (ctx, out, nodes, sameas, lookup, brand.get("value"))),
                         ("nap", check_nap, (ctx, out, usable, brand)),

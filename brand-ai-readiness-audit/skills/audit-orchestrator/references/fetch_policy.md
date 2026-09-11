@@ -18,9 +18,15 @@ Standard library only (`urllib`, `http.client`, `ssl`, `socket`, `gzip`,
 ```
 User-Agent: Mozilla/5.0 (compatible; brand-ai-readiness-audit/0.1; read-only audit; +https://github.com/brand-ai-readiness-audit)
 Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.5
-Accept-Language: en,*;q=0.5
+Accept-Language: *
 Accept-Encoding: gzip, deflate
 ```
+
+`Accept-Language: *` states no preference. A preference such as `en` makes
+multilingual sites redirect to that edition, and omitting the header is worse:
+bot protection treats it as a bot signal (lemonde.fr served a 3 KB stub instead
+of its 270 KB page). A site that still redirects to a language edition is named
+in the report's limitations.
 
 The audit never impersonates a browser beyond the compatibility prefix. The
 one place it announces another agent's token is the edge-access probe

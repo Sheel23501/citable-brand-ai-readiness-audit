@@ -953,6 +953,35 @@ def non_coverage_lines():
     return lines
 
 
+_LANG_CODES = frozenset(["en", "fr", "de", "es", "it", "pt", "nl", "ja", "zh", "ko", "ru", "ar", "hi", "pl", "sv",
+                         "da", "no", "fi", "tr", "cs", "el", "he", "id", "th", "vi", "uk", "ro", "hu"])
+
+
+def language_edition(page):
+    """The language edition a redirect sent the home URL to ("en" for lemonde.fr -> /en/), or None.
+
+    Read from the first path segment or the leftmost host label, and only when the seed URL did not already
+    name that language: a user who asked for example.com/en/ was not redirected anywhere they did not ask for.
+    """
+    if not page or not page.get("final_url") or not page.get("url"):
+        return None
+    seed, final = urlsplit(page["url"]), urlsplit(page["final_url"])
+
+    def lang_of(labels):
+        for label in labels:
+            code = label.lower().replace("_", "-").split("-")[0]
+            if len(label) in (2, 5) and code in _LANG_CODES:
+                return code
+        return None
+
+    def labels(u):
+        host = u.hostname or ""
+        return [x for x in u.path.split("/") if x][:1] + (host.split(".")[:1] if host.count(".") >= 2 else [])
+
+    before, after = lang_of(labels(seed)), lang_of(labels(final))
+    return after if after and after != before else None
+
+
 def build_limitations(sample, probes, checks, gated_lang=None, category=None):
     """report_schema.md section 3b: the boilerplate that applies, then section 5 non-coverage."""
     pages = sample.get("pages") or []
@@ -962,6 +991,12 @@ def build_limitations(sample, probes, checks, gated_lang=None, category=None):
     if roles and set(roles) <= {"home"}:
         out.append("No content pages beyond the home page were discoverable, so every finding below is based on "
                    "the home page alone.")
+    edition = language_edition(next((p for p in pages if p.get("role") == "home"), None))
+    if edition:
+        home = next(p for p in pages if p.get("role") == "home")
+        out.append("The home URL redirected to %s, the site's '%s' language edition, although the audit asked for no "
+                   "particular language. Every finding describes that edition, which may not be the one most of the "
+                   "site's own audience reads." % (home.get("final_url"), edition))
     category = category or (sample.get("site_category") or {}).get("value") or "unknown"
     by_role = sorted(cid for cid, c in checks.items() if c.get("reason") == "role_page_not_sampled")
     if by_role:

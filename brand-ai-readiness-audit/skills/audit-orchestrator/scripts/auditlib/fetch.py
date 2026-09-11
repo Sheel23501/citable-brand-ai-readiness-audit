@@ -48,10 +48,14 @@ PROBE_USER_AGENTS = (
      "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.4; +https://openai.com/gptbot"),
 )
 
+# Accept-Language "*": present, but with no preference. "en" asked multilingual sites for their English edition.
+# Omitting the header is worse -- bot protection reads a request with none as a bot: lemonde.fr served a 3 KB stub
+# instead of its 270 KB page. A site that still redirects "*" to a language edition (lemonde.fr sends it to /en/)
+# is named in the report's limitations rather than second-guessed here.
 DEFAULT_HEADERS = {
     "User-Agent": USER_AGENT,
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.5",
-    "Accept-Language": "en,*;q=0.5",
+    "Accept-Language": "*",
     "Accept-Encoding": "gzip, deflate",
     "Connection": "close",
 }
@@ -267,7 +271,15 @@ class Fetcher:
             self.allowed_hosts.add(host.lower())
 
     def host_allowed(self, host):
-        return (host or "").lower() in self.allowed_hosts
+        h = (host or "").lower()
+        if h in self.allowed_hosts:
+            return True
+        # Every Wikipedia language edition, and nothing else, once Wikipedia is allowed at all: a site's sameAs to
+        # de.wikipedia.org is as authoritative as one to en., and refusing it reported "lookup unavailable" for
+        # a German company that had done exactly what the audit recommends.
+        labels = h.split(".")
+        return (WIKIPEDIA_HOST in self.allowed_hosts and len(labels) == 3 and labels[1:] == ["wikipedia", "org"]
+                and 2 <= len(labels[0]) <= 12 and labels[0].replace("-", "").isalpha())
 
     # ------------------------------------------------------------ robots
     def robots(self, origin=None):

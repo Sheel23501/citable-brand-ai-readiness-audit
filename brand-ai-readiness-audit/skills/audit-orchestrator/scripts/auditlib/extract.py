@@ -396,6 +396,31 @@ def find_email(pages, prefer=("contact", "home")):
     return None
 
 
+# A phone number is claimed from text only with a "+" prefix or a cue word in front of it. The cues were
+# English-only and PHONE_TEXT_RE wants 3-4 digit groups, so "Telefon: 0211 - 63 55 33 55" -- the ordinary
+# German format -- was invisible and the site was told to add a number it already shows. This second pass
+# reads whatever follows a cue in any of the audit's languages, in whatever grouping the country uses. It
+# still requires the cue, which is what keeps bare digit runs (order numbers, years) from counting.
+_PHONE_CUES = (r"phone|telephone|tel|call|mobile|cell|whatsapp|fax|ph|"
+               r"telefon|telefono|tel[eé]fono|t[eé]l[eé]phone|t[eé]l|rufnummer|hotline|fon|telefoon")
+PHONE_AFTER_CUE_RE = re.compile(r"\b(?:%s)\b[\s.:]{0,4}((?:\+|00)?[\d(][\d\s.\-/()]{5,24}\d)" % _PHONE_CUES, re.I)
+
+
+def text_phone(text):
+    """First phone number stated as text, or None. Shared by find_phone and the entity probe's NAP check."""
+    t = text or ""
+    for m in PHONE_TEXT_RE.finditer(t):
+        digits = sum(c.isdigit() for c in m.group(0))
+        if 9 <= digits <= 15:
+            before = t[max(0, m.start() - 30):m.start()]
+            if m.group(0).strip().startswith("+") or PHONE_CUE_RE.search(before):
+                return m.group(0)
+    for m in PHONE_AFTER_CUE_RE.finditer(t):
+        if 8 <= sum(c.isdigit() for c in m.group(1)) <= 15:
+            return m.group(1).strip()
+    return None
+
+
 def find_phone(pages, prefer=("contact", "home")):
     for p in _ordered(pages, prefer):
         for l in p.doc.links:
@@ -406,13 +431,9 @@ def find_phone(pages, prefer=("contact", "home")):
                 if sum(c.isdigit() for c in v) >= 7:
                     return _found(v, p, "jsonld:telephone")
     for p in _ordered(pages, prefer):
-        t = page_text(p)
-        for m in PHONE_TEXT_RE.finditer(t):
-            digits = sum(c.isdigit() for c in m.group(0))
-            if 9 <= digits <= 15:
-                before = t[max(0, m.start() - 30):m.start()]
-                if m.group(0).strip().startswith("+") or PHONE_CUE_RE.search(before):
-                    return _found(m.group(0), p, "text")
+        hit = text_phone(page_text(p))
+        if hit:
+            return _found(hit, p, "text")
     return None
 
 

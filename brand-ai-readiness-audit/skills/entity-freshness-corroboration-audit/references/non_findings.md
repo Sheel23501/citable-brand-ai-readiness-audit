@@ -44,9 +44,11 @@ that tells a business to change a legitimate choice.
 - **A `collision` can be a legitimately more famous namesake.** The finding
   reports what an assistant would find under the name and asks the site to
   publish anchors; it does not judge the name.
-- **Phone and address recognition is pattern-based.** A bare number without
-  `+` or a cue word ("0117 496 0123" on its own line) is not recognised as a
-  phone. An address is recognised in either word order -- number-then-street
+- **Phone and address recognition is pattern-based.** A bare number with no
+  `+`, no cue word in front of it (phone, tel, Telefon, Tél., teléfono and
+  the like) and no `tel:` link around it ("0117 496 0123" alone on a line) is
+  not recognised as a phone. Behind a cue or inside a `tel:` link, national
+  groupings such as "0211 - 63 55 33 55" are. An address is recognised in either word order -- number-then-street
   ("12 Harbour Street", "12 Rue de Rivoli") and street-then-number
   ("Hauptstrasse 12", "Via Montenapoleone 8") -- plus UK postcodes, US
   city/state/ZIP, Indian PINs qualified by a state or by "India", Japanese

@@ -12,7 +12,7 @@ you missed.
 The full suite is ~10 minutes. **Do not run it on every edit.** Run the stage
 you touched.
 
-Stages split sharply by whether they need the fixture farm (18 local HTTP
+Stages split sharply by whether they need the fixture farm (24 local HTTP
 servers). Measured on a laptop:
 
 | Stage | Needs servers | Time |

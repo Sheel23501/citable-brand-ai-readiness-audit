@@ -152,6 +152,19 @@ def _slug_parts(url):
     return [p for p in path.split("/") if p]
 
 
+# Path segments that name a piece of a page rather than a page. CMSs serve these at their own URLs and
+# link them from the markup that includes them, so they look like navigation. adobe.com's "blog" was
+# /homepage/fragments/loggedout/.../news/news: noindexed on purpose, it became the report's top finding.
+# Deliberately short -- "components" or "widgets" can be real product pages, so they are not here.
+PAGE_PART_SEGMENTS = frozenset(["fragments", "fragment", "partials", "partial", "_partials", "_includes",
+                                "includes", "snippets", "esi", "ajax", "xhr", "modal", "modals"])
+
+
+def is_page_part(url):
+    """True for a URL whose path marks it as an included fragment, not a page a visitor lands on."""
+    return any(seg in PAGE_PART_SEGMENTS for seg in _slug_parts(url))
+
+
 def _keyword_hit(text, keywords, max_words=None):
     """Whole-phrase match: keyword equals the text, or appears as a whole word/phrase inside short link text.
     `max_words` limits the match to menu-length labels: a category word inside a headline is not a signal."""
@@ -248,7 +261,7 @@ def find_role_candidates(doc, sitemap_urls, home_url):
     seen = {r: set() for r in ROLE_ORDER}
     scored = []
     for l in doc.internal_links:
-        if l.url.rstrip("/") == home_norm:
+        if l.url.rstrip("/") == home_norm or is_page_part(l.url):
             continue
         parts = _slug_parts(l.url)
         for role in ROLE_ORDER:
@@ -275,7 +288,7 @@ def find_role_candidates(doc, sitemap_urls, home_url):
             for u in sitemap_urls:
                 p = urlsplit(u).path.lower()
                 hit = (p.rstrip("/") == pat.rstrip("/")) if not pat.endswith("/") else p.startswith(pat)
-                if hit and u.rstrip("/") != home_norm and u.rstrip("/") not in seen[role]:
+                if hit and u.rstrip("/") != home_norm and u.rstrip("/") not in seen[role] and not is_page_part(u):
                     seen[role].add(u.rstrip("/"))
                     out[role].append({"url": u, "source": "sitemap", "matched": pat})
     return out
