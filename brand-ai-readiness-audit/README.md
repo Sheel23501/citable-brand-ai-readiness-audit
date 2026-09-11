@@ -63,7 +63,8 @@ python3 skills/audit-orchestrator/scripts/run_audit.py https://example.com
 # Re-run the probes over an existing sample without touching the network
 python3 skills/audit-orchestrator/scripts/run_audit.py --workdir audit-example.com --offline
 
-# Any probe standalone, against a live URL or a saved sample
+# Any probe on its own, against a live URL or a saved sample. Every probe imports the shared auditlib from
+# skills/audit-orchestrator/scripts, so keep that folder alongside it.
 python3 skills/crawl-render-audit/scripts/crawl_probe.py --url https://example.com
 python3 skills/engagement-audit/scripts/engagement_probe.py --workdir audit-example.com
 ```

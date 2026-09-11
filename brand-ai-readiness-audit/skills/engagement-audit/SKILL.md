@@ -2,7 +2,7 @@
 name: engagement-audit
 description: Checks whether a visitor who arrives at a website, often mid-journey from an AI answer, can orient, understand the offer, and continue. Detects a missing or unclear first-viewport value proposition, no identifiable primary call to action, missing navigation landmarks, broken sampled links, missing mobile viewport, heavy page weight (a static proxy), missing trust signals, weak landing-page continuity (H1 versus title and description), missing breadcrumbs, related links, or site search, blocking interstitials, missing lang attribute, and soft or unhelpful 404 behaviour. Use when diagnosing why visitors bounce, or as the on-site engagement stage of a brand AI-readiness audit.
 license: MIT
-compatibility: Requires Python 3.8+ (standard library only). With --url it makes read-only GET requests under the shared fetch policy and respects robots.txt. Beyond the sampled pages it spends at most 15 internal-link requests and one request for a deliberately non-existent path; --no-network or --offline skips both. Reads served HTML only; never renders or measures load time.
+compatibility: Requires Python 3.8+ (standard library only). With --url it makes read-only GET requests under the shared fetch policy and respects robots.txt. Beyond the sampled pages it spends at most 15 internal-link requests and one request for a deliberately non-existent path; --no-network or --offline skips both. Reads served HTML only; never renders or measures load time. Imports the shared auditlib from ../audit-orchestrator/scripts; install it with audit-orchestrator.
 metadata:
   marketplace: brand-ai-readiness-audit
   concern: on-site-engagement

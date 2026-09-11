@@ -34,7 +34,7 @@ _LANG_WORD_RE = re.compile(r"[a-zà-ÿA-ZÀ-Ý]{2,}")  # own name: _WORD_RE belo
 def language_from_text(text, min_words=120, margin=1.6):
     """The language the words themselves suggest, or None when nothing wins clearly.
 
-    Real sites lie: lemonde.fr serves lang="en" on pages that are entirely French. A gate that trusts the
+    Real sites mislabel pages: a template's lang attribute can survive onto pages written in another language. A gate that trusts the
     attribute alone is inert exactly where it is needed, so the attribute is corroborated against this.
     Returns None on short text or a close call -- an uncertain guess is worse than no guess here, because
     the caller uses it to decide whether a finding may be asserted at full strength.
@@ -96,6 +96,7 @@ class _Parser(HTMLParser):
         self.text_parts = []
         self.body_text_parts = []
         self.div_stack = []      # (id, has_content_flag_index)
+        self.chrome_open = []    # (tag, links_at_open, body_parts_at_open) for open <header>/<footer>
         self.list_depth = 0      # open <ul>/<ol>
         self.open_overlays = []  # [candidate_index, stack_len_after_push, body_parts_start]
         self.cur_quote = None    # [text_parts, mpos] inside <blockquote>
@@ -195,9 +196,11 @@ class _Parser(HTMLParser):
                 d.content_mpos = mpos
         elif tag == "form":
             d.forms.append({"action": d._abs(a.get("action") or ""), "role": (a.get("role") or "").lower(),
+                            "id": a.get("id") or "", "cls": a.get("class") or "", "label": a.get("aria-label") or "",
                             "method": (a.get("method") or "get").lower(), "inputs": [], "context": self._ctx(), "mpos": mpos})
         elif tag == "input" and d.forms:
-            d.forms[-1]["inputs"].append({"type": (a.get("type") or "text").lower(), "name": a.get("name"), "id": a.get("id")})
+            d.forms[-1]["inputs"].append({"type": (a.get("type") or "text").lower(), "name": a.get("name"), "id": a.get("id"),
+                                          "placeholder": a.get("placeholder") or "", "label": a.get("aria-label") or ""})
         elif tag == "button" or (tag == "input" and (a.get("type") or "").lower() in ("submit", "button")):
             d.buttons.append({"text": (a.get("value") or "").strip(), "context": self._ctx(), "pos": len(self.body_text_parts), "mpos": mpos})
             if tag == "button":
@@ -215,6 +218,8 @@ class _Parser(HTMLParser):
             d.nav_count += 1
         if role == "search":
             d.search_roles += 1
+        if tag in ("header", "footer"):
+            self.chrome_open.append((tag, len(d.links), len(self.body_text_parts)))
         if tag in ("nav", "header", "footer", "main", "aside", "article", "form"):
             self.ctx.append(tag)
             self.stack.append((tag, True))
@@ -254,6 +259,14 @@ class _Parser(HTMLParser):
 
     def handle_endtag(self, tag):
         d = self.doc
+        if tag in ("header", "footer") and self.chrome_open:
+            # served with no link and almost no text: the page's header or footer is filled in by a script
+            for i in range(len(self.chrome_open) - 1, -1, -1):
+                if self.chrome_open[i][0] == tag:
+                    _, n_links, n_parts = self.chrome_open.pop(i)
+                    if len(d.links) == n_links and len(" ".join(self.body_text_parts[n_parts:]).strip()) < 40:
+                        d.empty_chrome.append(tag)
+                    break
         if tag == "head":
             self.in_body = True
         # pop stack to the matching tag (tolerate bad nesting)
@@ -400,6 +413,7 @@ class Document:
         self.microdata_hint = False
         self.overlay_candidates = []
         self.empty_root_containers = []
+        self.empty_chrome = []
         self.body_mpos = None        # markup fraction where <body> (or the first body-level tag) starts
         self.content_mpos = None     # markup fraction of the first visible content (text, heading, image): the viewport starts here
         self.stylesheets = []
@@ -547,6 +561,7 @@ class Document:
                 "internal_links": len(self.internal_links), "images": len(self.images), "jsonld_types": self.jsonld_types,
                 "jsonld_blocks": len(self.jsonld_raw), "script_bytes": self.script_bytes,
                 "external_scripts": len(self.external_scripts), "empty_root_containers": self.empty_root_containers,
+                "empty_chrome": self.empty_chrome,
                 "nav_count": self.nav_count, "forms": len(self.forms), "prices": len(self.price_mentions),
                 "noscript_blocks": len(self.noscript_texts), "meta_refresh": self.meta_refresh,
                 "body_onload": bool(self.body_attrs.get("onload"))}

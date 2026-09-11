@@ -2,7 +2,7 @@
 name: fact-extractability-audit
 description: Checks whether the specific facts an AI assistant would quote (what the brand does, price, contact, hours, specs) exist as plain, extractable text on the page rather than only in images, PDFs, or client-side rendering. Also validates JSON-LD structured data (parseable, required properties present), page self-identification (title, H1, meta description, Open Graph), image alt text, and FAQ-shaped content. Use when diagnosing why an assistant cannot quote a fact about a brand, or as the fact-extraction stage of a brand AI-readiness audit.
 license: MIT
-compatibility: Requires Python 3.8+ (standard library only). With --url it makes read-only GET requests under the shared fetch policy and respects robots.txt; with --workdir it reads existing snapshots and needs no network.
+compatibility: Requires Python 3.8+ (standard library only). With --url it makes read-only GET requests under the shared fetch policy and respects robots.txt; with --workdir it reads existing snapshots and needs no network. Imports the shared auditlib from ../audit-orchestrator/scripts; install it with audit-orchestrator.
 metadata:
   marketplace: brand-ai-readiness-audit
   concern: fact-extractability

@@ -124,6 +124,13 @@ CTA_VOCAB = {
     "corporate_enterprise": ["contact", "learn more", "explore", "careers"],
     "unknown": ["contact", "get started", "learn more"],
 }
+# Phrases that ask the visitor to act whatever kind of site it is. The table above says what a site of each kind
+# usually asks for; it is not a whitelist. Keying on the guessed category alone reported "no call to action" on a
+# corporate home page whose first screen said "Free trial". Kept to unambiguous conversion phrases: adding
+# "learn more" or "read" here would make every page pass.
+CTA_UNIVERSAL = ["free trial", "start free", "try free", "try it free", "sign up", "get started", "buy now",
+                 "add to cart", "shop now", "subscribe", "donate", "apply now", "admissions", "book a demo",
+                 "request a demo", "get a quote", "book now", "join now"]
 
 # Calls to action in the languages we can check. The category vocabulary above is English; on a
 # non-English page it finds nothing and the check would report "no call to action" about a site

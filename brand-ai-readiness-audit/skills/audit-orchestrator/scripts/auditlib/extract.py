@@ -87,7 +87,7 @@ AUDIENCE_RE = re.compile(r"\b(?:built|designed|made|created|tailored|perfect|ide
                          r"|\b(?:for|helps?|helping|serving|serves)\s+(?:[\w,.'’\-]+\s+){0,3}?(?:%s)\b" % (AUD_NOUNS, AUD_NOUNS), re.I)
 LOCATION_PHRASE_RE = re.compile(r"\b(?:based|headquartered|located|founded|offices?|serving|we\s+serve|operating)\s+(?:in|across|throughout|from)\s+"
                                 r"((?:[A-Z][\w\-.’']+)(?:[ ,]+(?:[A-Z][\w\-.’']+|and|the|of)){0,4})")
-MISSION_RE = re.compile(r"\b(our\s+mission|mission\s+is|we\s+exist\s+to|our\s+purpose|our\s+vision|we\s+believe|dedicated\s+to|committed\s+to|"
+MISSION_RE = re.compile(r"\b((?:the\s+)?mission\s+of\s+(?:the\s+)?[\w&.\-' ]{2,60}?\s+is\s+to|our\s+mission|mission\s+is|we\s+exist\s+to|our\s+purpose|our\s+vision|we\s+believe|dedicated\s+to|committed\s+to|"
                         r"we\s+work\s+to|founded\s+to|our\s+goal\s+is|our\s+aim\s+is|we\s+aim\s+to|we\s+strive\s+to)\b[^.!?\n]{10,220}", re.I)
 PARTICIPATE_RE = re.compile(r"\b(donate|give\s+now|give\s+today|make\s+a\s+(gift|donation)|apply\s+now|apply|admissions?|enrol|enroll|volunteer|join\s+us|"
                             r"join|become\s+a\s+member|membership|register|get\s+involved|support\s+us|sponsor|fundraise|take\s+action|sign\s+the\s+petition)\b", re.I)

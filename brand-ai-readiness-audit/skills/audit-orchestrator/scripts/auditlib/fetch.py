@@ -15,9 +15,11 @@ Guarantees:
 """
 import datetime as _dt
 import http.client
+import ipaddress
 import json
 import os
 import re
+import socket
 import socket
 import ssl
 import sys
@@ -74,6 +76,46 @@ HTML_TYPES = ("text/html", "application/xhtml+xml")
 ERRORS = ("connect_timeout", "read_timeout", "total_timeout", "too_many_redirects", "dns_failure",
           "connection_refused", "tls_error", "budget_exhausted", "unsupported_scheme", "time_budget",
           "network_disabled", "host_not_allowed", "unknown")
+# Language editions and country domains. A redirect from the bare domain to /en/ or en. is a language edition;
+# a country-code domain names its audience's language only where the country has one main language.
+_LANG_CODES = frozenset(["en", "fr", "de", "es", "it", "pt", "nl", "ja", "zh", "ko", "ru", "ar", "hi", "pl", "sv",
+                         "da", "no", "fi", "tr", "cs", "el", "he", "id", "th", "vi", "uk", "ro", "hu"])
+_CCTLD_LANGUAGE = {"fr": "fr", "de": "de", "at": "de", "es": "es", "mx": "es", "ar": "es", "cl": "es", "pe": "es",
+                   "it": "it", "nl": "nl", "pt": "pt", "br": "pt", "jp": "ja", "pl": "pl", "se": "sv", "dk": "da",
+                   "no": "no", "fi": "fi", "cz": "cs", "gr": "el", "tr": "tr", "ru": "ru", "kr": "ko", "hu": "hu",
+                   "ro": "ro"}
+
+
+def cctld_language(url):
+    """The language of a country-code domain where that is unambiguous (.fr -> fr), else None. Multilingual
+    countries (.ch, .be, .ca, .in) and generic domains (.com, .io, .co) return None."""
+    host = (urlsplit(url or "").hostname or "").lower()
+    return _CCTLD_LANGUAGE.get(host.rsplit(".", 1)[-1]) if "." in host else None
+
+
+def language_edition(seed_url, final_url):
+    """The language edition a redirect moved seed_url to ("en" for lemonde.fr -> /en/), or None.
+
+    Read from the first path segment or the leftmost host label, and only when the seed did not already name that
+    language: a user who asked for example.com/en/ was not redirected anywhere they did not ask for.
+    """
+    if not seed_url or not final_url:
+        return None
+
+    def lang_of(u):
+        parts = urlsplit(u)
+        host = parts.hostname or ""
+        labels = [x for x in parts.path.split("/") if x][:1] + (host.split(".")[:1] if host.count(".") >= 2 else [])
+        for label in labels:
+            code = label.lower().replace("_", "-").split("-")[0]
+            if len(label) in (2, 5) and code in _LANG_CODES:
+                return code
+        return None
+
+    before, after = lang_of(seed_url), lang_of(final_url)
+    return after if after and after != before else None
+
+
 WIKIDATA_HOST = "www.wikidata.org"
 WIKIPEDIA_HOST = "en.wikipedia.org"
 EXTERNAL_HOSTS = {WIKIDATA_HOST, WIKIPEDIA_HOST}  # entity probe only; robots.txt of these hosts is obeyed like any other
@@ -246,6 +288,7 @@ class Fetcher:
         self.min_delay = min_delay
         self.deadline = (time.monotonic() + time_budget) if time_budget else None
         self.headers = dict(DEFAULT_HEADERS)
+        self._private_cache = {}
         if user_agent:
             self.headers["User-Agent"] = user_agent
         self.verbose = verbose
@@ -269,6 +312,34 @@ class Fetcher:
     def allow_host(self, host):
         if host:
             self.allowed_hosts.add(host.lower())
+
+    def is_private_host(self, host):
+        """True for loopback, private, link-local and other non-public addresses, unless the environment allows them.
+
+        A tool pointed at any URL must not be usable to read a cloud metadata endpoint or a service on the machine
+        running it. The test suite serves its fixtures on 127.0.0.1 and sets BRAND_AUDIT_ALLOW_PRIVATE=1.
+        """
+        if os.environ.get("BRAND_AUDIT_ALLOW_PRIVATE") == "1":
+            return False
+        h = (host or "").strip("[]").lower()
+        if h in self._private_cache:
+            return self._private_cache[h]
+        verdict = h == "localhost" or h.endswith((".localhost", ".local", ".internal"))
+        if not verdict:
+            try:
+                infos = socket.getaddrinfo(h, None)
+            except (OSError, UnicodeError):
+                infos = []  # unresolvable: the normal path reports dns_failure
+            for info in infos:
+                try:
+                    ip = ipaddress.ip_address(str(info[4][0]).split("%")[0])
+                except ValueError:
+                    continue
+                if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified:
+                    verdict = True
+                    break
+        self._private_cache[h] = verdict
+        return verdict
 
     def host_allowed(self, host):
         h = (host or "").lower()
@@ -351,6 +422,10 @@ class Fetcher:
         if not token:
             r["skipped"] = "unknown_token"
             self._record(r, purpose); return r
+        if not self.offline and self.is_private_host(urlsplit(url).hostname):
+            r["error"] = "host_not_allowed"
+            r["note"] = "private_address"
+            self._record(r, purpose); return r
         if not self.offline:
             rob = self.robots(origin_of(url))
             if rob.state not in ("ok", "missing"):
@@ -403,6 +478,10 @@ class Fetcher:
             self.set_site(url)
         if not self.host_allowed(s.hostname):
             r["error"] = "host_not_allowed"
+            self._record(r, purpose); return r
+        if self.is_private_host(s.hostname):
+            r["error"] = "host_not_allowed"
+            r["note"] = "private_address"
             self._record(r, purpose); return r
         if check_robots:
             ok, rule = self.allowed_by_robots(url)

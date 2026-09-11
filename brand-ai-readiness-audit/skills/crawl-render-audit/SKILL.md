@@ -2,7 +2,7 @@
 name: crawl-render-audit
 description: Checks whether a non-JavaScript-executing fetcher (the kind used by most AI assistants) can reach and read a website. Detects robots.txt blocks on named AI bots by tier, blanket disallows, JavaScript-required entry gates, client-rendered shells with no server-rendered text, missing or broken sitemaps, noindex directives, and misdirected canonicals. Use when diagnosing why AI crawlers or assistants cannot access or read a site, or as the reachability stage of a brand AI-readiness audit.
 license: MIT
-compatibility: Requires Python 3.8+ (standard library only) and outbound HTTPS access. Read-only GET requests only. Respects robots.txt.
+compatibility: Requires Python 3.8+ (standard library only) and outbound HTTPS access. Read-only GET requests only. Respects robots.txt. Imports the shared auditlib from ../audit-orchestrator/scripts; install it with audit-orchestrator.
 metadata:
   marketplace: brand-ai-readiness-audit
   concern: reachability-and-readability

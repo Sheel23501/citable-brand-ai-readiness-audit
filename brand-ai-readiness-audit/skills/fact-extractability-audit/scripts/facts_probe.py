@@ -393,24 +393,43 @@ def check_jsonld(ctx, out, pages):
                  pages=pages_bad, page_roles=[p.role for p, _, _ in bad], references=[REFS["jsonld"]])
     else:
         out.check("fx.jsonld.malformed", "pass")
-    incomplete = []
+    incomplete, seen_nodes = [], set()
     for p in pages:
         for n, i in X.doc_top_nodes(p.doc):
             spec_type, missing, unmet = X.missing_required(n)
             if spec_type and (missing or unmet):
-                incomplete.append((p, i, spec_type, X.node_types(n), missing, unmet))
+                # the same node is often repeated -- once per page that embeds the site-wide graph, or several
+                # times in one @graph -- and listing it four times reads as four defects
+                key = n.get("@id") or json.dumps(n, sort_keys=True, ensure_ascii=False, default=str)[:500]
+                if key in seen_nodes:
+                    continue
+                seen_nodes.add(key)
+                incomplete.append((p, i, spec_type, X.node_types(n), missing, unmet, n))
     if incomplete:
-        desc = "; ".join("%s on %s lacks %s" % (types[0], p.role, ", ".join(missing + ["|".join(g) for g in unmet])) for p, i, st, types, missing, unmet in incomplete[:4])
-        out.fail("fx.jsonld.required_props_missing",
+        # every node names itself and lacks only an offers/rating/review group: that is Google's rich-result
+        # condition for the type, not an identity gap, and it must not outrank real findings
+        only_optional = all(not inc[4] for inc in incomplete)
+        why = ("Each listed node already says what it is; what it lacks (offers, a rating or reviews) is what Google "
+               "requires before it shows a rich result for that type. It does not stop an assistant identifying the "
+               "brand, so this is polish, not an identity gap." if only_optional else
+               "A node without its identifying properties tells a machine that something exists but not what it is "
+               "called or what it offers, so it cannot be matched to the brand or quoted.")
+        desc = "; ".join("%s on %s lacks %s" % (types[0], p.role, ", ".join(missing + ["|".join(g) for g in unmet])) for p, i, st, types, missing, unmet, n in incomplete[:4])
+        f = out.fail("fx.jsonld.required_props_missing",
                  title="%d JSON-LD node%s lack%s required properties" % (len(incomplete), "s" if len(incomplete) != 1 else "", "" if len(incomplete) != 1 else "s"),
                  evidence=desc + ".",
-                 evidence_items=[evidence_item(p.final_url, "jsonld_excerpt", json.dumps({k: v for k, v in list(_node_preview(p, i, types).items())[:6]}, ensure_ascii=False)[:280],
-                                               location="script[type=application/ld+json][%d]" % (i + 1), note="missing: %s" % ", ".join(missing + ["|".join(g) for g in unmet])) for p, i, st, types, missing, unmet in incomplete[:4]],
-                 why="A node without its identifying properties tells a machine that something exists but not what it is called or what it offers, so it cannot be matched to the brand or quoted.",
+                 evidence_items=[evidence_item(p.final_url, "jsonld_excerpt", json.dumps(dict(list(_node_dict_preview(n).items())[:6]), ensure_ascii=False)[:280],
+                                               location="script[type=application/ld+json][%d]" % (i + 1), note="missing: %s" % ", ".join(missing + ["|".join(g) for g in unmet])) for p, i, st, types, missing, unmet, n in incomplete[:4]],
+                 why=why,
                  action="Add the missing properties to each listed node.",
                  detail="For each node add: %s. Validate with the Schema Markup Validator and Google's Rich Results Test." % "; ".join(
-                     "%s → %s" % (st, ", ".join(missing + [" or ".join(g) for g in unmet])) for p, i, st, types, missing, unmet in incomplete[:4]),
+                     "%s → %s" % (st, ", ".join(missing + [" or ".join(g) for g in unmet])) for p, i, st, types, missing, unmet, n in incomplete[:4]),
                  pages=sorted({p.final_url for p, *_ in incomplete}), page_roles=[p.role for p, *_ in incomplete], references=[REFS["jsonld"]])
+        if only_optional and f and f.get("severity") not in ("low", "info"):
+            from auditlib.findings import impact_for, priority_for
+            f["severity"] = "low"
+            f["suggested_action"]["impact"] = impact_for("low")
+            f["suggested_action"]["priority"] = priority_for("low", f.get("confidence"))
     else:
         out.check("fx.jsonld.required_props_missing", "pass")
     anchor_pages = [p for p in pages if p.role in ("home", "about")] or pages[:1]
@@ -428,6 +447,11 @@ def check_jsonld(ctx, out, pages):
                  action="Add an Organization JSON-LD node (name, url, logo, sameAs) to the home page.",
                  detail="One block in the home page <head> is enough; reference it from other nodes via publisher or provider.",
                  pages=[p.final_url for p in anchor_pages], page_roles=[p.role for p in anchor_pages], references=[REFS["jsonld"]])
+
+
+def _node_dict_preview(node):
+    """Scalar fields of one node, for an evidence excerpt; nested values are elided."""
+    return {k: (v if isinstance(v, (str, int, float)) else "…") for k, v in node.items()}
 
 
 def _node_preview(page, block_index, types):

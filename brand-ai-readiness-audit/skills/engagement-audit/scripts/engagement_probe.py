@@ -31,7 +31,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.normpath(os.path.join(HERE, "..", "..", "audit-orchestrator", "scripts")))
 
 from auditlib import extract as X  # noqa: E402
-from auditlib.categories import (CTA_VOCAB, CTA_VOCAB_BY_LANG, CTA_LANGS_SUPPORTED, CATEGORY_NOUNS, OFFER_VERBS, TRUST_SIGNALS, TRUST_SIGNALS_DEFAULT,  # noqa: E402
+from auditlib.categories import (CTA_VOCAB, CTA_VOCAB_BY_LANG, CTA_LANGS_SUPPORTED, CTA_UNIVERSAL, CATEGORY_NOUNS, OFFER_VERBS, TRUST_SIGNALS, TRUST_SIGNALS_DEFAULT,  # noqa: E402
                                  engagement_cap, is_key_page, category_label)
 from auditlib.cli import probe_main  # noqa: E402
 from auditlib.fetch import Fetcher, normalize_url, registrable_domain  # noqa: E402
@@ -58,7 +58,7 @@ LISTING_MIN_LINKS = 6               # a page listing this many internal links in
 BLOCKED_CLUSTER_MIN = 3
 BROKEN_ERRORS = ("dns_failure", "connect_timeout", "read_timeout", "total_timeout", "connection_refused", "tls_error", "too_many_redirects")
 SEARCH_INPUT_NAMES = {"q", "s", "search", "query", "keyword", "keywords", "term"}
-STOPWORDS = {"this", "that", "with", "from", "your", "have", "will", "about", "home", "page", "more", "what", "when", "where",
+STOPWORDS = {"this", "that", "with", "from", "your", "have", "will", "home", "page", "more", "what", "when", "where",
              "which", "their", "there", "they", "them", "then", "than", "into", "over", "also", "just", "only", "some", "such",
              "very", "here", "been", "were", "being", "after", "before", "other", "every", "each", "because", "while", "these",
              "those", "would", "could", "should", "welcome", "official", "site", "website"}
@@ -130,7 +130,8 @@ def _cta_re(category, lang=None):
     vocab = list(CTA_VOCAB.get(category) or CTA_VOCAB["unknown"])
     if lang and lang != "en":
         vocab += CTA_VOCAB_BY_LANG.get(lang, [])
-    return re.compile(r"\b(?:%s)\b" % "|".join(re.escape(v).replace(r"\ ", r"\s+") for v in vocab), re.I), vocab
+    words = vocab + [v for v in CTA_UNIVERSAL if v not in vocab]   # vocab stays category-first for the messages
+    return re.compile(r"\b(?:%s)\b" % "|".join(re.escape(v).replace(r"\ ", r"\s+") for v in words), re.I), vocab
 
 
 def _network_enabled(ctx, args):
@@ -273,8 +274,15 @@ def check_hero(ctx, out, usable, excluded, work):
           pages=[home.final_url], page_roles=["home"], confidence=conf)
 
 
-def cta_hits(doc, rx, vocab):
+def cta_hits(doc, rx, vocab, role=None):
     hits = []
+    if role == "contact":
+        # a contact page's call to action is the contact method itself, wherever it sits on the page: sipgate.de
+        # shows its number as a tel: link in the header and was told its contact page asked for nothing
+        for l in doc.links:
+            scheme = urlsplit(l.url).scheme
+            if not l.in_head and scheme in ("tel", "mailto"):
+                hits.append((scheme, l.text or l.url))
     for l in doc.links:
         if l.in_head:
             continue
@@ -294,7 +302,7 @@ def cta_hits(doc, rx, vocab):
             hits.append(("button", b["text"]))
     for f in doc.forms:
         frac = doc.body_frac(f.get("mpos"))
-        if frac is None or frac > FIRST_VIEWPORT_FRAC or f.get("role") == "search":
+        if frac is None or frac > FIRST_VIEWPORT_FRAC or is_search_form(f):
             continue
         inputs = [i for i in f["inputs"] if i["type"] not in ("hidden", "submit", "button", "search")]
         if any((i.get("name") or "").lower() not in SEARCH_INPUT_NAMES for i in inputs):
@@ -320,7 +328,7 @@ def check_cta(ctx, out, usable, work):
     rx, vocab = _cta_re(ctx.category, lang=lang)
     failing, items, seen = [], [], []
     for p in pages:
-        hits = cta_hits(p.doc, rx, vocab)
+        hits = cta_hits(p.doc, rx, vocab, role=p.role)
         early = [l.text for l in p.doc.links if not l.in_head and p.doc.body_frac(l.mpos) is not None and p.doc.body_frac(l.mpos) <= FIRST_VIEWPORT_FRAC and l.text]
         work.setdefault("cta", {})[p.final_url] = {"role": p.role, "hits": hits[:5], "first_viewport_links": len(early)}
         if hits:
@@ -387,13 +395,32 @@ def check_landmark(ctx, out, usable, excluded, work):
           pages=[page.final_url], page_roles=[page.role], references=[REFS["nav"]])
 
 
+# A search box is recognised by what its markup calls it, in any of the audit's languages. Drupal names its box
+# search_block_form, WordPress uses s, and many CMSs put the word only in the form id, action or placeholder: a
+# name whitelist reported "no site search" on a university site with a working search box in its header.
+SEARCH_WORD_RE = re.compile(r"search|suche|recherch|buscar|busca|cerca|ricerca|zoek|pesquis|搜索|検索", re.I)
+
+
+def is_search_form(f):
+    if f.get("role") == "search":
+        return True
+    if SEARCH_WORD_RE.search(" ".join([f.get("id") or "", f.get("cls") or "", f.get("label") or "",
+                                       urlsplit(f.get("action") or "").path])):
+        return True
+    for i in f["inputs"]:
+        if i["type"] == "search" or (i.get("name") or "").lower() in SEARCH_INPUT_NAMES:
+            return True
+        if SEARCH_WORD_RE.search(" ".join([i.get("name") or "", i.get("id") or "", i.get("placeholder") or "",
+                                           i.get("label") or ""])):
+            return True
+    return False
+
+
 def has_site_search(doc):
     if doc.search_roles > 0:
         return "role_search"
-    for f in doc.forms:
-        for i in f["inputs"]:
-            if i["type"] == "search" or (i.get("name") or "").lower() in SEARCH_INPUT_NAMES:
-                return "search_form"
+    if any(is_search_form(f) for f in doc.forms):
+        return "search_form"
     return None
 
 

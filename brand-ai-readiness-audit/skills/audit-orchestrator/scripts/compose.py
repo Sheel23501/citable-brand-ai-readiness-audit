@@ -33,6 +33,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 from auditlib import __version__  # noqa: E402
+from auditlib.fetch import language_edition as _language_edition  # noqa: E402
 from auditlib.categories import (AUDIENCE_FACT, AUDIENCE_PHRASE, CTA_LANGS_SUPPORTED, FACT_ROLES, KEY_FACTS,  # noqa: E402
                                  SIMULATION_QUESTIONS, category_label, key_pages)
 from auditlib.findings import (SEVERITIES, Registry, ProbeOutput, evidence_item,  # noqa: E402
@@ -583,7 +584,7 @@ def sample_language(sample):
     """The language the sampled pages are actually written in, as a bare subtag, or None if unclear.
 
     The declared lang attribute is the stated answer and the word counts are the observed one. Real sites
-    get this wrong often enough to matter -- lemonde.fr serves lang="en" on pages that are entirely French
+    get this wrong often enough to matter -- a page can keep its template's lang attribute while its words are in another language
     -- so where the text disagrees with the attribute, the text wins: it is what an assistant reading the
     page would see. Majority across sampled pages, so one stray consent page cannot flip a site.
     """
@@ -599,6 +600,36 @@ def sample_language(sample):
         if votes:
             return collections.Counter(votes).most_common(1)[0][0]
     return None
+
+
+# Visitor-facing checks whose evidence lives in the page chrome: the header (navigation, search, the call to action)
+# and the footer (terms, privacy, address, copyright year, the way on from a 404). When the served HTML leaves both
+# for a script to fill in, these read an empty frame, not the page a visitor sees.
+CHROME_DEPENDENT = ("en.nav.landmark_missing", "en.nav.site_search_missing", "en.nav.breadcrumbs_missing",
+                    "en.nav.related_links_missing", "en.cta.missing", "en.trust.signals_missing",
+                    "en.errors.unhelpful_404", "ef.freshness.no_visible_dates")
+
+
+def apply_render_gate(findings, checks, sample):
+    """Withdraw chrome-dependent failures when the home page's header or footer is served empty and filled by script.
+
+    The signal is structural, not a guess: a <header> or <footer> that arrives with no link and almost no text, no
+    <nav> anywhere in the served HTML, and at least one external script. adobe.com was told it had no navigation,
+    no search and no privacy link because its header and footer are assembled in the browser. The checks get no
+    verdict (reason chrome_rendered_by_javascript) and the limitations say what a non-JavaScript reader misses.
+    Returns the withdrawn check ids.
+    """
+    home = next((p for p in sample.get("pages") or [] if p.get("role") == "home"), None)
+    summ = (home or {}).get("summary") or {}
+    if not (summ.get("empty_chrome") and not summ.get("nav_count") and (summ.get("external_scripts") or 0) > 0):
+        return []
+    gated = []
+    for f in findings:
+        if f.get("check_id") in CHROME_DEPENDENT and f.get("status") == "fail":
+            _gate_not_evaluated(f, checks, "chrome_rendered_by_javascript")
+            gated.append(f["check_id"])
+    findings[:] = [f for f in findings if not f.get("_gated")]
+    return gated
 
 
 def apply_language_gate(findings, checks, sample):
@@ -953,36 +984,14 @@ def non_coverage_lines():
     return lines
 
 
-_LANG_CODES = frozenset(["en", "fr", "de", "es", "it", "pt", "nl", "ja", "zh", "ko", "ru", "ar", "hi", "pl", "sv",
-                         "da", "no", "fi", "tr", "cs", "el", "he", "id", "th", "vi", "uk", "ro", "hu"])
-
-
 def language_edition(page):
-    """The language edition a redirect sent the home URL to ("en" for lemonde.fr -> /en/), or None.
-
-    Read from the first path segment or the leftmost host label, and only when the seed URL did not already
-    name that language: a user who asked for example.com/en/ was not redirected anywhere they did not ask for.
-    """
-    if not page or not page.get("final_url") or not page.get("url"):
+    """The language edition a redirect sent the home URL to ("en" for lemonde.fr -> /en/), or None."""
+    if not page:
         return None
-    seed, final = urlsplit(page["url"]), urlsplit(page["final_url"])
-
-    def lang_of(labels):
-        for label in labels:
-            code = label.lower().replace("_", "-").split("-")[0]
-            if len(label) in (2, 5) and code in _LANG_CODES:
-                return code
-        return None
-
-    def labels(u):
-        host = u.hostname or ""
-        return [x for x in u.path.split("/") if x][:1] + (host.split(".")[:1] if host.count(".") >= 2 else [])
-
-    before, after = lang_of(labels(seed)), lang_of(labels(final))
-    return after if after and after != before else None
+    return _language_edition(page.get("url"), page.get("final_url"))
 
 
-def build_limitations(sample, probes, checks, gated_lang=None, category=None):
+def build_limitations(sample, probes, checks, gated_lang=None, category=None, chrome_gated=None):
     """report_schema.md section 3b: the boilerplate that applies, then section 5 non-coverage."""
     pages = sample.get("pages") or []
     out = ["This report reflects a single point-in-time fetch of %d sampled page%s; personalised or A/B-tested "
@@ -997,6 +1006,11 @@ def build_limitations(sample, probes, checks, gated_lang=None, category=None):
         out.append("The home URL redirected to %s, the site's '%s' language edition, although the audit asked for no "
                    "particular language. Every finding describes that edition, which may not be the one most of the "
                    "site's own audience reads." % (home.get("final_url"), edition))
+    if chrome_gated:
+        out.append("The home page's header and footer are empty in the HTML served without JavaScript and are filled in "
+                   "by scripts, so %d visitor-facing check%s had no verdict (%s): a person with a browser sees what the "
+                   "scripts add. An assistant or crawler that does not run JavaScript sees none of it."
+                   % (len(chrome_gated), "" if len(chrome_gated) == 1 else "s", ", ".join(chrome_gated)))
     category = category or (sample.get("site_category") or {}).get("value") or "unknown"
     by_role = sorted(cid for cid, c in checks.items() if c.get("reason") == "role_page_not_sampled")
     if by_role:
@@ -1135,6 +1149,7 @@ def compose(workdir, wall_clock=None, input_url=None, category_override=None):
     # scope absence claims to what was actually read, before ordering assigns ids and ranks
     findings = apply_absence_gate(findings, checks, sample, category, facts)
     gated_lang = apply_language_gate(findings, checks, sample)
+    chrome_gated = apply_render_gate(findings, checks, sample)
 
     kept, folded = dedupe(findings, sample, category)
     kept = sort_findings(kept)
@@ -1198,7 +1213,7 @@ def compose(workdir, wall_clock=None, input_url=None, category_override=None):
         "proactive_recommendations": build_recommendations(category, facts, checks, kept, sample),
         "ai_answer_simulation": simulation,
         "narrative_summary": "",
-        "limitations": build_limitations(sample, probes, checks, gated_lang, category),
+        "limitations": build_limitations(sample, probes, checks, gated_lang, category, chrome_gated),
         "suppressed_findings": folded,
         "run": {"wall_clock_seconds": wall_clock, "requests_made": sample.get("requests_made"),
                 "probe_errors": probe_errors},
@@ -1349,8 +1364,14 @@ def render_markdown(report):
         L.append("Not applicable to %s: " % category_label((report.get("site_category") or {}).get("value", "unknown"))
                  + ", ".join("`%s`" % e["check_id"] for e in cov["not_applicable_for_category"]))
         L.append("")
-    for line in report.get("limitations") or []:
-        L.append("- %s" % line)
+    limits = report.get("limitations") or []
+    for line in limits:
+        if not line.startswith("Not covered: "):
+            L.append("- %s" % line)
+    gaps = [line[len("Not covered: "):].split(". ")[0].rstrip(".") for line in limits if line.startswith("Not covered: ")]
+    if gaps:
+        # one line in the report; the reason for each gap stays in report.json under limitations
+        L.append("- Outside this audit's scope: %s. Each is explained in report.json under limitations." % "; ".join(gaps))
     L.append("")
     return "\n".join(L)
 

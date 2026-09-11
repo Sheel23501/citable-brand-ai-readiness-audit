@@ -17,7 +17,7 @@ import re
 import zlib
 from urllib.parse import urlsplit, urljoin
 
-from .fetch import PROBE_USER_AGENTS, normalize_url, origin_of, registrable_domain
+from .fetch import PROBE_USER_AGENTS, cctld_language, normalize_url, origin_of, registrable_domain
 from .htmldoc import Document
 
 MAX_PAGES = 6
@@ -204,10 +204,34 @@ def _parse_sitemap(body):
     return kind, locs
 
 
+# Specialised sitemaps list one slice of a site (a product line, the news feed, one language folder); the role
+# pages the audit needs -- about, contact, pricing -- sit in the site-wide one. robots.txt order says nothing
+# about which is which, and with two sitemap requests to spend, taking them in listed order can spend both on a
+# product index and never reach a home sitemap listed four lines later.
+_SITEMAP_SPECIFIC = frozenset(["news", "image", "images", "video", "videos", "product", "products", "catalog",
+                               "catalogue", "feed", "podcast", "event", "events", "author", "authors", "tag", "tags",
+                               "category", "categories", "archive"])
+_SITEMAP_GENERAL = frozenset(["home", "main", "page", "pages", "site", "general", "core", "www", "static"])
+
+
+def _sitemap_rank(url):
+    """Lower is tried first: root-level site-wide names, other root-level names, then subfolders; a name that
+    announces one content slice goes last. sorted() is stable, so ties keep robots.txt order."""
+    parts = [p for p in urlsplit(url).path.lower().split("/") if p]
+    stem = re.sub(r"\.(xml|txt)(\.gz)?$", "", parts[-1] if parts else "")
+    words = set(re.split(r"[^a-z]+", stem)) - {""}
+    rank = 0 if stem in ("sitemap", "sitemap_index", "sitemap-index", "sitemapindex") else (1 if words & _SITEMAP_GENERAL else 2)
+    if len(parts) > 1:
+        rank += 2
+    if words & _SITEMAP_SPECIFIC:
+        rank += 4
+    return rank
+
+
 def discover_sitemap(fetcher, origin, robots):
     """Follow fetch_policy: robots Sitemap lines first, else /sitemap.xml then /sitemap_index.xml. <= 2 requests."""
     candidates = list(robots.sitemaps) if robots.state == "ok" and robots.sitemaps else []
-    candidates = [c for c in candidates if urlsplit(c).scheme in ("http", "https")]
+    candidates = sorted((c for c in candidates if urlsplit(c).scheme in ("http", "https")), key=_sitemap_rank)
     if not candidates:
         candidates = [origin + "/sitemap.xml", origin + "/sitemap_index.xml"]
     result = {"state": "missing", "url": None, "url_count": 0, "urls": [], "path": None, "from_robots": bool(robots.sitemaps)}
@@ -482,6 +506,14 @@ def probe_edge_access(fetcher, url, home_r, robots):
 def _sample(fetcher, url, category_override, save, manifest):
     url = normalize_url(url)
     fetcher.set_site(url)
+    # A country-code domain whose language is unambiguous is fetched in that language first. With no preference a
+    # multilingual site may answer with its English edition (lemonde.fr sends such a request to /en/), and the audit
+    # would grade an edition most of the site's own audience never reads.
+    lang = cctld_language(url)
+    if lang:
+        fetcher.headers["Accept-Language"] = "%s,*;q=0.5" % lang
+        manifest["notes"].append("asked for '%s' first, the language of the .%s domain"
+                                 % (lang, (urlsplit(url).hostname or "").rsplit(".", 1)[-1]))
     home_r = fetcher.get(url, purpose="page", save_as="snapshots/home.html" if save else None)
     site_origin = origin_of(home_r.get("final_url") or url)
     manifest["site"] = site_origin

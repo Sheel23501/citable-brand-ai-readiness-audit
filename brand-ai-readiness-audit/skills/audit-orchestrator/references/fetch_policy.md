@@ -28,6 +28,15 @@ bot protection treats it as a bot signal (lemonde.fr served a 3 KB stub instead
 of its 270 KB page). A site that still redirects to a language edition is named
 in the report's limitations.
 
+On a country-code domain whose language is unambiguous (`.fr`, `.de`, `.es`,
+`.it`, `.nl`, `.jp` and a few more) that language is asked for first, the way a
+visitor from that country would.
+
+Private, loopback and link-local addresses are refused (`host_not_allowed`)
+before any connection, so the audit cannot be pointed at a cloud metadata
+endpoint or a service on the machine running it. The test suite, whose
+fixtures are served on 127.0.0.1, sets `BRAND_AUDIT_ALLOW_PRIVATE=1`.
+
 The audit never impersonates a browser beyond the compatibility prefix. The
 one place it announces another agent's token is the edge-access probe
 (`cr.access.edge_block`): at most three GETs of the home URL, each announcing

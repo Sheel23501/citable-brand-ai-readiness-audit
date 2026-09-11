@@ -110,7 +110,7 @@ def check_robots(ctx, out):
                  evidence_items=[evidence_item("robots.txt", "robots_rule", "User-agent: %s / %s" % (g["token"], g["root_rule"])) for g in by_tier["live_answer"]],
                  why="These user agents are the ones assistants use to read a page while answering a user's question. A block here means the assistant cannot quote the site even when it wants to. The brand is invisible at answer time.",
                  action="Allow %s on '/' in robots.txt, or scope their Disallow to genuinely private paths." % ", ".join(toks),
-                 detail="For each listed token, remove 'Disallow: /' from its group or add 'Allow: /' with narrower Disallow lines. Blocking training-only bots (GPTBot, ClaudeBot, CCBot) is a separate decision and can stay.",
+                 detail="For each listed token, remove 'Disallow: /' from its group or add 'Allow: /' with narrower Disallow lines. Blocking training-only bots (GPTBot, ClaudeBot, CCBot) is a separate decision and can stay. If this block is a deliberate licensing or content-policy decision, keep it: the finding states what it costs in assistant answers, not that it is a mistake.",
                  extra_adjust=["all_live_answer_blocked:critical"] if all_blocked else None,
                  references=[REFS["robots"]])
         if all_blocked:
@@ -446,7 +446,7 @@ def check_render(ctx, out):
         out.fail("cr.render.csr_shell",
                  title="%s %s a client-rendered shell with no server-rendered text" % (
                      "The home page" if home_hit and len(shells) == 1 else ("Every sampled page" if len(shells) == len(ctx.html_pages) and len(shells) > 1 else "%d sampled page%s" % (len(shells), "s" if len(shells) != 1 else "")),
-                     "is" if (home_hit and len(shells) == 1) or (len(shells) == len(ctx.html_pages) and len(shells) > 1) else "are"),
+                     "is" if len(shells) == 1 or (len(shells) == len(ctx.html_pages) and len(shells) > 1) else "are"),
                  evidence="%d page%s serve%s under %d words of visible text together with a framework root container or script-heavy body (%s). The content exists only after JavaScript runs." % (
                      len(shells), "s" if len(shells) != 1 else "", "" if len(shells) != 1 else "s", THIN_WORDS, "; ".join(sorted({s.split(":")[0] for _, sig in shells for s in sig}))),
                  evidence_items=[evidence_item(p.final_url, "computed", "visible_words=%d; script_bytes=%d; external_scripts=%d; signals=%s" % (

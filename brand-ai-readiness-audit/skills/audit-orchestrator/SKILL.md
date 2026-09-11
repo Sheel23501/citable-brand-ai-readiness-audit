@@ -21,8 +21,10 @@ from what a non-JavaScript fetcher receives; nothing is modified, nothing is
 submitted, no assistant is queried.
 
 Do not use it for a single page, a PDF, an app store listing, or a site the
-user cannot legitimately audit. It never impersonates a bot or bypasses a
-challenge page.
+user cannot legitimately audit. It never bypasses a
+challenge page. The edge-access check is the one place it sends another user
+agent: each AI crawler's published string, once, to the home page, and only for
+tokens the site's robots.txt allows.
 
 ## Inputs
 

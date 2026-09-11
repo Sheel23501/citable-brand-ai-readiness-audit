@@ -1720,6 +1720,70 @@ def stage_extract(res):
     res.check(_C.language_edition({"url": "https://x.example/en/", "final_url": "https://x.example/en/"}) is None
               and _C.language_edition({"url": "https://x.example/", "final_url": "https://x.example/blog/"}) is None,
               "compose: no edition when the seed named it, or the path is not a language")
+
+    # Sitemaps: site-wide before specialised, whatever order robots.txt lists them in.
+    from auditlib.sampler import _sitemap_rank
+    listed = ["https://a.example/cc-product.index.xml", "https://a.example/creativecloud/sitemap-index.xml",
+              "https://a.example/home-sitemap.xml", "https://a.example/plans-catalog-sitemap.xml"]
+    res.check(sorted(listed, key=_sitemap_rank)[0].endswith("/home-sitemap.xml"),
+              "sampler: a root home sitemap is tried before a product index listed first")
+    res.check(sorted(["https://b.example/sitemap_news.xml", "https://b.example/sitemap_index.xml"], key=_sitemap_rank)[0]
+              .endswith("/sitemap_index.xml"), "sampler: the site index is tried before the news sitemap")
+
+    # Mission stated as "The mission of X is to", and near misses that are not a mission statement.
+    res.check(bool(X.MISSION_RE.search("The mission of the Python Software Foundation is to promote, protect, and advance Python.")),
+              "mission: 'The mission of X is to' is a mission statement")
+    res.check(not X.MISSION_RE.search("Mission of Burma tour dates announced for the autumn."),
+              "mission: a band name is not a mission statement")
+
+    # Engagement: search boxes by markup, calls to action beyond the category list, contact methods.
+    import importlib.util as _ilu
+    _spec = _ilu.spec_from_file_location("_ep_t", os.path.join(ROOT, "skills", "engagement-audit", "scripts", "engagement_probe.py"))
+    _EP = _ilu.module_from_spec(_spec); _spec.loader.exec_module(_EP)
+    _u = "https://x.example/"
+    res.check(bool(_EP.has_site_search(Document('<form id="search-block-form" action="/"><input type="text" name="search_block_form">'
+                                                '<input type="submit" value="Search"></form>', base_url=_u))),
+              "engagement: Drupal's search-block-form is a site search")
+    res.check(not _EP.has_site_search(Document('<form id="newsletter" action="/subscribe"><input type="email" name="email"></form>', base_url=_u)),
+              "engagement: a newsletter form is not a site search")
+    _rx, _vocab = _EP._cta_re("corporate_enterprise")
+    res.check(bool(_EP.cta_hits(Document('<body><header><a href="/trial">Free trial</a></header>' + "<p>text</p>" * 40 + "</body>", base_url=_u), _rx, _vocab)),
+              "engagement: 'Free trial' is a call to action whatever the category")
+    _rx2, _vocab2 = _EP._cta_re("saas_software")
+    res.check(bool(_EP.cta_hits(Document("<body>" + "<p>text</p>" * 40 + '<a href="tel:+4921163553355">0211 - 63 55 33 55</a></body>', base_url=_u),
+                                _rx2, _vocab2, role="contact")),
+              "engagement: a contact page's tel: link is its call to action")
+
+    # Header and footer served empty, and the gate that follows from it.
+    res.check(Document("<body><header></header><main><p>Hello there, world.</p></main><footer></footer></body>", base_url=_u).empty_chrome
+              == ["header", "footer"], "htmldoc: a header and footer served empty are recorded")
+    res.check(Document('<body><header><a href="/a">About</a></header><footer>Example Ltd, 1 Road, Town, 2026, all rights reserved</footer></body>',
+                       base_url=_u).empty_chrome == [], "htmldoc: a header with links and a footer with text are not empty")
+    _fs = [{"check_id": "en.nav.landmark_missing", "status": "fail"}, {"check_id": "cr.robots.index_bot_blocked", "status": "fail"}]
+    _cs = {"en.nav.landmark_missing": {"status": "fail"}, "cr.robots.index_bot_blocked": {"status": "fail"}}
+    _sm = {"pages": [{"role": "home", "summary": {"empty_chrome": ["header", "footer"], "nav_count": 0, "external_scripts": 2}}]}
+    res.check(_C.apply_render_gate(_fs, _cs, _sm) == ["en.nav.landmark_missing"] and [f["check_id"] for f in _fs] == ["cr.robots.index_bot_blocked"]
+              and _cs["en.nav.landmark_missing"]["status"] == "not_evaluated",
+              "compose: a script-built header withdraws the navigation finding and leaves robots findings alone")
+    _sm2 = {"pages": [{"role": "home", "summary": {"empty_chrome": ["header"], "nav_count": 2, "external_scripts": 2}}]}
+    res.check(_C.apply_render_gate([{"check_id": "en.nav.landmark_missing", "status": "fail"}], {}, _sm2) == [],
+              "compose: an empty header on a page with a real <nav> is not a script-built page")
+
+    # Country domains and private addresses.
+    from auditlib.fetch import cctld_language
+    res.check(cctld_language("https://www.lemonde.fr/") == "fr" and cctld_language("https://www.sipgate.de/") == "de"
+              and cctld_language("https://www.adobe.com/") is None and cctld_language("https://x.ch/") is None,
+              "fetch: a country domain names its language only where that is unambiguous")
+    _prev = os.environ.pop("BRAND_AUDIT_ALLOW_PRIVATE", None)
+    try:
+        _g = _F(site="http://127.0.0.1:9/")
+        res.check(_g.is_private_host("127.0.0.1") and _g.is_private_host("169.254.169.254") and _g.is_private_host("localhost"),
+                  "fetch: loopback, link-local and localhost count as private")
+        res.check(not _g.is_private_host("93.184.216.34"), "fetch: a public address is not private")
+        res.check(_g.get("http://127.0.0.1:9/").get("error") == "host_not_allowed", "fetch: a private URL is refused before connecting")
+    finally:
+        if _prev is not None:
+            os.environ["BRAND_AUDIT_ALLOW_PRIVATE"] = _prev
     ld = mk('<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","name":"Acme","url":"https://x.example/","logo":"l.png"},{"@type":"BlogPosting","headline":"Hi","publisher":{"@type":"Organization","name":"Acme"}},{"@type":"SoftwareApplication","applicationCategory":"BusinessApplication"}]}</script>')
     nodes = X.doc_top_nodes(ld.doc)
     res.check(len(nodes) == 3, "top_level_nodes: @graph members only, nested publisher excluded (%d)" % len(nodes))
@@ -1960,8 +2024,12 @@ def stage_probe_en(res, farm):
     res.check(f is not None and f["severity"] == "medium" and f["confidence"] == "medium" and "Welcome friends" in f["evidence"] and "h1_too_short" in json.dumps(f["evidence_items"]) and "lead_text_no_offer" in json.dumps(f["evidence_items"]),
               "en/weak-engagement: hero unclear with two signals => medium confidence", f["evidence"] if f else None)
     f = finding(we, "en.cta.missing")
-    res.check(f is not None and f["severity"] == "medium" and len(f["affected_pages"]) == 5 and "search" not in json.dumps(f["evidence_items"]).lower().split("matched=0")[0][-40:],
-              "en/weak-engagement: cta_missing on all five key pages (search form never counts)", str(f and f["affected_pages"]))
+    # Four key pages, not five: the contact page's mailto: link is its call to action, so it passes. The rest
+    # of the site offers nothing to act on, and a search box is never a call to action.
+    res.check(f is not None and f["severity"] == "medium" and len(f["affected_pages"]) == 4
+              and not any("/contact" in u for u in f["affected_pages"])
+              and "search" not in json.dumps(f["evidence_items"]).lower().split("matched=0")[0][-40:],
+              "en/weak-engagement: cta_missing on the four key pages with nothing to act on", str(f and f["affected_pages"]))
     res.check(sev(we, "en.nav.landmark_missing") == "low" and conf(we, "en.nav.landmark_missing") == "high", "en/weak-engagement: landmark_missing low/high")
     f = finding(we, "en.links.broken_sampled")
     res.check(f is not None and f["severity"] == "medium" and f["confidence"] == "high" and "/old-pricing" in json.dumps(f["evidence_items"]) and "404" in f["evidence"],
@@ -2051,6 +2119,14 @@ def stage_probe_en(res, farm):
 STAGES = {"manifest": None, "serve": None, "variants": None, "robots": None, "htmldoc": None, "extract": None, "fetch": None, "sample": None, "probe_cr": None, "probe_fx": None, "probe_ef": None, "probe_en": None, "compose": None, "validate": None, "run_audit": None, "scripts": None, "live": None}
 
 
+def _remove_new_run_dirs(before):
+    """CLI cases that exercise the default workdir create audit-<host>/ in the package root; remove this run's."""
+    import glob as _glob
+    import shutil
+    for d in set(_glob.glob(os.path.join(ROOT, "audit-*"))) - before:
+        shutil.rmtree(d, ignore_errors=True)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="brand-ai-readiness-audit test runner")
     ap.add_argument("--stage", choices=sorted(STAGES), action="append", help="run only these stages")
@@ -2059,6 +2135,10 @@ def main(argv=None):
     ap.add_argument("--live", nargs="*", metavar="URL", help="also run the live stage against these sites")
     args = ap.parse_args(argv)
     os.environ["BRAND_AUDIT_EXTERNAL"] = "0"  # the suite never contacts Wikipedia/Wikidata; the entity lookup is unit-tested on canned responses
+    os.environ["BRAND_AUDIT_ALLOW_PRIVATE"] = "1"  # fixtures are served on 127.0.0.1; the guard itself is unit-tested with this unset
+    import atexit
+    import glob as _glob
+    atexit.register(_remove_new_run_dirs, set(_glob.glob(os.path.join(ROOT, "audit-*"))))
     stages = args.stage or ["manifest", "serve", "variants", "robots", "htmldoc", "extract", "fetch", "sample", "probe_cr", "probe_fx", "probe_ef", "probe_en", "compose", "validate", "run_audit", "scripts"]
     if args.live:
         stages.append("live")

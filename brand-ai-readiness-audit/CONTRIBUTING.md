@@ -45,7 +45,8 @@ Which stage matters for what you changed:
 | Report schema or validator | `--stage validate --stage run_audit` |
 
 `tests/serve_fixtures.py` keeps the fixture sites up on ports 8100+ so you can
-probe them by hand.
+probe them by hand. Set `BRAND_AUDIT_ALLOW_PRIVATE=1` first: the fetcher refuses
+loopback addresses otherwise.
 
 **Never check the exit code through a pipe.** `run_tests.py | tail` returns
 `tail`'s status, not the runner's, so a failing suite looks like it passed.
