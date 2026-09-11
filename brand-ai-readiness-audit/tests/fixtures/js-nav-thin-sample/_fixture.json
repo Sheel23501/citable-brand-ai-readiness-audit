@@ -1,0 +1,37 @@
+{
+  "name": "js-nav-thin-sample",
+  "description": "Ledgerly (clean-site) rebuilt the way a large corporate site looks to a non-JavaScript fetcher: the navigation is rendered by a script, so the served HTML links only to a sign-up page and three legal pages; robots.txt points at a sitemap index whose first child lists feature and integration URLs that match no page role, while the child that lists about-us, contact-us and the newsroom is never read. The sampler therefore reaches the home page alone and records every role as missing. The home page itself is fine: it has a heading, a call to action, testimonials, dates, JSON-LD and a search form, but no address, no FAQ and no press link. Pins the absence gate: what this sample cannot see must not be reported as absent from the site.",
+  "base": "clean-site",
+  "category": "saas_software",
+  "routes": {},
+  "expected": {
+    "fail": [],
+    "gated": [
+      "fx.facts.key_fact_missing",
+      "fx.content.faq_absent",
+      "ef.entity.nap_missing_plain_text",
+      "ef.corroboration.press_page_missing"
+    ],
+    "info": [
+      "ef.entity.wikidata_unavailable",
+      "ef.corroboration.offsite_spotcheck"
+    ],
+    "pass_required": [
+      "cr.render.js_gate",
+      "cr.render.csr_shell",
+      "cr.index.sitemap_missing",
+      "cr.index.sitemap_invalid",
+      "en.nav.landmark_missing",
+      "en.cta.missing",
+      "en.hero.value_prop_unclear",
+      "en.trust.signals_missing",
+      "en.links.broken_sampled",
+      "en.nav.site_search_missing",
+      "ef.freshness.no_visible_dates",
+      "fx.jsonld.missing",
+      "fx.jsonld.required_props_missing",
+      "fx.identity.h1_missing_or_multiple"
+    ],
+    "notes": "The four gated ids all fail at probe level, and each was a false positive on a real corporate site before the gate: 'no address' when the contact page was never fetched, 'key facts missing' when the pages that state them were never fetched, 'no FAQ' likewise, and 'no newsroom' from a two-page sample of a site whose newsroom sits behind a script-rendered menu. After compose each is not_evaluated (role_page_not_sampled, or navigation_not_readable for the press check), produces no finding, and is explained in limitations. en.cta.missing is not gated because it is a claim about the home page that was read, and it passes here because the header button is in the first viewport. The sitemap index is the adobe.com shape: 91 children of which the sampler reads the first."
+  }
+}

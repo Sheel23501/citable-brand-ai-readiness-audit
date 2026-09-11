@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ledgerly — Invoicing and expense software for freelance designers</title>
+<meta name="description" content="Ledgerly helps freelance designers and small studios send invoices, track expenses, and get paid faster.">
+<link rel="canonical" href="{{BASE}}/">
+<meta property="og:title" content="Ledgerly — Invoicing and expense software for freelance designers">
+<meta property="og:description" content="Ledgerly helps freelance designers and small studios send invoices, track expenses, and get paid faster.">
+<meta property="og:site_name" content="Ledgerly">
+<meta property="og:url" content="{{BASE}}/">
+<meta property="og:type" content="website">
+<style>body{font-family:system-ui,sans-serif;max-width:960px;margin:0 auto;padding:1rem;color:#222}header,footer{display:flex;flex-wrap:wrap;gap:1rem;align-items:center}nav ul{display:flex;gap:1rem;list-style:none;padding:0}.button{background:#0a5;color:#fff;padding:.5rem 1rem;border-radius:4px;text-decoration:none}</style>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Ledgerly",
+  "legalName": "Ledgerly Software Ltd",
+  "url": "{{BASE}}/",
+  "logo": "{{BASE}}/logo.png",
+  "description": "Ledgerly is invoicing and expense-tracking software for freelance designers and small studios.",
+  "foundingDate": "2019-03-01",
+  "email": "hello@ledgerly.example",
+  "sameAs": ["https://www.wikidata.org/wiki/Q000000001", "https://en.wikipedia.org/wiki/Ledgerly_(software)", "https://www.linkedin.com/company/ledgerly-example", "https://find-and-update.company-information.service.gov.uk/company/00000000"]
+}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Ledgerly","applicationCategory":"BusinessApplication","operatingSystem":"Web, iOS, Android","url":"{{BASE}}/","description":"Invoicing and expense software for freelance designers and small studios.","aggregateRating":{"@type":"AggregateRating","ratingValue":"4.7","ratingCount":"212"},"publisher":{"@type":"Organization","name":"Ledgerly"}}
+</script>
+</head>
+<body>
+<header>
+  <a href="/" class="logo"><img src="/logo.png" alt="Ledgerly logo" width="120" height="32"></a>
+  <nav aria-label="Main" id="main-nav"></nav>
+  <script>
+    // The menu is assembled on the client. A fetcher that does not run scripts sees an empty <nav>.
+    var items = [["/product", "Product"], ["/pricing", "Pricing"], ["/blog", "Newsroom"], ["/about", "About"], ["/contact", "Contact"]];
+    document.getElementById("main-nav").innerHTML = "<ul>" + items.map(function (i) { return "<li><a href=\"" + i[0] + "\">" + i[1] + "</a></li>"; }).join("") + "</ul>";
+  </script>
+  <form role="search" action="/search" method="get" class="site-search"><label for="q">Search</label><input type="search" id="q" name="q" placeholder="Search Ledgerly"><button type="submit">Search</button></form>
+  <a class="button" href="/start">Start free trial</a>
+</header>
+<main>
+  <section class="hero">
+    <h1>Invoicing and expense software built for freelance designers</h1>
+    <p>Ledgerly helps freelance designers and small studios send professional invoices, track expenses, and get paid on time. Set up in five minutes, no accountant required.</p>
+    <p><a class="button" href="/start">Start free trial</a></p>
+  </section>
+  <section>
+    <h2>What Ledgerly does</h2>
+    <ul>
+      <li><strong>Invoices</strong> that match your brand, sent from your own domain, with card and bank payment links.</li>
+      <li><strong>Expense tracking</strong> by photographing receipts; Ledgerly reads the amount, date, and supplier.</li>
+      <li><strong>Quarterly reports</strong> your accountant can import directly.</li>
+    </ul>
+  </section>
+  <section>
+    <h2>Who it is for</h2>
+    <p>Ledgerly is built for freelance designers, illustrators, and studios of up to ten people who bill by project or by the hour.</p>
+  </section>
+  <section>
+    <h2>Trusted by independent studios</h2>
+    <blockquote><p>“Ledgerly cut my month-end admin from a day to an hour.”</p><footer>— Priya Raman, brand designer, Leeds</footer></blockquote>
+    <blockquote><p>“Our clients pay faster because the invoice has a pay button.”</p><footer>— Tomás Herrera, Studio Norte</footer></blockquote>
+    <p>Ledgerly is independently audited every year; read the <a href="/security">security overview</a>.</p>
+  </section>
+</main>
+<footer>
+  <p><strong>Ledgerly Software Ltd</strong> · Email: <a href="mailto:hello@ledgerly.example">hello@ledgerly.example</a></p>
+  <p><a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/security">Security</a></p>
+  <p>Last updated <time datetime="{{DATE}}">{{DATE}}</time>. © {{YEAR}} Ledgerly Software Ltd.</p>
+</footer>
+</body>
+</html>

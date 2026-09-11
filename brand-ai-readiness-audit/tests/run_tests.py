@@ -122,7 +122,7 @@ def stage_manifest(res):
     exercised = set()
     for n in names:
         exp = load_fixture(n).get("expected", {})
-        exercised |= set(exp.get("fail", [])) | set(exp.get("info", []))
+        exercised |= set(exp.get("fail", [])) | set(exp.get("info", [])) | set(exp.get("gated", []))
     unexercised = sorted(c for c in ids if c.startswith("en.") and c not in exercised)
     res.check(not unexercised, "fixtures exercise every en.* check as a failure or note", ", ".join(unexercised))
     # documentation hygiene: a skill whose references/ exist must document every registered check of its prefix,
@@ -637,10 +637,11 @@ def run_probe_on_fixtures(res, farm, prefix, probe_mod, label):
             out2 = probe_mod.run(AuditContext.from_workdir(td)).to_dict()
         results[name] = out
         # _fixture.json contract: `fail` = real defects (severity above info); `info` = info-severity notes
-        # (inconclusive, not_evaluated, and policy notes), regardless of status
+        # (inconclusive, not_evaluated, and policy notes), regardless of status. `gated` ids fail here, at
+        # probe level, and are withdrawn by the orchestrator's absence gate (compose stage asserts that).
         fails = {f["check_id"] for f in out["findings"] if f["severity"] != "info"}
         infos = {f["check_id"] for f in out["findings"] if f["severity"] == "info"}
-        exp_fail = {c for c in exp["fail"] if c.startswith(prefix)}
+        exp_fail = {c for c in exp["fail"] + exp.get("gated", []) if c.startswith(prefix)}
         exp_info = {c for c in exp["info"] if c.startswith(prefix)}
         statuses = {c["check_id"]: c["status"] for c in out["checks"]}
         res.check(fails == exp_fail, "%s/%s: fail set matches" % (label, name), "got %s expected %s" % (sorted(fails), sorted(exp_fail)))
@@ -805,6 +806,88 @@ def stage_compose_units(res, C):
     res.check(C.is_quick_win(_mkf("cr.x.y", "medium")) and not C.is_quick_win(_mkf("cr.x.y", "info"))
               and not C.is_quick_win(_mkf("cr.x.y", "medium", confidence="low")), "quick win rule matches the rubric")
 
+    # ---- the absence gate (rubric section 3 rule 6): a sample claim is never voiced as a site claim
+    def _smp(category, read, missing, links=10):
+        pages = [{"role": r, "fetch": {"final_url": "http://s/%s" % r, "status": 200, "is_html": True}} for r in read]
+        return {"site_category": {"value": category}, "pages": pages, "missing_roles": list(missing), "internal_links_seen": links}
+
+    def _kf(missing_facts, severity="high"):
+        item = {"page": "site", "kind": "computed",
+                "value": "pages_searched=2 (home, about); key_facts=4; found=2; missing=%s" % ",".join(missing_facts)}
+        return _mkf("fx.facts.key_fact_missing", severity, [], [item], confidence="medium")
+
+    def _gate(findings, sample, category, facts=None):
+        checks = {f["check_id"]: {"check_id": f["check_id"], "status": "fail", "reason": None} for f in findings}
+        kept = C.apply_absence_gate(findings, checks, sample, category, facts)
+        return {f["check_id"]: f for f in kept}, checks
+
+    kept, chk = _gate([_kf(["mission", "location"]), _mkf("ef.entity.nap_missing_plain_text", "medium")],
+                      _smp("nonprofit_institution", ["home", "about", "contact", "product", "blog"], []), "nonprofit_institution")
+    res.check(len(kept) == 2 and kept["fx.facts.key_fact_missing"]["severity"] == "high"
+              and "absence_scope" not in kept["fx.facts.key_fact_missing"], "gate: a full sample changes nothing")
+    # a role the category does not expect is never "unreached": a nonprofit has no pricing page to miss
+    kept, chk = _gate([_kf(["mission", "location"]), _mkf("fx.content.faq_absent", "low")],
+                      _smp("nonprofit_institution", ["home", "about", "contact", "blog"], ["pricing", "product"]), "nonprofit_institution")
+    kf = kept["fx.facts.key_fact_missing"]
+    res.check(kf["severity"] == "high" and "absence_scope" not in kf and "pricing" not in kf["evidence"],
+              "gate: an unexpected role (pricing on a nonprofit) neither caps nor annotates the key-fact finding", kf["evidence"])
+    fq = kept["fx.content.faq_absent"]
+    res.check(fq.get("absence_scope") == "sample" and fq["confidence"] == "low" and "product page was" in fq["evidence"],
+              "gate: faq_absent with the programs page unread is a sample claim naming that page", fq["evidence"])
+    # fully blind: no page that could carry the thing was read -> no verdict and no finding
+    fs = [_kf(["pricing_or_trial"], "medium"), _mkf("ef.entity.nap_missing_plain_text", "medium"), _mkf("fx.content.faq_absent", "low"),
+          _mkf("ef.corroboration.press_page_missing", "medium"), _mkf("en.cta.missing", "medium", ["http://s/home"]),
+          _mkf("fx.identity.h1_missing_or_multiple", "low", ["http://s/home"])]
+    kept, chk = _gate(fs, _smp("saas_software", ["home"], ["about", "contact", "pricing", "product", "blog"], links=24), "saas_software")
+    gone = {"fx.facts.key_fact_missing", "ef.entity.nap_missing_plain_text", "fx.content.faq_absent", "ef.corroboration.press_page_missing"}
+    res.check(set(kept) == {"en.cta.missing", "fx.identity.h1_missing_or_multiple"},
+              "gate: a home-only sample withdraws every site-level absence claim", str(sorted(kept)))
+    res.check(all(chk[c]["status"] == "not_evaluated" for c in gone), "gate: withdrawn checks are not_evaluated in the checks list")
+    res.check(chk["fx.facts.key_fact_missing"]["reason"] == "role_page_not_sampled"
+              and chk["ef.corroboration.press_page_missing"]["reason"] == "navigation_not_readable",
+              "gate: the reasons distinguish an unreached role page from an unreadable navigation")
+    res.check(kept["en.cta.missing"]["severity"] == "medium" and kept["en.cta.missing"]["confidence"] == "high",
+              "gate: a per-page finding (en.cta.missing) is never gated")
+    # partly blind key facts are scoped one fact at a time
+    kept, chk = _gate([_kf(["mission", "location"]), _mkf("ef.entity.nap_missing_plain_text", "medium")],
+                      _smp("nonprofit_institution", ["home", "about", "product", "blog"], ["contact", "pricing"]), "nonprofit_institution")
+    kf = kept["fx.facts.key_fact_missing"]
+    res.check(kf["severity"] == "medium" and kf["confidence"] == "medium" and kf.get("absence_scope") == "sample",
+              "gate: one confirmed fact is medium (rubric rule 2) and scoped to the sample", "%s/%s" % (kf["severity"], kf["confidence"]))
+    res.check("1 of 4 key facts" in kf["title"] and "1 not checked" in kf["title"] and len(kf["title"]) <= 90,
+              "gate: the title counts confirmed and unchecked facts", kf["title"])
+    res.check("Confirmed missing: mission" in kf["evidence"] and "location (contact page not reached)" in kf["evidence"],
+              "gate: the evidence separates confirmed from not checked", kf["evidence"])
+    res.check("mission" in kf["suggested_action"]["summary"] and "location" not in kf["suggested_action"]["summary"]
+              and kf["suggested_action"]["priority"] == "medium",
+              "gate: the action names only the confirmed facts and the priority follows the new severity", json.dumps(kf["suggested_action"]))
+    nap = kept["ef.entity.nap_missing_plain_text"]
+    res.check(nap["confidence"] == "low" and nap["severity"] == "medium" and nap.get("absence_scope") == "sample"
+              and "contact page was" in nap["evidence"], "gate: NAP with the contact page unread is a low-confidence sample claim", nap["evidence"])
+    bare = _mkf("fx.facts.key_fact_missing", "high", confidence="medium")
+    facts = {"facts": {"mission": {"status": "absent"}, "location": {"status": "absent"},
+                       "programs_or_services": {"status": "present"}, "how_to_participate": {"status": "present"}}}
+    kept, chk = _gate([bare], _smp("nonprofit_institution", ["home", "about", "product"], ["contact", "pricing", "blog"]),
+                      "nonprofit_institution", facts)
+    res.check(kept["fx.facts.key_fact_missing"]["severity"] == "medium"
+              and "Confirmed missing: mission" in kept["fx.facts.key_fact_missing"]["evidence"],
+              "gate: key facts fall back to the facts file when the finding carries no missing= item")
+    kept, chk = _gate([_kf(["what_it_does", "pricing_or_trial"])],
+                      _smp("saas_software", ["home", "about", "contact", "product", "blog"], ["pricing"]), "saas_software")
+    kf = kept["fx.facts.key_fact_missing"]
+    res.check(kf["severity"] == "medium" and "pricing_or_trial (pricing page not reached)" in kf["evidence"],
+              "gate: a missed pricing page scopes only the pricing fact", kf["evidence"])
+    for read, missing, links, want in ((["home", "about", "contact", "product"], ["pricing", "blog"], 8, True),
+                                       (["home", "about"], ["contact", "pricing", "product", "blog"], 24, False),
+                                       (["home"], ["about", "contact", "pricing", "product", "blog"], 2, False)):
+        kept, chk = _gate([_mkf("ef.corroboration.press_page_missing", "low")], _smp("saas_software", read, missing, links), "saas_software")
+        res.check(("ef.corroboration.press_page_missing" in kept) == want,
+                  "gate: press_page_missing %s with %d home links and %d roles unreached" % ("keeps its verdict" if want else "has no verdict", links, len(missing)))
+    kept, chk = _gate([_mkf("fx.content.faq_absent", "low"), _mkf("ef.entity.nap_missing_plain_text", "low")],
+                      _smp("portfolio_personal", ["home", "about", "contact"], ["pricing", "product", "blog"]), "portfolio_personal")
+    res.check(len(kept) == 2 and all("absence_scope" not in f for f in kept.values()),
+              "gate: a portfolio with about and contact read is fully graded")
+
     # the tables compose owns must cover the registry exactly
     ids = set(reg.ids())
     res.check(set(C.POSITIVE_TITLES) == ids, "every registry check has a positive title",
@@ -824,6 +907,23 @@ def stage_compose_units(res, C):
                 res.check(fid in KEY_FACTS[cat], "%s: question fact %s is one of the category key facts" % (cat, fid))
     res.check(C.non_coverage_lines(), "non-coverage lines are read from coverage_map.md section 5")
     res.check(len(C.non_coverage_lines()) >= 10, "all of section 5 is carried into limitations (%d)" % len(C.non_coverage_lines()))
+    # the absence gate's fact table mirrors site_categories.md section 1b and the gates are documented conventions
+    from auditlib.categories import FACT_ROLES
+    from auditlib.sampler import ROLE_ORDER
+    all_facts = {fid for facts in KEY_FACTS.values() for fid in facts}
+    res.check(set(FACT_ROLES) == all_facts, "FACT_ROLES covers every key fact exactly", str(sorted(set(FACT_ROLES) ^ all_facts)))
+    res.check(all(set(v) <= set(ROLE_ORDER) | {"home"} for v in FACT_ROLES.values()), "FACT_ROLES uses only sampler roles")
+    res.check("### 1b." in sc, "site_categories.md has section 1b (where each key fact is expected)")
+    section1b = sc.split("### 1b.")[-1].split("\n## 2.")[0]
+    for fid in sorted(all_facts):
+        res.check("`%s`" % fid in section1b, "site_categories 1b names key fact %s" % fid)
+    refs = os.path.join(ROOT, "skills", "audit-orchestrator", "references")
+    schema = open(os.path.join(refs, "report_schema.md"), encoding="utf-8").read()
+    rubric = open(os.path.join(refs, "severity_confidence_rubric.md"), encoding="utf-8").read()
+    for reason in C.GATE_REASONS:
+        res.check(reason in schema, "report_schema.md documents the gate reason %s" % reason)
+    res.check("absence_scope" in schema and "language_scope" in schema, "report_schema.md documents absence_scope and language_scope")
+    res.check("Absence scope" in rubric and "Language scope" in rubric, "the rubric lists the absence and language gates as adjustment rules")
 
 
 def stage_compose(res, farm):
@@ -862,6 +962,31 @@ def stage_compose(res, farm):
                   "got %s expected %s" % (sorted(seen_fail), sorted(exp["fail"])))
         res.check(seen_info == set(exp["info"]), "compose/%s: info notes match the fixture" % name,
                   "got %s expected %s" % (sorted(seen_info), sorted(exp["info"])))
+        # the absence gate's contract: `gated` checks lose their verdict (coverage carries the reason, no finding
+        # remains), `scoped` findings are marked as sample claims, and `max_severity` / `max_confidence` pin caps
+        from auditlib.findings import SEVERITIES as _SEV, CONFIDENCES as _CONF
+        reasons = {e["check_id"]: e["reason"] for e in report["coverage"]["not_evaluated"]}
+        gated = set(exp.get("gated", []))
+        for cid in sorted(gated):
+            res.check(reasons.get(cid) in C.GATE_REASONS, "compose/%s: %s is withdrawn by the absence gate" % (name, cid), str(reasons.get(cid)))
+        leaked = gated & {f["check_id"] for f in fnds + report["suppressed_findings"]}
+        res.check(not leaked, "compose/%s: a gated check produces no finding" % name, str(sorted(leaked)))
+        if gated:
+            res.check(any(l.startswith("Not checked, because") or "navigation could not be read" in l for l in report["limitations"]),
+                      "compose/%s: limitations explain the gated checks" % name)
+        by_cid = {f["check_id"]: f for f in fnds}
+        for cid in exp.get("scoped", []):
+            f = by_cid.get(cid)
+            res.check(f is not None and f.get("absence_scope") == "sample", "compose/%s: %s is scoped to the sample" % (name, cid),
+                      str(f.get("absence_scope")) if f else "no finding")
+        for cid, cap in (exp.get("max_severity") or {}).items():
+            f = by_cid.get(cid)
+            res.check(f is not None and _SEV.index(f["severity"]) >= _SEV.index(cap),
+                      "compose/%s: %s severity is at most %s" % (name, cid, cap), f["severity"] if f else "no finding")
+        for cid, cap in (exp.get("max_confidence") or {}).items():
+            f = by_cid.get(cid)
+            res.check(f is not None and _CONF.index(f["confidence"]) >= _CONF.index(cap),
+                      "compose/%s: %s confidence is at most %s" % (name, cid, cap), f["confidence"] if f else "no finding")
         for f in fnds:
             res.check(f.get("quick_win") == C.is_quick_win(f), "compose/%s: %s quick-win flag follows the rubric" % (name, f["id"]))
             res.check(f.get("source_skill") and f.get("opportunity_type") in ("technical", "content"),
@@ -1192,6 +1317,10 @@ def stage_run_audit(res, farm):
             seen = {f["check_id"] for f in report["findings"] + report["suppressed_findings"] if f["severity"] != "info"}
             res.check(seen == set(exp["fail"]), "run_audit/%s: the whole pipeline reproduces the fixture's fail set" % name,
                       "got %s expected %s" % (sorted(seen), sorted(exp["fail"])))
+            reasons = {e["check_id"]: e["reason"] for e in report["coverage"]["not_evaluated"]}
+            for cid in exp.get("gated", []):
+                res.check(reasons.get(cid) in ("role_page_not_sampled", "navigation_not_readable"),
+                          "run_audit/%s: %s has no verdict end to end" % (name, cid), str(reasons.get(cid)))
             md = open(os.path.join(wd, "report.md"), encoding="utf-8").read()
             res.check(md.startswith("# AI-readiness audit: "), "run_audit/%s: the Markdown is rendered" % name)
 

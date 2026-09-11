@@ -56,14 +56,14 @@ is given). It never raises; on internal error it still emits this object with
 | `check_id` | string | yes | From the registry in `check_ids.md`. |
 | `status` | enum | yes | `pass` / `fail` / `inconclusive` / `not_evaluated`. |
 | `pages` | string[] | no | Pages the status applies to. Omit for site-level checks. |
-| `reason` | string | when not `pass`/`fail` | Machine-readable snake_case reason, e.g. `challenge_page`, `robots_disallow`, `network_disabled`, `tool_unavailable`, `not_applicable_for_category`, `dependency_failed`. |
+| `reason` | string | when not `pass`/`fail` | Machine-readable snake_case reason, e.g. `challenge_page`, `robots_disallow`, `network_disabled`, `tool_unavailable`, `not_applicable_for_category`, `dependency_failed`, `role_page_not_sampled`, `navigation_not_readable`. |
 
 Status meanings:
 
 - `pass` — the check ran on real evidence and found no problem.
 - `fail` — the check ran and found the condition. Produces a finding with a real severity, except for checks registered as `info` by default (policy notes such as a training-only bot block): those keep status `fail` because the condition is real, but severity `info` because it is not a defect.
 - `inconclusive` — the check ran but the evidence cannot be trusted (challenge page, truncated body). Produces an `info` finding that says so.
-- `not_evaluated` — the check did not run (network off, tool unavailable, category makes it not applicable, an upstream condition made it meaningless). Produces an `info` finding only when nothing else in the report explains the gap (`network_disabled`, `tool_unavailable`). Reasons that another probe already explains produce no finding: `robots_disallow` and `challenge_page` (crawl-render carries the finding), `no_rendered_content` (the page is a JS gate or CSR shell, again crawl-render's finding), `non_html`, `not_applicable_for_category`, `dependency_failed`. The `checks` list still carries every one of them with its reason, and compose lists them under coverage.
+- `not_evaluated` — the check did not run (network off, tool unavailable, category makes it not applicable, an upstream condition made it meaningless). Produces an `info` finding only when nothing else in the report explains the gap (`network_disabled`, `tool_unavailable`). Reasons that another probe already explains produce no finding: `robots_disallow` and `challenge_page` (crawl-render carries the finding), `no_rendered_content` (the page is a JS gate or CSR shell, again crawl-render's finding), `non_html`, `not_applicable_for_category`, `dependency_failed`. Nor do the two reasons the orchestrator's absence gate assigns (`severity_confidence_rubric.md` rule 6): `role_page_not_sampled` (no page that could have carried the thing was reached) and `navigation_not_readable` (the sample was too thin to show the site's navigation); a `limitations` line explains them. The `checks` list still carries every one of them with its reason, and compose lists them under coverage.
 
 ---
 
@@ -205,14 +205,20 @@ Extra fields on each final Finding, added by compose:
 | `pipeline_stage` | enum | Citation-failure stage, derived from the stage (`coverage_map.md` section 7): access, render → `retrieval`; extract, entity, freshness, corroboration → `ranking`; `or.simulation.*` → `selection`; engagement → `post_click`. |
 | `opportunity_type` | enum | `technical` or `content`, Adobe's own split for detected issues (`coverage_map.md` section 7). |
 | `merged_from` | string[] | `dedupe_key`s folded into this finding, if any. |
+| `absence_scope` | enum | Optional. `sample` when the orchestrator's absence gate (rubric rule 6) scoped a site-level absence claim to the pages read: confidence is `low`, severity at most `medium`, and the evidence names the pages not reached. Absent on every other finding. |
+| `language_scope` | string | Optional. The bare language subtag when the language gate (rubric rule 7) scoped an English-phrase-list check on a non-English site. Absent otherwise. |
 
 `limitations` always begins with the boilerplate lines that apply (compose adds
 them, the agent never removes them): the single point-in-time fetch statement
 with the page count; "no content pages beyond the home page were discoverable"
-when only home was sampled; "N pages skipped: rate limited (429)" when any
-sampled page ended in 429; "challenge page served on N pages: those checks are
-inconclusive" when any page was challenged; "this audit reads served HTML only
-and does not execute JavaScript or query live assistants" always.
+when only home was sampled; "Not checked, because the … pages were not reached
+…: <check ids>" when the absence gate withdrew a check (`role_page_not_sampled`);
+"The home page exposed N internal links and led to K of 5 role pages …" when it
+withdrew the press check (`navigation_not_readable`); "N pages skipped: rate
+limited (429)" when any sampled page ended in 429; "challenge page served on N
+pages: those checks are inconclusive" when any page was challenged; the language
+line when the language gate fired; "this audit reads served HTML only and does
+not execute JavaScript or query live assistants" always.
 
 `ai_answer_simulation.basis` must be exactly `extracted_facts_only`. The
 orchestrator agent may not use anything it knows or fetched itself; if a

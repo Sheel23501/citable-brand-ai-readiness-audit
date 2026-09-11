@@ -1,0 +1,5 @@
+# Harbourside Literacy Trust - all crawlers welcome
+User-agent: *
+Allow: /
+
+Sitemap: {{BASE}}/sitemap.xml

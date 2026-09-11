@@ -49,6 +49,34 @@ NAP fields (`address`, `phone`) are owned by the entity probe for every
 category **except** `local_business`, where they are also key facts; compose
 dedupes the overlap (see `coverage_map.md` section 4).
 
+### 1b. Where each key fact is expected
+
+`fx.facts.key_fact_missing` searches every sampled page, but "absent" is only a
+claim about the site when the pages a fact would live on were actually read.
+The orchestrator's absence gate (`severity_confidence_rubric.md` rule 6) uses
+this table: a fact counts as **confirmed missing** when every listed role the
+category expects (section 1, "Key pages") was sampled; otherwise it is **not
+checked** and named as such in the evidence. Home is always sampled and never
+blocks a verdict on its own. The machine-readable copy is `FACT_ROLES` in
+`skills/audit-orchestrator/scripts/auditlib/categories.py`; the test suite
+asserts the two agree.
+
+| Fact | Pages it would live on |
+|---|---|
+| `what_it_sells`, `services_or_menu` | home, product |
+| `sample_product_price` | product, pricing |
+| `shipping_or_returns` | product, contact |
+| `contact_method` | home, contact |
+| `what_it_does`, `who_it_is_for`, `who_it_serves`, `services_offered`, `programs_or_services`, `how_to_participate` | home, about, product |
+| `pricing_or_trial` | home, pricing, product |
+| `contact_or_signup_method` | home, contact, pricing |
+| `address`, `phone`, `location`, `location_or_service_area`, `location_or_contact`, `headquarters`, `contact_or_profile_link` | home, contact, about |
+| `opening_hours` | home, contact |
+| `topics_covered` | home, about, blog |
+| `recency_evidence` | home, blog |
+| `publisher_identity`, `who`, `what_they_do`, `mission`, `what_company_does`, `leadership_or_size` | home, about |
+| `contact_or_press_method` | home, contact, blog |
+
 ---
 
 ## 2. Inference rule (Step 5 implements exactly this)

@@ -65,9 +65,26 @@ Apply in this order.
 3. **Blast radius.** The same `fail` on every sampled page (≥ 3 pages) ⇒ one level higher, up to the check's registered maximum.
 4. **Confidence cap.** `confidence: low` ⇒ severity at most `medium`.
 5. **Category overrides** listed in `site_categories.md` (for example NAP missing is `high` for `local_business`, `medium` otherwise) replace the default before steps 2–4 run.
+6. **Absence scope** (orchestrator only, `compose.apply_absence_gate`). A site-level absence claim is
+   scoped to the pages actually read. When no page that could have carried the thing was reached, for a
+   role the category expects (`site_categories.md` section 1), the check is `not_evaluated` with reason
+   `role_page_not_sampled`, emits no finding, and coverage plus a `limitations` line carry it. When some
+   were reached, the finding stands at `confidence: low`, severity at most `medium`, `absence_scope: sample`,
+   and its evidence names the pages not reached. `fx.facts.key_fact_missing` is scoped one fact at a time
+   (`site_categories.md` section 1b, `categories.py` `FACT_ROLES`): a fact is confirmed missing only when
+   every page it would live on was read, and rule 2 is re-applied to the confirmed count.
+   `ef.corroboration.press_page_missing` is `not_evaluated` with reason `navigation_not_readable` when the
+   sample was too thin to have shown the navigation (three or fewer internal links on home, or at most one
+   role page reached). Presence findings and per-page findings are never gated; a role the category does
+   not expect is never "unreached".
+7. **Language scope** (orchestrator only, `compose.apply_language_gate`). A finding whose verdict rests on
+   English phrase lists (`compose.LANG_DEPENDENT`), on a site whose sampled pages are written in a language
+   that check has no vocabulary for, stands at `confidence: low`, severity at most `medium`,
+   `language_scope: <lang>`, and a `limitations` line names the checks.
 
 A probe records which adjustments fired in a `computed` evidence item, e.g.
-`adjustments=blast_radius:+1,confidence_cap:medium`.
+`adjustments=blast_radius:+1,confidence_cap:medium`. Rules 6 and 7 run in compose, after the probes,
+and record theirs as `absence_scope=sample; ...` and `language_scope` on the finding.
 
 ---
 

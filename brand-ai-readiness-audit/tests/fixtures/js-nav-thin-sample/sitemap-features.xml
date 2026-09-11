@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>{{BASE}}/</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/features/invoicing.html</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/features/expenses.html</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/features/reports.html</loc><lastmod>{{DATE_MINUS_10}}</lastmod></url>
+  <url><loc>{{BASE}}/integrations/xero.html</loc><lastmod>{{DATE_MINUS_10}}</lastmod></url>
+  <url><loc>{{BASE}}/integrations/stripe.html</loc><lastmod>{{DATE_MINUS_10}}</lastmod></url>
+  <url><loc>{{BASE}}/legal/terms.html</loc><lastmod>{{DATE_MINUS_10}}</lastmod></url>
+  <url><loc>{{BASE}}/legal/privacy.html</loc><lastmod>{{DATE_MINUS_10}}</lastmod></url>
+  <url><loc>{{BASE}}/start</loc><lastmod>{{DATE}}</lastmod></url>
+</urlset>

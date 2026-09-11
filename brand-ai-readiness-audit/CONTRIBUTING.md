@@ -63,7 +63,8 @@ were real.
 
 ## Adding a check
 
-A check id lives in **six** places. The tests enforce five of them.
+A check id lives in **six** places, seven if it asserts that something is absent
+from the site. The tests enforce six of them.
 
 1. **`skills/audit-orchestrator/references/check_ids.md`** — one registry row:
    `| check_id | stage | severity | max | confidence | effort | scope | fails when |`.
@@ -85,6 +86,14 @@ A check id lives in **six** places. The tests enforce five of them.
 6. **`tests/fixtures/<name>/`** — a fixture that triggers it, with the check id
    listed in `_fixture.json` under `expected.fail` / `expected.info`, plus the
    ids that must still `pass`. A check with no fixture is untested.
+7. **`skills/audit-orchestrator/scripts/compose.py`** → `ABSENCE_ROLES` — only
+   if the check claims something is absent from the *site* (not from a page it
+   read): the roles whose pages could carry the thing, so the absence gate
+   (`severity_confidence_rubric.md` rule 6) can withdraw the claim when none of
+   them was sampled. A new key fact goes in `categories.py` `FACT_ROLES` and
+   `site_categories.md` section 1b instead.
+   *Enforced by:* "FACT_ROLES covers every key fact exactly" and the `gated` /
+   `scoped` / `max_severity` keys a fixture may set in `_fixture.json`.
 
 Then emit it from the probe via `ProbeOutput`: `out.fail(...)`,
 `out.policy_note(...)` (for `info`-severity policy observations),

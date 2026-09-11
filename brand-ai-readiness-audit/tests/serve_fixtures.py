@@ -45,6 +45,11 @@ FIXTURE_SCHEMA = {
         "fail": ["check_id ... real defects: findings whose severity is above info"],
         "info": ["check_id ... info-severity findings: inconclusive, not_evaluated notes, and policy notes"],
         "pass_required": ["check_id ... that must be pass, used to catch false positives"],
+        "gated": ["check_id ... that fails at probe level but the orchestrator's absence gate withdraws (no finding, "
+                  "not_evaluated with reason role_page_not_sampled or navigation_not_readable)"],
+        "scoped": ["check_id ... whose final finding must carry absence_scope: sample"],
+        "max_severity": {"check_id": "the highest severity the final finding may carry"},
+        "max_confidence": {"check_id": "the highest confidence the final finding may carry"},
         "notes": "free text",
     },
 }

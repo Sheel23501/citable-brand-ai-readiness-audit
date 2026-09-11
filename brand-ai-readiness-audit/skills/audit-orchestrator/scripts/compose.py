@@ -33,7 +33,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 from auditlib import __version__  # noqa: E402
-from auditlib.categories import (AUDIENCE_FACT, AUDIENCE_PHRASE, CTA_LANGS_SUPPORTED,  # noqa: E402
+from auditlib.categories import (AUDIENCE_FACT, AUDIENCE_PHRASE, CTA_LANGS_SUPPORTED, FACT_ROLES, KEY_FACTS,  # noqa: E402
                                  SIMULATION_QUESTIONS, category_label, key_pages)
 from auditlib.findings import (SEVERITIES, Registry, ProbeOutput, evidence_item,  # noqa: E402
                                impact_for, priority_for, _title)
@@ -365,27 +365,34 @@ def dedupe(findings, sample, category=None):
     return kept, folded
 
 
-# ---------------------------------------------------------------- the absence gate
-# An absence finding is a claim about a *site*, made from a *sample* of it. When the page where
-# the missing thing would live was never fetched, "absent from the site" and "absent from the
-# pages I read" are different statements, and the audit must not make them in the same voice.
-# The sampler already records the roles it could not reach in sample.missing_roles; until this
-# gate existed nothing consulted them, so a two-page sample of a JS-navigated site produced
-# high-confidence "no newsroom" and "key fact missing" findings about pages that were never read.
-# Presence findings (an image-only h1, malformed JSON-LD on a page that was fully parsed) are
-# page-local and cannot be wrong this way, so they are not listed here.
+# ---------------------------------------------------------------- the absence gate (rubric section 3, rule 6)
+# An absence finding is a claim about a *site*, made from a *sample* of it. When the page where the
+# missing thing would live was never fetched, "absent from the site" and "absent from the pages I
+# read" are different statements, and the audit must not make them in the same voice. The sampler
+# records the roles it could not reach in sample.missing_roles; this gate is the only place that
+# turns them into verdicts. A two-page sample of a JS-navigated site once produced high-confidence
+# "no newsroom" and "key fact missing" findings about pages that were never read.
 #
-# check_id -> the roles that could have carried the thing. Roles: about, contact, pricing, product, blog.
-# Only checks whose evidence can live *nowhere else* than an unsampled role page belong here. Two checks
-# were wrongly listed: press_page_missing is decided from the navigation links of every page that was read,
-# and no_visible_dates reads the date on each sampled page. Neither needs the blog fetched to have a
-# verdict, and gating them made the audit answer "I could not check" about pages it had in hand.
+# Presence findings (an image-only h1, malformed JSON-LD on a page that was fully parsed) are
+# page-local and cannot be wrong this way. Per-page absence findings (en.cta.missing,
+# en.trust.signals_missing) name the pages they graded and claim nothing about the others, so they
+# are not gated either. Two rules keep the gate from over-suppressing real findings:
+#   * a role the category does not expect is never "unreached": a nonprofit has no pricing page, so
+#     not finding one says nothing (site_categories.md section 1, key_pages());
+#   * key facts are scoped one fact at a time (FACT_ROLES): "no mission statement on the About page
+#     we read" stays a confirmed finding when only the contact page, where the address would live,
+#     was missed. The severity is then recomputed from the facts that were actually checked.
+#
+# Site-level absence checks whose evidence can live only on the listed role pages.
 ABSENCE_ROLES = {
     "ef.entity.nap_missing_plain_text": ("contact", "about"),
-    "fx.facts.key_fact_missing": ("contact", "about", "pricing", "product"),
     "fx.content.faq_absent": ("pricing", "product", "about"),
-    "en.cta.missing": ("contact", "product", "pricing"),
 }
+# press_page_missing is decided from the links of every page read, so it needs no blog page to have a
+# verdict; it is gated only when the sample is too thin to have shown the site's navigation at all.
+NAV_THIN_LINKS = 3    # home exposed this many internal links or fewer to a non-JavaScript fetcher
+NAV_THIN_ROLES = 4    # this many of the five roles not found: at most one role page was reached
+GATE_REASONS = ("role_page_not_sampled", "navigation_not_readable")
 
 
 def _resync_action(f):
@@ -399,56 +406,164 @@ def _resync_action(f):
     act["priority"] = priority_for(f.get("severity"), f.get("confidence"))
 
 
-def _role_phrase(roles):
+def _roles_text(roles):
     roles = list(roles)
     if len(roles) == 1:
-        return "%s page was" % roles[0]
-    return "%s and %s pages were" % (", ".join(roles[:-1]), roles[-1])
+        return "%s page" % roles[0]
+    return "%s and %s pages" % (", ".join(roles[:-1]), roles[-1])
 
 
-def apply_absence_gate(findings, checks, sample):
-    """Scope every absence claim to what was actually read. Mutates findings and their checks in place.
+def _role_phrase(roles):
+    return _roles_text(roles) + (" was" if len(list(roles)) == 1 else " were")
 
-    Fully blind (no role that could have carried it was fetched) -> the check cannot be decided:
-    status not_evaluated, severity info, reason role_page_not_sampled.
-    Partly blind -> the finding stands but is a sample claim: confidence low, severity capped at
-    medium, and the evidence says which pages were missing.
+
+def _pages_read(sample):
+    """Sampled pages that were actually read: fetched 200, HTML, not a challenge page."""
+    out = []
+    for p in sample.get("pages") or []:
+        fetch = p.get("fetch") or {}
+        if fetch.get("status") == 200 and fetch.get("is_html") and not fetch.get("challenge"):
+            out.append(p)
+    return out
+
+
+def _blind_roles(roles, missing, category):
+    """The listed roles the category expects that were not reached. Home is always read."""
+    expected = set(key_pages(category))
+    return [r for r in roles if r != "home" and r in expected and r in missing]
+
+
+def _gate_not_evaluated(f, checks, reason):
+    """The check has no verdict: drop the finding; coverage and limitations carry the reason."""
+    f["_gated"] = reason
+    c = checks.get(f["check_id"])
+    if c is not None:
+        c["status"] = "not_evaluated"
+        c["reason"] = reason
+
+
+def _append_note(evidence, note):
+    """Append a gate's note inside the 300-character evidence limit, cutting the original at a sentence end."""
+    room = 300 - len(note)
+    head = evidence or ""
+    if len(head) > room:
+        cut = head[:room]
+        dot = cut.rfind(". ")
+        head = cut[:dot + 1] if dot > room // 2 else cut.rstrip() + "…"
+    return (head.rstrip() + note)[:300]
+
+
+def _gate_sample_scope(f, blind, n_read, note=None):
+    """The finding stands as a claim about the pages read: confidence low, severity at most medium."""
+    f["confidence"] = "low"
+    if f.get("severity") in ("critical", "high"):
+        f["severity"] = "medium"
+    _resync_action(f)
+    f["absence_scope"] = "sample"
+    note = note or (" The %s not reached in this sample, so this describes the %d page%s read, not the whole site."
+                    % (_role_phrase(blind), n_read, "s" if n_read != 1 else ""))
+    f["evidence"] = _append_note(f.get("evidence", ""), note)
+    f.setdefault("evidence_items", []).append(
+        evidence_item("site", "computed", "absence_scope=sample; roles_not_sampled=%s" % ",".join(blind)))
+
+
+def _missing_fact_ids(f, category, facts):
+    """The key facts the finding reports missing: its own computed evidence first, the facts file as fallback."""
+    for it in f.get("evidence_items") or []:
+        m = re.search(r"\bmissing=([\w,]+)", it.get("value") or "")
+        if m:
+            return [x for x in m.group(1).split(",") if x]
+    table = facts.get("facts") if isinstance(facts, dict) else None
+    if isinstance(table, dict):
+        return [fid for fid in KEY_FACTS.get(category, KEY_FACTS["unknown"])
+                if (table.get(fid) or {}).get("status", "absent") != "present"]
+    return []
+
+
+def _gate_key_facts(f, checks, sample, category, facts, missing, n_read):
+    """One fact at a time: a fact is confirmed missing only when every page it would live on was read."""
+    fids = _missing_fact_ids(f, category, facts)
+    if not fids:
+        return
+    unchecked = {}
+    for fid in fids:
+        blind = _blind_roles(FACT_ROLES.get(fid, ()), missing, category)
+        if blind:
+            unchecked[fid] = blind
+    if not unchecked:
+        return
+    confirmed = [fid for fid in fids if fid not in unchecked]
+    if not confirmed:
+        _gate_not_evaluated(f, checks, "role_page_not_sampled")
+        return
+    total = len(KEY_FACTS.get(category, KEY_FACTS["unknown"]))
+    roles_read = [p.get("role") or "?" for p in _pages_read(sample)]
+    if len(confirmed) == 1 and f.get("severity") in ("critical", "high"):
+        f["severity"] = "medium"      # rubric rule 2 (one fact is medium, two or more high), on the confirmed count
+    _resync_action(f)
+    f["absence_scope"] = "sample"
+    title = ("%d of %d key facts for %s are not extractable as text; %d not checked"
+             % (len(confirmed), total, category_label(category), len(unchecked)))
+    if len(title) > 90:   # long category labels: keep both counts, drop the label rather than truncate mid-sentence
+        title = "%d of %d key facts are not extractable as text; %d not checked (%s unreached)" % (
+            len(confirmed), total, len(unchecked), ", ".join(sorted({r for b in unchecked.values() for r in b})))
+    f["title"] = _title(title)
+    not_checked = "; ".join("%s (%s not reached)" % (fid, _roles_text(b)) for fid, b in unchecked.items())
+    evidence = ("Searched %d sampled page%s (%s). Confirmed missing: %s. Not checked: %s."
+                % (n_read, "s" if n_read != 1 else "", ", ".join(roles_read), ", ".join(confirmed), not_checked))
+    if len(evidence) > 300:
+        evidence = ("Searched %d sampled page%s. Confirmed missing: %s. Not checked: %s."
+                    % (n_read, "s" if n_read != 1 else "", ", ".join(confirmed), ", ".join(unchecked)))
+    f["evidence"] = evidence[:300]
+    f.setdefault("evidence_items", []).append(evidence_item(
+        "site", "computed", "absence_scope=sample; confirmed_missing=%s; not_checked=%s; roles_not_sampled=%s"
+        % (",".join(confirmed), ",".join(unchecked), ",".join(sorted({r for b in unchecked.values() for r in b})))))
+    act = f.setdefault("suggested_action", {})
+    act["summary"] = ("Add the missing facts as plain text on the pages a visitor would expect them (%s)."
+                      % ", ".join(fid.replace("_", " ") for fid in confirmed[:4]))
+
+
+def _gate_press(f, checks, sample, missing):
+    """A link-based absence claim needs a readable navigation; one role page found is not one."""
+    links = sample.get("internal_links_seen")
+    thin_links = isinstance(links, int) and links <= NAV_THIN_LINKS
+    if "blog" in missing and (thin_links or len(missing) >= NAV_THIN_ROLES):
+        _gate_not_evaluated(f, checks, "navigation_not_readable")
+
+
+def apply_absence_gate(findings, checks, sample, category=None, facts=None):
+    """Scope every absence claim to what was actually read. Returns the findings that keep a verdict.
+
+    Fully blind (no page that could have carried the thing was read, for a role the category expects):
+    the check has no verdict. Its status becomes not_evaluated with the reason, the finding is dropped,
+    and coverage plus a limitations line carry it. It is never reported as a defect.
+    Partly blind: the finding stands as a claim about the pages read, at low confidence and at most
+    medium severity, and its evidence names the pages that were not reached. Key facts are scoped
+    one fact at a time (_gate_key_facts); the press check on the navigation being readable (_gate_press).
     """
     missing = set(sample.get("missing_roles") or [])
     if not missing:
-        return
-    n_read = len([p for p in (sample.get("pages") or []) if not (p.get("fetch") or {}).get("skipped")])
+        return findings
+    category = category or (sample.get("site_category") or {}).get("value") or "unknown"
+    n_read = len(_pages_read(sample))
     for f in findings:
-        roles = ABSENCE_ROLES.get(f.get("check_id"))
-        if not roles or f.get("status") != "fail":
+        cid = f.get("check_id")
+        if f.get("status") != "fail":
             continue
-        blind = [r for r in roles if r in missing]
-        if not blind:
-            continue
-        if len(blind) == len(roles):
-            f["status"] = "not_evaluated"
-            f["reason"] = "role_page_not_sampled"
-            f["severity"] = "info"
-            f["effort"] = "n/a"
-            act = f.setdefault("suggested_action", {})
-            act["impact"], act["effort"], act["priority"] = "low", "n/a", "low"
-            f["title"] = _title("Not checked: the %s not reached in this sample" % _role_phrase(blind))
-            f["evidence"] = ("The %s not reached from the home page's links or the sitemap, so this check has no "
-                             "verdict: %d page%s were read. This is not a finding that the site lacks it."
-                             % (_role_phrase(blind), n_read, "s" if n_read != 1 else ""))[:300]
-            c = checks.get(f["check_id"])
-            if c is not None:
-                c["status"] = "not_evaluated"
-                c["reason"] = "role_page_not_sampled"
-        else:
-            f["confidence"] = "low"
-            if f.get("severity") in ("critical", "high"):
-                f["severity"] = "medium"
-            _resync_action(f)
-            f["absence_scope"] = "sample"
-            note = (" The %s not reached in this sample, so this describes the %d page%s read, not the whole site."
-                    % (_role_phrase(blind), n_read, "s" if n_read != 1 else ""))
-            f["evidence"] = (f.get("evidence", "")[:300 - len(note)] + note)[:300]
+        if cid == "fx.facts.key_fact_missing":
+            _gate_key_facts(f, checks, sample, category, facts, missing, n_read)
+        elif cid == "ef.corroboration.press_page_missing":
+            _gate_press(f, checks, sample, missing)
+        elif cid in ABSENCE_ROLES:
+            expected = [r for r in ABSENCE_ROLES[cid] if r in key_pages(category)]
+            blind = _blind_roles(ABSENCE_ROLES[cid], missing, category)
+            if not blind:
+                continue
+            if len(blind) == len(expected):
+                _gate_not_evaluated(f, checks, "role_page_not_sampled")
+            else:
+                _gate_sample_scope(f, blind, n_read)
+    return [f for f in findings if not f.get("_gated")]
 
 
 # Checks whose verdict rests on matching English phrases. The value is the set of languages whose
@@ -511,7 +626,7 @@ def apply_language_gate(findings, checks, sample):
         f["language_scope"] = lang
         note = (" Pages declare lang=\"%s\"; the phrases this check searches for are English, so the site may "
                 "state this in its own language where the audit did not look." % lang)
-        f["evidence"] = (f.get("evidence", "")[:300 - len(note)] + note)[:300]
+        f["evidence"] = _append_note(f.get("evidence", ""), note)
         gated.append(f["check_id"])
     return lang
 
@@ -787,7 +902,7 @@ def non_coverage_lines():
     return lines
 
 
-def build_limitations(sample, probes, checks, gated_lang=None):
+def build_limitations(sample, probes, checks, gated_lang=None, category=None):
     """report_schema.md section 3b: the boilerplate that applies, then section 5 non-coverage."""
     pages = sample.get("pages") or []
     out = ["This report reflects a single point-in-time fetch of %d sampled page%s; personalised or A/B-tested "
@@ -796,6 +911,20 @@ def build_limitations(sample, probes, checks, gated_lang=None):
     if roles and set(roles) <= {"home"}:
         out.append("No content pages beyond the home page were discoverable, so every finding below is based on "
                    "the home page alone.")
+    category = category or (sample.get("site_category") or {}).get("value") or "unknown"
+    by_role = sorted(cid for cid, c in checks.items() if c.get("reason") == "role_page_not_sampled")
+    if by_role:
+        unreached = [r for r in (sample.get("missing_roles") or []) if r in key_pages(category)]
+        out.append("Not checked, because the %s not reached from the home page's links or the sitemap: %s. "
+                   "These are not findings that the site lacks them; a run that reaches those pages will grade them."
+                   % (_role_phrase(unreached or sample.get("missing_roles") or ["role"]), ", ".join(by_role)))
+    by_nav = sorted(cid for cid, c in checks.items() if c.get("reason") == "navigation_not_readable")
+    if by_nav:
+        found = 5 - len(sample.get("missing_roles") or [])
+        out.append("The home page exposed %s internal link%s and led to %d of 5 role pages for a non-JavaScript "
+                   "fetcher, so the site's navigation could not be read and %s has no verdict."
+                   % (sample.get("internal_links_seen", "few"), "" if sample.get("internal_links_seen") == 1 else "s",
+                      max(found, 0), ", ".join(by_nav)))
     rate_limited = [p for p in pages if (p.get("fetch") or {}).get("status") == 429]
     if rate_limited:
         out.append("%d page%s skipped: rate limited (429)." % (len(rate_limited), "" if len(rate_limited) == 1 else "s"))
@@ -918,7 +1047,7 @@ def compose(workdir, wall_clock=None, input_url=None, category_override=None):
         checks[c["check_id"]] = {"check_id": c["check_id"], "status": c["status"], "reason": c.get("reason"),
                                  "pages": c.get("pages") or [], "source_skill": "audit-orchestrator"}
     # scope absence claims to what was actually read, before ordering assigns ids and ranks
-    apply_absence_gate(findings, checks, sample)
+    findings = apply_absence_gate(findings, checks, sample, category, facts)
     gated_lang = apply_language_gate(findings, checks, sample)
 
     kept, folded = dedupe(findings, sample, category)
@@ -976,7 +1105,7 @@ def compose(workdir, wall_clock=None, input_url=None, category_override=None):
         "proactive_recommendations": build_recommendations(category, facts, checks, kept, sample),
         "ai_answer_simulation": simulation,
         "narrative_summary": "",
-        "limitations": build_limitations(sample, probes, checks, gated_lang),
+        "limitations": build_limitations(sample, probes, checks, gated_lang, category),
         "suppressed_findings": folded,
         "run": {"wall_clock_seconds": wall_clock, "requests_made": sample.get("requests_made"),
                 "probe_errors": [{"probe": p.get("probe"), "error": p["error"]} for p in probes if p.get("error")]

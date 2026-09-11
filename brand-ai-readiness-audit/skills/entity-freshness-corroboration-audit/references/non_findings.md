@@ -58,7 +58,12 @@ that tells a business to change a legitimate choice.
   in a non-Latin script without its country's postal mark. Both name and
   address must be missed before `ef.entity.nap_missing_plain_text` fires on a
   non-local site, and the evidence names the pages searched so the owner can
-  point to the line that has it.
+  point to the line that has it. When the contact and about pages were never
+  reached, the probe still reports what it saw and the orchestrator withdraws
+  the claim (`severity_confidence_rubric.md` rule 6): an address the sampler
+  could not get to is not an address the site lacks. The same rule turns
+  `ef.corroboration.press_page_missing` into "no verdict" when the sample was
+  too thin to have shown the navigation a newsroom link would sit in.
 - **Dates are read in ISO and English written forms.** Numeric `07/09/2026`
   and non-English month names are not parsed; this is why
   `ef.freshness.no_visible_dates` is medium confidence.

@@ -30,7 +30,9 @@ ROLE_KEYWORDS = {
     "contact": ["contact", "contact us", "get in touch", "support", "help", "kontakt", "contacto", "contatti"],
     "pricing": ["pricing", "plans", "prices", "rates", "fees", "preise", "prix", "precios", "prezzi", "tarifs"],
     "product": ["products", "product", "services", "solutions", "features", "shop", "menu", "programs", "what we do",
-                "produkte", "produits", "productos", "boutique", "tienda", "leistungen"],
+                "produkte", "produits", "productos", "boutique", "tienda", "leistungen",
+                # "features" in the languages CATEGORY_SIGNALS already scores: the category saw the page, the sampler did not
+                "funktionen", "fonctionnalités", "fonctionnalites", "funciones", "funzionalità", "funzionalita"],
     "blog": ["blog", "news", "newsroom", "press", "insights", "articles", "latest", "journal", "aktuelles",
              "actualités", "actualites", "noticias", "presse"],
 }
@@ -39,7 +41,7 @@ ROLE_SLUGS = {
     "contact": ["contact", "contact-us", "support", "kontakt", "contacto", "contatti"],
     "pricing": ["pricing", "plans", "prices", "preise", "prix", "precios", "prezzi", "tarifs"],
     "product": ["products", "product", "services", "solutions", "features", "collections", "shop", "menu", "programs",
-                "produkte", "produits", "productos", "leistungen"],
+                "produkte", "produits", "productos", "leistungen", "funktionen", "fonctionnalites", "funciones", "funzionalita"],
     "blog": ["blog", "news", "newsroom", "press", "insights", "articles", "journal", "aktuelles", "actualites", "noticias", "presse"],
 }
 ROLE_SITEMAP_PATTERNS = {

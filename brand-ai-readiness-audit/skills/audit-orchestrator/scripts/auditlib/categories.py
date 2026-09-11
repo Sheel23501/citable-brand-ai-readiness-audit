@@ -32,6 +32,42 @@ KEY_FACTS = {
     "unknown": ["what_it_does", "location_or_contact"],
 }
 
+# where each key fact is expected to be stated (section 1b). The orchestrator's absence gate reports a
+# fact missing only when every listed role the category expects was actually read; otherwise the fact is
+# "not checked". Home is always sampled, so it never blocks a verdict on its own.
+FACT_ROLES = {
+    "what_it_sells": ("home", "product"),
+    "sample_product_price": ("product", "pricing"),
+    "shipping_or_returns": ("product", "contact"),
+    "contact_method": ("home", "contact"),
+    "what_it_does": ("home", "about", "product"),
+    "pricing_or_trial": ("home", "pricing", "product"),
+    "who_it_is_for": ("home", "about", "product"),
+    "contact_or_signup_method": ("home", "contact", "pricing"),
+    "address": ("home", "contact", "about"),
+    "phone": ("home", "contact", "about"),
+    "opening_hours": ("home", "contact"),
+    "services_or_menu": ("home", "product"),
+    "services_offered": ("home", "product", "about"),
+    "who_it_serves": ("home", "about", "product"),
+    "location_or_service_area": ("home", "contact", "about"),
+    "topics_covered": ("home", "about", "blog"),
+    "publisher_identity": ("home", "about"),
+    "recency_evidence": ("home", "blog"),
+    "who": ("home", "about"),
+    "what_they_do": ("home", "about"),
+    "contact_or_profile_link": ("home", "contact", "about"),
+    "mission": ("home", "about"),
+    "programs_or_services": ("home", "about", "product"),
+    "location": ("home", "contact", "about"),
+    "how_to_participate": ("home", "about", "product"),
+    "what_company_does": ("home", "about"),
+    "headquarters": ("home", "contact", "about"),
+    "leadership_or_size": ("home", "about"),
+    "contact_or_press_method": ("home", "contact", "blog"),
+    "location_or_contact": ("home", "contact", "about"),
+}
+
 # the audience fact used by simulation Q4 (section 6)
 AUDIENCE_FACT = {
     "ecommerce": "what_it_sells", "saas_software": "who_it_is_for", "local_business": "services_or_menu",

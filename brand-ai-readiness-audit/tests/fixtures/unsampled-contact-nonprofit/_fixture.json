@@ -1,0 +1,44 @@
+{
+  "name": "unsampled-contact-nonprofit",
+  "description": "A fictional Bristol literacy charity (Harbourside Literacy Trust) whose navigation links About, Programs, News and Donate but not its contact page, which exists at /get-in-touch, is listed in the sitemap under a slug no role pattern recognises, and holds the only postal address and phone number on the site. The pages that were read genuinely lack a mission statement, so that finding must survive; the location and the address live on the page that was not read, so those claims must be scoped to the sample. Pins the two rules that keep the absence gate honest in both directions: an unreached page never becomes 'absent from the site', and an unread pricing page (which a nonprofit does not have) never weakens a confirmed finding.",
+  "base": null,
+  "category": "nonprofit_institution",
+  "routes": {},
+  "expected": {
+    "fail": [
+      "fx.facts.key_fact_missing",
+      "ef.entity.nap_missing_plain_text"
+    ],
+    "scoped": [
+      "fx.facts.key_fact_missing",
+      "ef.entity.nap_missing_plain_text"
+    ],
+    "max_severity": {
+      "fx.facts.key_fact_missing": "medium",
+      "ef.entity.nap_missing_plain_text": "medium"
+    },
+    "max_confidence": {
+      "ef.entity.nap_missing_plain_text": "low"
+    },
+    "info": [
+      "ef.entity.wikidata_unavailable",
+      "ef.corroboration.offsite_spotcheck"
+    ],
+    "pass_required": [
+      "fx.content.faq_absent",
+      "ef.corroboration.press_page_missing",
+      "en.cta.missing",
+      "en.trust.signals_missing",
+      "en.hero.value_prop_unclear",
+      "en.nav.landmark_missing",
+      "en.nav.breadcrumbs_missing",
+      "en.nav.site_search_missing",
+      "en.links.broken_sampled",
+      "fx.jsonld.missing",
+      "fx.jsonld.no_organization",
+      "ef.freshness.no_visible_dates",
+      "ef.entity.sameas_missing"
+    ],
+    "notes": "At probe level fx.facts.key_fact_missing reports two of four facts missing (mission and location) at high. The gate confirms mission (home and about were read and neither states one), cannot check location (the contact page was not reached), and re-applies rubric rule 2 to the one confirmed fact: medium, absence_scope sample, evidence 'Confirmed missing: mission. Not checked: location (contact page not reached)'. nap_missing_plain_text stays a finding because the about page was read, but at low confidence with the contact page named. pricing is also in missing_roles and must not appear anywhere in either finding: a nonprofit has no pricing page. faq_absent passes (FAQ heading on the programs page), press_page_missing passes (News is the blog role), en.cta.missing passes (Donate in the header of every key page read)."
+  }
+}

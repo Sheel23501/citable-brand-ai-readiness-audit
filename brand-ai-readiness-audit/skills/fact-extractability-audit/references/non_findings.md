@@ -47,7 +47,12 @@ that tells a business to change a legitimate choice.
   Spanish, Italian, Portuguese and Dutch and is only gated outside those.
 - **Only sampled pages are searched.** Home plus up to five role pages, chosen
   by navigation labels and sitemap patterns. A fact on an unsampled page is
-  invisible to this audit; every finding lists the pages it applies to.
+  invisible to this audit; every finding lists the pages it applies to. The
+  probe reports what it could not find; the orchestrator then decides what that
+  means (`severity_confidence_rubric.md` rule 6): a fact whose pages
+  (`site_categories.md` 1b) were not all reached is "not checked", never
+  "absent from the site", and `fx.facts.key_fact_missing` is withdrawn
+  entirely when no missing fact could be checked.
 - **Prices are recognised by currency symbols and ISO codes** (`$ £ € ¥ ₹`,
   `USD EUR GBP INR CAD AUD JPY CHF`). A price written as "twelve pounds a
   month" or in another currency's plain code is missed.

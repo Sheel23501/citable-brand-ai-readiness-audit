@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>{{BASE}}/company/about-us.html</loc><lastmod>{{DATE_MINUS_10}}</lastmod></url>
+  <url><loc>{{BASE}}/company/contact-us.html</loc><lastmod>{{DATE_MINUS_10}}</lastmod></url>
+  <url><loc>{{BASE}}/company/newsroom.html</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/company/pricing-and-plans.html</loc><lastmod>{{DATE}}</lastmod></url>
+</urlset>
