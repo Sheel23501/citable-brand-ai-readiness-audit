@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>{{BASE}}/</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/services</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/services/operations-strategy</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/services/margin-improvement</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/services/post-merger-integration</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/case-studies</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/insights</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/insights/reshoring-checklist</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/about</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/team</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/contact</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/privacy</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/terms</loc><lastmod>{{DATE}}</lastmod></url>
+</urlset>

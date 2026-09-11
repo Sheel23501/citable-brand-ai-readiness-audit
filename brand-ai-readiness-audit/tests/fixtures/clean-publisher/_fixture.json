@@ -1,0 +1,55 @@
+{
+  "name": "clean-publisher",
+  "description": "A well-built regional news site (Tidewater Gazette, Halifax, Nova Scotia), category publisher_media. Exercises the publisher key facts (topics from section headings, publisher identity from NewsMediaOrganization JSON-LD, recency from time elements, contact), the publisher applicability rules (breadcrumbs and search required, related links graded on detail pages only, FAQ not applicable), dated NewsArticle markup that must agree with the visible dates, and the medium severity of no_visible_dates for publishers. Must trigger zero fail findings.",
+  "base": null,
+  "category": "publisher_media",
+  "routes": {},
+  "expected": {
+    "fail": [],
+    "info": [
+      "ef.entity.wikidata_unavailable",
+      "ef.corroboration.offsite_spotcheck"
+    ],
+    "pass_required": [
+      "fx.facts.key_fact_missing",
+      "fx.facts.image_only",
+      "fx.jsonld.missing",
+      "fx.jsonld.required_props_missing",
+      "fx.jsonld.no_organization",
+      "fx.identity.title_missing_or_generic",
+      "fx.identity.h1_missing_or_multiple",
+      "fx.identity.meta_description_missing",
+      "fx.identity.og_missing",
+      "ef.entity.sameas_missing",
+      "ef.entity.sameas_no_authority",
+      "ef.entity.nap_missing_plain_text",
+      "ef.entity.name_inconsistent",
+      "ef.freshness.no_visible_dates",
+      "ef.freshness.stale_copyright_year",
+      "ef.freshness.date_modified_mismatch",
+      "ef.corroboration.press_page_missing",
+      "en.hero.value_prop_unclear",
+      "en.cta.missing",
+      "en.nav.landmark_missing",
+      "en.nav.breadcrumbs_missing",
+      "en.nav.site_search_missing",
+      "en.trust.signals_missing",
+      "en.continuity.h1_title_mismatch",
+      "en.interstitial.blocking",
+      "en.mobile.viewport_missing",
+      "en.lang.attribute_missing",
+      "en.links.broken_sampled",
+      "en.errors.soft_404",
+      "en.errors.unhelpful_404",
+      "cr.robots.blanket_disallow",
+      "cr.index.sitemap_missing",
+      "cr.render.js_gate",
+      "cr.render.csr_shell"
+    ],
+    "not_evaluated": {
+      "fx.content.faq_absent": "not_applicable_for_category",
+      "en.nav.related_links_missing": "listing_pages_only"
+    },
+    "notes": "Category publisher_media at high confidence: NewsMediaOrganization JSON-LD, nav labels News and Subscribe plus the section cluster Politics / Business / Sport / Culture, URL pattern /news/. Roles: blog=/news ('News'), about, contact; product and pricing are missing roles, which is normal for a publisher. Key facts: topics_covered from the four section h2 headings on /news, publisher_identity from the NewsMediaOrganization name, recency_evidence from the time elements, contact_method from the mailto link. The sampled blog page is a section listing, so related_links is not graded (listing_pages_only) and the contract says so; faq_absent is not applicable to publishers. The Canadian address is read from JSON-LD and from the street grammar ('1741 Lower Water Street'); the B3J 1S5 postal code itself has no grammar yet, which is why the footer keeps the street line."
+  }
+}

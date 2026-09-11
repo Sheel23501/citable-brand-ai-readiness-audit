@@ -78,7 +78,17 @@ outsized effect on disambiguation.
 `wikidata.org`, `wikipedia.org`, `linkedin.com`, `crunchbase.com`,
 `companieshouse`, `company-information.service.gov.uk`, `opencorporates.com`,
 `sec.gov`, `dnb.com`, `bloomberg.com`, `glassdoor.com`, `g2.com`,
-`trustpilot.com` (`auditlib/extract.py` `AUTHORITY_HOSTS`). For
+`trustpilot.com`; the national company registers and their public mirrors
+outside the UK and US (`societe.com`, `pappers.fr`, `infogreffe.fr`,
+`handelsregister.de`, `northdata`, `unternehmensregister.de`, `zefix.ch`,
+`kvk.nl`, `registroimprese.it`, `abr.business.gov.au`, `asic.gov.au`,
+`bizfile.gov.sg`, `companiesoffice.govt.nz`, `zaubacorp.com`, `tofler.in`,
+`mca.gov.in`, `cvr.dk`, `brreg.no`); and the place and review listings that
+carry a stable identifier for a business the way Trustpilot does
+(`tripadvisor`, `yelp.com`, `maps.app.goo.gl`). The list is
+`auditlib/extract.py` `AUTHORITY_HOSTS`, matched as substrings of the host. A
+Paris bistro anchored to TripAdvisor and societe.com was told it had "only
+social profiles" under the Anglo-only first version of this list. For
 `portfolio_personal` a professional-profile host also counts
 (`PROFILE_HOSTS`: `linkedin.com`, `github.com`, `behance.net`,
 `dribbble.com`, `instagram.com`, `twitter.com`, `x.com`, `facebook.com`,
@@ -180,13 +190,22 @@ usable) is searched for:
   `og:site_name`, a repeated title segment); a name guessed from the host
   label is not evidence, so it is dropped from the requirement and the
   `computed` item shows `required=` without it.
-- **postal address**: a street pattern (a number, up to three capitalised
-  words, and a street word in English, German, French, Spanish or Italian), a
-  UK postcode preceded within 40 characters by a word, or a US city, state
-  and ZIP.
-- **phone**: 9–15 digits in phone layout that either start with `+` or follow
-  a cue word within 30 characters (phone, tel, telephone, call, mobile, cell,
-  whatsapp, fax, ph).
+- **postal address**: any shape the shared `address_match` reads: a street
+  pattern in either word order (a number then a capitalised street word in
+  English, German, French, Spanish or Italian; a street word then a number,
+  "Hauptstrasse 12"; a number then a lower-case French street word and a
+  proper noun, "12 rue des Archives"), a UK postcode preceded within 40
+  characters by a word, a US city, state and ZIP, an Indian PIN qualified by
+  a state or by "India", a Japanese postal mark, or a European postcode and
+  city corroborated by a postal cue or an adjacent country name.
+- **phone**: 9–15 digits in one of three layouts, that either start with `+`
+  or follow a cue word within 30 characters. The layouts are the Anglo one
+  (area code, exchange, number), the international one with a country code
+  and the country's own grouping ("+33 1 42 72 00 00", "+61 2 9000 0000",
+  "+91 11 2690 7400"), and the French domestic one (five pairs starting with
+  0). Cue words: phone, tel, tél, téléphone, telefon, teléfono, telefone,
+  telefoon, call, mobile, cell, handy, whatsapp, fax, ph, each optionally
+  followed by a full stop and a colon ("Tél. :").
 - **email**: an address pattern.
 
 Required per category: `local_business` name, postal address and phone;

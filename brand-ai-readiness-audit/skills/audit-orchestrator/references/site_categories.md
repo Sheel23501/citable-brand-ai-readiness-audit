@@ -176,6 +176,14 @@ Expected CTA vocabulary per category (used by `en.cta.missing`; a match is a
 - corporate_enterprise: contact, learn more, explore, careers
 - unknown: contact, get started, learn more
 
+On a page whose language is German, French, Spanish, Italian, Portuguese or
+Dutch the matcher also searches that language's list (`CTA_VOCAB_BY_LANG`),
+which carries the same families of verbs: sign up and subscribe, buy and
+order, contact, book a table and call and directions, get a quote and make an
+appointment, read, apply, donate and join. A language outside that set is not
+guessed at: the check reports `not_evaluated` with reason
+`language_not_supported`.
+
 Expected trust signals per category (used by `en.trust.signals_missing`; ≥ 1
 present passes):
 

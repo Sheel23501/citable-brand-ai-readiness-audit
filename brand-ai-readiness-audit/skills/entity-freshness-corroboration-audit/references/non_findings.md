@@ -45,11 +45,12 @@ that tells a business to change a legitimate choice.
   reports what an assistant would find under the name and asks the site to
   publish anchors; it does not judge the name.
 - **Phone and address recognition is pattern-based.** A bare number with no
-  `+`, no cue word in front of it (phone, tel, Telefon, Tél., teléfono and
-  the like) and no `tel:` link around it ("0117 496 0123" alone on a line) is
-  not recognised as a phone. Behind a cue or inside a `tel:` link, national
-  groupings such as "0211 - 63 55 33 55" are. An address is recognised in either word order -- number-then-street
-  ("12 Harbour Street", "12 Rue de Rivoli") and street-then-number
+  `+`, no cue word in front of it and no `tel:` link around it ("0117 496 0123"
+  alone on a line) is not recognised as a phone; with a cue in any of the
+  covered languages ("Tél. : 01 42 72 00 00", "Telefon: 030 5557 0199"), a
+  country code ("+61 2 9000 0000", whatever the grouping), or a `tel:` link
+  around it (the header number "0211 - 63 55 33 55") it is. An address is recognised in either word order -- number-then-street
+  ("12 Harbour Street", "12 Rue de Rivoli", "12 rue des Archives") and street-then-number
   ("Hauptstrasse 12", "Via Montenapoleone 8") -- plus UK postcodes, US
   city/state/ZIP, Indian PINs qualified by a state or by "India", Japanese
   postal marks, and a European postcode-and-city line. That last shape is the

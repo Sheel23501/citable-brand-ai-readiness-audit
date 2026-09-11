@@ -12,8 +12,19 @@ from .htmldoc import PRICE_RE
 
 # ------------------------------------------------------------------ regexes
 EMAIL_RE = re.compile(r"\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b")
-PHONE_TEXT_RE = re.compile(r"(?<![\w/])(\+\d{1,3}[\s.\-]?)?(\(?\d{2,5}\)?[\s.\-]?)\d{3,4}[\s.\-]?\d{3,5}(?![\w/])")
-PHONE_CUE_RE = re.compile(r"\b(phone|tel|telephone|call|mobile|cell|whatsapp|fax|ph)\b\.?:?\s*$", re.I)
+# Phone layouts. The first alternative is the Anglo shape (area code, exchange, number). The second is the
+# international form with a country code and whatever grouping the country uses: France and Belgium pair the
+# digits ("+33 1 42 72 00 00"), Australia and India lead with a one- or two-digit area code ("+61 2 9000 0000",
+# "+91 11 2690 7400"). The Anglo shape could not read those because it wants two digits in the first group and
+# three in the second, so a Paris bistro with its number in the footer was reported as having no phone. The
+# third is the French domestic form: five pairs starting with 0. Callers still require 9 to 15 digits and either
+# a leading "+" or a cue word, so a date or a reference number does not pass.
+PHONE_TEXT_RE = re.compile(
+    r"(?<![\w/])(?:(\+\d{1,3}[\s.\-]?)?(\(?\d{2,5}\)?[\s.\-]?)\d{3,4}[\s.\-]?\d{3,5}"
+    r"|\+\d{1,3}(?:[\s.\-]\(?\d{1,5}\)?){2,5}"
+    r"|0\d(?:[\s.]\d{2}){4})(?![\w/])")
+# The cue word before a number, in the languages the address grammars cover: "Tél. :", "Telefon:", "Teléfono:".
+PHONE_CUE_RE = re.compile(r"\b(phone|tel|t[eé]l|t[eé]l[eé]phone|tel[eé]fono|telefon|telefone|telefoon|call|mobile|cell|handy|whatsapp|fax|ph)\b\.?\s*:?\s*$", re.I)
 SALES_LED_RE = re.compile(
     r"\b(request|book|schedule|arrange|get|see)\s+(a\s+|your\s+|an?\s+)?(demo|quote|consultation|callback|call)\b"
     r"|\b(contact|talk\s+to|speak\s+(to|with)|chat\s+(to|with))\s+(our\s+)?(sales|sales\s+team|team\s+for\s+pricing)\b"
@@ -35,6 +46,12 @@ POSTAL_CUE_RE = re.compile(r"\b(suite|floor|fl\.|building|bldg|unit|level|po\s+b
 STREET_REVERSED_RE = re.compile(  # "Hauptstrasse 12", "Via Montenapoleone 8", "Rue du Marche 27"
     r"\b[A-ZÄÖÜ][\wÄÖÜäöüß'’\-]*(?:stra(?:ss|ß)e|str\.|gasse|weg|allee|platz|ring|damm)\s+\d{1,4}\s*[a-z]?\b"
     r"|\b(?:rue|avenue|boulevard|via|viale|calle|carrer|plaza|praca|praça)\s+[\w'’\-\s]{2,40}?\s+\d{1,4}\b", re.I)
+# French and Belgian addresses put the street word in lower case after the number ("12 rue des Archives",
+# "3 boulevard Saint-Germain"), so the capitalised alternation in STREET_RE never sees them. The proper noun
+# after the street word must be capitalised, which keeps "finished in 12th place" and "12 place mats" out.
+STREET_FR_RE = re.compile(
+    r"\b\d{1,4}(?:\s?(?:bis|ter))?,?\s+(?:rue|avenue|av\.|boulevard|bd|impasse|all[ée]e|chemin|quai|cours|place|route|passage|villa|cit[ée])\s+"
+    r"(?:d[eu]s?\s+|de\s+la\s+|de\s+l['’]|du\s+|la\s+|le\s+|l['’])?[A-ZÀ-Ý][\w'’\-]+")
 IN_STATES = (r"andhra\s+pradesh|karnataka|kerala|maharashtra|tamil\s+nadu|telangana|gujarat|rajasthan|punjab|"
              r"haryana|west\s+bengal|uttar\s+pradesh|madhya\s+pradesh|bihar|odisha|assam|goa|delhi|chandigarh")
 IN_PIN_RE = re.compile(  # a bare six-digit run is far too common to trust; require country, state or a PIN label
@@ -118,8 +135,18 @@ TEXT_DATE_RE = re.compile(r"\b(?:\d{1,2}(?:st|nd|rd|th)?\s+)?(jan|feb|mar|apr|ma
 COPYRIGHT_RE = re.compile(r"(?:©|\(c\)|copyright)\s*(?:(?:19|20)\d{2}(?:\s*[-–]\s*(?:19|20)\d{2})?\s*)?([A-Z][\w&.,'’\- ]{2,60}?)(?=\.|,|\s+all\s+rights|\s*$|\s+·|\s+\|)", re.I | re.M)
 PROFILE_HOSTS = ("instagram.com", "linkedin.com", "behance.net", "dribbble.com", "github.com", "twitter.com", "x.com", "facebook.com",
                  "youtube.com", "tiktok.com", "vimeo.com", "medium.com", "substack.com", "mastodon", "bsky.app", "threads.net", "pinterest.com")
+# Hosts whose page about a brand pins its name to one entity: knowledge graphs, professional networks, and the
+# company registers (or their public mirrors) of the countries the address grammars cover, plus review and place
+# listings that carry a stable identifier for a business the way Trustpilot does. Matched as substrings of the
+# host, so "tripadvisor." covers every country edition and "northdata." both .de and .com. A Paris bistro whose
+# only anchors were TripAdvisor and societe.com was told it had "only social profiles"; that was the Anglo
+# register list talking, not the site.
 AUTHORITY_HOSTS = ("wikidata.org", "wikipedia.org", "linkedin.com", "crunchbase.com", "companieshouse", "company-information.service.gov.uk",
-                   "opencorporates.com", "sec.gov", "dnb.com", "bloomberg.com", "glassdoor.com", "g2.com", "trustpilot.com")
+                   "opencorporates.com", "sec.gov", "dnb.com", "bloomberg.com", "glassdoor.com", "g2.com", "trustpilot.com",
+                   "societe.com", "pappers.fr", "infogreffe.fr", "handelsregister.de", "northdata.", "unternehmensregister.de",
+                   "zefix.ch", "kvk.nl", "registroimprese.it", "abr.business.gov.au", "asic.gov.au", "bizfile.gov.sg",
+                   "companiesoffice.govt.nz", "zaubacorp.com", "tofler.in", "mca.gov.in", "cvr.dk", "brreg.no",
+                   "tripadvisor.", "yelp.com", "maps.app.goo.gl")
 GENERIC_HEADINGS = ("contact", "about", "faq", "frequently asked", "related", "latest", "news", "newsletter", "follow", "footer", "menu",
                     "navigation", "search", "log in", "login", "sign in", "legal", "privacy", "terms", "cookie", "subscribe", "share", "leadership",
                     "where we are", "press", "security", "who it is for", "who we are", "what we do", "trusted by")
@@ -464,7 +491,7 @@ def _guard_address_context(text, m):
 
 
 # Order matters only for which label is reported; every pattern is tried before giving up.
-ADDRESS_PATTERNS = ((STREET_RE, "street"), (STREET_REVERSED_RE, "street"),
+ADDRESS_PATTERNS = ((STREET_RE, "street"), (STREET_REVERSED_RE, "street"), (STREET_FR_RE, "street"),
                     (UK_POSTCODE_RE, "uk_postcode"), (US_CITY_STATE_ZIP_RE, "us_city_state_zip"),
                     (IN_PIN_RE, "in_pin"), (EU_POSTCODE_CITY_RE, "eu_postcode_city"),
                     (JP_POSTCODE_RE, "jp_postcode"))
@@ -737,13 +764,31 @@ def find_participation(pages):
     return find_by_regex(pages, PARTICIPATE_RE, prefer=("home", "product", "about"), use_links=True, use_headings=True)
 
 
+def _leadership_value(key, v):
+    """The quotable text of a leadership or size property, or None.
+
+    schema.org writes numberOfEmployees as a QuantitativeValue ({"value": 12400}) and founder as a Person;
+    reading only `name` returned an empty string for the count, and an empty string became a "present" fact
+    the simulation then quoted as nothing.
+    """
+    if isinstance(v, list):
+        v = v[0] if v else None
+    if isinstance(v, dict):
+        v = v.get("name") or v.get("value") or v.get("minValue")
+    if v is None or v == "" or isinstance(v, (dict, list)):
+        return None
+    if key == "numberOfEmployees" and not isinstance(v, str):
+        return "%s employees" % v
+    return str(v)
+
+
 def find_leadership_or_size(pages):
     for p in _ordered(pages, ("about", "home")):
         for n, _ in doc_top_nodes(p.doc):
             for k in ("numberOfEmployees", "founder", "founders", "employee", "member"):
-                if _present(n.get(k)):
-                    v = n.get(k)
-                    return _found(v if isinstance(v, str) else (v.get("name") if isinstance(v, dict) else k), p, "jsonld:%s" % k)
+                v = _leadership_value(k, n.get(k))
+                if v:
+                    return _found(v, p, "jsonld:%s" % k)
         t = p.doc.body_text or ""
         m = LEADERSHIP_RE.search(t) or SIZE_RE.search(t)
         if m:

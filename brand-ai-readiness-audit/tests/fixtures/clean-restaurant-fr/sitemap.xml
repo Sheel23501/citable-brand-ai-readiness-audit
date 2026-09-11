@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>{{BASE}}/</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/menu</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/a-propos</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/contact</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/actualites</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/actualites/nouvelle-carte-automne</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/reservation</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/mentions-legales</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/confidentialite</loc><lastmod>{{DATE}}</lastmod></url>
+</urlset>

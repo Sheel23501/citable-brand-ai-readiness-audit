@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>{{BASE}}/</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/news</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/news/politics</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/news/business</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/news/sport</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/news/culture</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/news/harbour-ferry-funding</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/news/fishery-quota-2026</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/about</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/contact</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/subscribe</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/newsletter</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/privacy</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/terms</loc><lastmod>{{DATE}}</lastmod></url>
+</urlset>

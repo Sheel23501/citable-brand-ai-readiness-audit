@@ -12,8 +12,8 @@ you missed.
 The full suite is ~10 minutes. **Do not run it on every edit.** Run the stage
 you touched.
 
-Stages split sharply by whether they need the fixture farm (24 local HTTP
-servers). Measured on a laptop:
+Stages split sharply by whether they need the fixture farm (one local HTTP
+server per fixture, 29 today). Measured on a laptop:
 
 | Stage | Needs servers | Time |
 |---|---|---|
@@ -86,7 +86,12 @@ from the site. The tests enforce six of them.
    **every** fixture at once if you skip it.
 6. **`tests/fixtures/<name>/`** — a fixture that triggers it, with the check id
    listed in `_fixture.json` under `expected.fail` / `expected.info`, plus the
-   ids that must still `pass`. A check with no fixture is untested.
+   ids that must still `pass`. A check with no fixture is untested. If the
+   check declines to grade some category or language, name that too:
+   `expected.not_evaluated` maps a check id to the reason it must record
+   (`not_applicable_for_category`, `language_not_supported`,
+   `listing_pages_only`, …), and the probe, compose and run_audit stages all
+   assert it, so a "no verdict" is a tested outcome rather than a silent one.
 7. **`skills/audit-orchestrator/scripts/compose.py`** → `ABSENCE_ROLES` — only
    if the check claims something is absent from the *site* (not from a page it
    read): the roles whose pages could carry the thing, so the absence gate
@@ -164,6 +169,43 @@ makes `TemporaryDirectory` cleanup fail with `WinError 32`.
 
 **Derive counts, never hardcode them.** A test that asserts `checks_run == 61`
 goes stale the moment someone adds a check. Use `len(Registry().rows)`.
+
+---
+
+## What the fixtures cover
+
+Generalization is tested by construction: a well-built site per category must
+produce **zero defects**, and every language- or country-dependent detector has
+a fixture written in that language or country whose facts it must read. The
+suite asserts the clean set (`CLEAN_SITES` in `run_tests.py`) reports no
+defect, populates the recommendations, states the fixture's category, and
+answers every simulation question from the facts file.
+
+| Category | Clean site (zero defects) | Defect / edge fixtures |
+|---|---|---|
+| `saas_software` | `clean-site` (Ledgerly, Bristol, en) | `weak-engagement`, `weak-entity`, `undated-entity`, `bare-metadata`, `malformed-jsonld`, `image-only-pricing`, `bot-blocking-robots`, `blocked-links`, `non-html-seed`, `js-nav-thin-sample`, the five `edge-*` policy cases, `german-site` (de) |
+| `local_business` | `clean-restaurant-fr` (Bistrot Marguerite, Paris, **fr**) | — |
+| `professional_services` | `clean-consultancy` (Northgate Advisory, New York, en) | — |
+| `publisher_media` | `clean-publisher` (Tidewater Gazette, Halifax NS, en) | — |
+| `corporate_enterprise` | `clean-corporate` (Meridian Industrial Group, Sydney, en) | — |
+| `ecommerce` | — | `weak-ecommerce` (orientation defects only; discoverability clean) |
+| `nonprofit_institution` | — | `unsampled-contact-nonprofit` (absence gate), `hindi-nonprofit` (**hi**, Devanagari: language gate) |
+| `portfolio_personal` | `one-page-portfolio` (category caps) | — |
+| `unknown` | — | `csr-shell`, `js-gate`, `challenge-page`, `blanket-disallow`, `edge-refuses-auditor` |
+
+| Language / country | Fixture | What it proves |
+|---|---|---|
+| English, UK and US addresses | `clean-site`, `clean-consultancy` | the baseline |
+| German, street-then-number address, German hours and CTA words | `german-site` | non-English recognition, plus the language gate on the checks whose phrase lists are English only |
+| French, lower-case street word, pair-grouped phone with a "Tél." cue, French hours and CTA words, TripAdvisor and a national register as identity anchors | `clean-restaurant-fr` | a French site is fully readable: nothing is gated, nothing is missed |
+| Australian phone (single-digit area code), Australian street address | `clean-corporate` | international phone grouping |
+| Canadian address (street line; the postal code has no grammar yet) | `clean-publisher` | the street grammar carries an address the postcode grammar cannot |
+| Hindi, Devanagari throughout, Indian phone, English slugs under Hindi labels | `hindi-nonprofit` | structure, dates, phone and JSON-LD are read; whole-word tokenising of Indic text; the English-phrase checks are gated to low confidence and the CTA check declines rather than guesses |
+
+What is still not covered, and is listed as a limitation rather than guessed
+at: written non-English dates, Devanagari and CJK addresses, Australian,
+Canadian, Singaporean and Brazilian postcodes, and any page whose language the
+Latin stopword detector cannot name when it declares no `lang`.
 
 ---
 

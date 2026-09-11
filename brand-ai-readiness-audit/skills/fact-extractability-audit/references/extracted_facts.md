@@ -81,12 +81,12 @@ English-first (see `non_findings.md`, limits).
 | `pricing_or_trial` | saas | currency amount in text or `Offer.price`/`lowPrice` in JSON-LD (pricing, product, home first) → sales-led phrase on the pricing, product or home page (anywhere if the site has no pricing page), in text or link text → free-tier phrase anywhere → free-trial phrase anywhere (**partial**) | `price`, `sales_led`, `free_tier`, `trial_only` |
 | `sample_product_price` | ecommerce | currency amount in text or `Offer.price` (product, pricing, home first) | `price` |
 | `who_it_is_for`, `who_it_serves`, `audience` | saas, professional; optional everywhere | JSON-LD `audience` (`audienceType` or `name`) → "built / designed / made / tailored / perfect / ideal / trusted / used / loved for|by … <audience noun>" in text (home, about, product first) | `audience` |
-| `contact_method` | ecommerce, professional, publisher | `mailto:` link or e-mail address in text (contact, home first) → phone: JSON-LD `telephone`, or a 9–15 digit number that starts with `+` or follows a phone cue word → a form on the contact page with an email or message field | `contact` |
+| `contact_method` | ecommerce, professional, publisher | `mailto:` link or e-mail address in text (contact, home first) → phone: `tel:` link, JSON-LD `telephone`, or a 9–15 digit number in an Anglo, international ("+33 1 42 72 00 00", "+61 2 9000 0000") or French-domestic layout that starts with `+` or follows a phone cue word in any covered language ("Tél. :", "Telefon:") → a form on the contact page with an email or message field | `contact` |
 | `contact_or_signup_method` | saas | as `contact_method` → sign-up phrase in text, link or button text ("sign up", "get started", "create account", "start free", …) | `contact`, `signup` |
 | `contact_or_press_method` | corporate | as `contact_method` → press e-mail (press@, media@, pr@) → press or newsroom phrase in text, headings or links | `contact`, `press` |
 | `contact_or_profile_link` | portfolio | as `contact_method` → JSON-LD `sameAs` URLs → a link to a profile host (LinkedIn, GitHub, Instagram, Behance, Dribbble, X/Twitter, Facebook, …) | `contact`, `profile_link` |
-| `address` | local | JSON-LD `PostalAddress` with a street, or locality plus postcode → street pattern in either word order ("12 Harbour Street", "Hauptstrasse 12"), UK postcode (with a word before it), US city-state-zip, Indian PIN with a state or "India", Japanese 〒 postcode, or a European postcode-and-city line next to a postal cue, in body text (contact, about, home first) | `address` |
-| `phone` | local | JSON-LD `telephone` → phone number in text as above | `phone` |
+| `address` | local | JSON-LD `PostalAddress` with a street, or locality plus postcode → the shared `address_match` grammars in body text (contact, about, home first): street line in either word order incl. the lower-case French form ("12 rue des Archives"), UK postcode (with a word before it), US city-state-zip, Indian PIN with state or country, Japanese postal mark, European postcode+city with a postal cue or country adjacent | `address` |
+| `phone` | local | `tel:` link → JSON-LD `telephone` → phone number in text as above | `phone` |
 | `opening_hours` | local | JSON-LD `openingHoursSpecification` or `openingHours` → day-and-time pattern in body text (contact, home, product first) | `hours` |
 | `services_or_menu` | local | three or more named top-level `Product`/`Service`/`Menu`/`MenuItem`/`ItemList`/`Offer`/`Course`/`Event` nodes or `itemListElement` names (not breadcrumbs) → three or more non-generic h2/h3 headings of at most eight words → three or more 2–10 word links in the main content (product, home, contact first) | `list` |
 | `services_offered`, `programs_or_services` | professional, nonprofit | as above (product, home, about first) | `list` |
@@ -115,7 +115,7 @@ capitalised.
 | `source` | Meaning |
 |---|---|
 | `text` | Visible body text (plus meta description and JSON-LD leaf strings for phrase searches). |
-| `text:street`, `text:uk_postcode`, `text:us_city_state_zip` | Which address pattern matched. |
+| `text:street`, `text:uk_postcode`, `text:us_city_state_zip`, `text:in_pin`, `text:eu_postcode_city`, `text:jp_postcode` | Which address grammar matched (`street` covers both word orders and the French lower-case form). |
 | `text:copyright`, `text:press_email` | Copyright line; press e-mail address. |
 | `meta:description`, `meta:og:description`, `meta:og:site_name` | The named meta tag. |
 | `jsonld:<Type>.<property>` | A property of a top-level node of that type (`jsonld:Organization.name`, `jsonld:Person.jobTitle`, `jsonld:Offer.price`). |

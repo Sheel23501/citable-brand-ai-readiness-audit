@@ -36,7 +36,7 @@ from auditlib.categories import (CTA_VOCAB, CTA_VOCAB_BY_LANG, CTA_LANGS_SUPPORT
 from auditlib.cli import probe_main  # noqa: E402
 from auditlib.fetch import Fetcher, normalize_url, registrable_domain  # noqa: E402
 from auditlib.findings import ProbeOutput, evidence_item, impact_for, priority_for  # noqa: E402
-from auditlib.htmldoc import Document  # noqa: E402
+from auditlib.htmldoc import Document, WORD_RE  # noqa: E402
 from auditlib.render import render_state  # noqa: E402
 from auditlib.sampler import CONTEXT_RANK  # noqa: E402
 
@@ -62,7 +62,6 @@ STOPWORDS = {"this", "that", "with", "from", "your", "have", "will", "home", "pa
              "which", "their", "there", "they", "them", "then", "than", "into", "over", "also", "just", "only", "some", "such",
              "very", "here", "been", "were", "being", "after", "before", "other", "every", "each", "because", "while", "these",
              "those", "would", "could", "should", "welcome", "official", "site", "website"}
-_WORD_RE = re.compile(r"\w+", re.U)
 RELATED_HEADING_RE = re.compile(r"\b(related|similar|you\s+may\s+also\s+like|you\s+might\s+also\s+like|recommended|see\s+also|read\s+next|"
                                 r"further\s+reading|more\s+(from|like|in)|customers\s+also|people\s+also|popular\s+(posts|products|articles)|"
                                 r"you\s+may\s+also\s+need|frequently\s+bought|latest\s+(posts|articles|from))\b", re.I)
@@ -104,7 +103,11 @@ def _norm(url):
 
 
 def _words(s):
-    return _WORD_RE.findall(s or "")
+    return WORD_RE.findall(s or "")   # the shared tokenizer: whole words in every script, see htmldoc.WORD_RE
+
+
+def _norm_words(s):
+    return " ".join(w.lower() for w in _words(s))
 
 
 def _noun_re(category):
@@ -550,12 +553,22 @@ def check_continuity(ctx, out, usable, work):
         h1 = next((h for h in doc.h1s if h.strip()), None)
         if not h1 or not title or title.lower() in X.GENERIC_TITLES or title.lower() == host:
             continue  # fx.identity.* owns missing/generic titles and missing or empty h1s (dedupe row 10)
-        graded += 1
         h1w = _content_words(h1)
         tw = _content_words(title) | _content_words(doc.meta("description") or "")
         shared = sorted(h1w & tw)
-        work.setdefault("continuity", {})[p.final_url] = {"role": p.role, "h1": h1[:120], "title": title[:120], "shared": shared[:5]}
-        if shared:
+        # A title or description that repeats the heading word for word matches whatever its words are; and a
+        # heading made only of function words ("What we do", "Get in touch") that is not repeated has nothing
+        # to compare, so it is not graded rather than failed. Measured: a corporate "What we do" page under the
+        # title "What we do — Meridian Industrial Group" was reported as a mismatch.
+        h1n = _norm_words(h1)
+        verbatim = bool(h1n) and (h1n in _norm_words(title) or h1n in _norm_words(doc.meta("description") or ""))
+        if not h1w and not verbatim:
+            work.setdefault("continuity", {})[p.final_url] = {"role": p.role, "h1": h1[:120], "title": title[:120], "shared": [], "graded": False}
+            continue
+        graded += 1
+        work.setdefault("continuity", {})[p.final_url] = {"role": p.role, "h1": h1[:120], "title": title[:120],
+                                                            "shared": shared[:5] or (["(heading repeated verbatim)"] if verbatim else [])}
+        if shared or verbatim:
             ok.append(p.final_url)
         else:
             failing.append(p)

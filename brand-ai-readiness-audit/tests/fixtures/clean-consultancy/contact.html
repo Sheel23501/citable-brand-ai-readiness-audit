@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contact Northgate Advisory — Book a consultation</title>
+<meta name="description" content="Contact Northgate Advisory by email, phone or the form below to book a consultation. We reply within one business day.">
+<link rel="canonical" href="{{BASE}}/contact">
+<meta property="og:title" content="Contact Northgate Advisory — Book a consultation">
+<meta property="og:description" content="Contact Northgate Advisory by email, phone or the form below to book a consultation. We reply within one business day.">
+<meta property="og:site_name" content="Northgate Advisory">
+<meta property="og:url" content="{{BASE}}/contact">
+<meta property="og:type" content="website">
+<style>body{font-family:system-ui,sans-serif;max-width:960px;margin:0 auto;padding:1rem;color:#222}header,footer{display:flex;flex-wrap:wrap;gap:1rem;align-items:center}nav ul{display:flex;gap:1rem;list-style:none;padding:0}.button{background:#264653;color:#fff;padding:.5rem 1rem;border-radius:4px;text-decoration:none}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:.4rem .8rem}</style>
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@type": "ProfessionalService",
+ "name": "Northgate Advisory",
+ "legalName": "Northgate Advisory LLC",
+ "url": "{{BASE}}/",
+ "telephone": "+1 212 555 0142",
+ "email": "hello@northgate-advisory.example",
+ "description": "Northgate Advisory is an operations consultancy for mid-market manufacturing companies in North America.",
+ "foundingDate": "2014-06-01",
+ "areaServed": "United States and Canada",
+ "address": {
+  "@type": "PostalAddress",
+  "streetAddress": "245 Fifth Avenue, Suite 1200",
+  "addressLocality": "New York",
+  "addressRegion": "NY",
+  "postalCode": "10016",
+  "addressCountry": "US"
+ },
+ "sameAs": [
+  "https://www.linkedin.com/company/northgate-advisory-example",
+  "https://www.crunchbase.com/organization/northgate-advisory-example"
+ ]
+}
+</script>
+</head>
+<body>
+<header>
+  <a href="/" class="logo"><strong>Northgate Advisory</strong></a>
+  <nav aria-label="Main">
+    <ul><li><a href="/services">Services</a></li><li><a href="/case-studies">Case studies</a></li><li><a href="/insights">Insights</a></li><li><a href="/about">About</a></li><li><a href="/team">Team</a></li><li><a href="/contact">Contact</a></li></ul>
+  </nav>
+  
+  <a class="button" href="/contact">Book a consultation</a>
+</header>
+<nav aria-label="Breadcrumb" class="breadcrumb"><ol><li><a href="/">Home</a></li><li aria-current="page">Contact</li></ol></nav>
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@type": "BreadcrumbList",
+ "itemListElement": [
+  {
+   "@type": "ListItem",
+   "position": 1,
+   "name": "Home",
+   "item": "{{BASE}}/"
+  },
+  {
+   "@type": "ListItem",
+   "position": 2,
+   "name": "Contact",
+   "item": "{{BASE}}/contact"
+  }
+ ]
+}
+</script>
+<main>
+<h1>Contact Northgate Advisory</h1>
+  <p>Email <a href="mailto:hello@northgate-advisory.example">hello@northgate-advisory.example</a> or call <a href="tel:+12125550142">+1 212 555 0142</a>, Monday to Friday, 9am - 6pm Eastern. We reply within one business day.</p>
+  <h2>Book a consultation</h2>
+  <form action="/contact" method="post">
+    <p><label for="name">Name</label> <input type="text" id="name" name="name" required></p>
+    <p><label for="email">Work email</label> <input type="email" id="email" name="email" required></p>
+    <p><label for="message">What would you like to discuss?</label> <textarea id="message" name="message" rows="4"></textarea></p>
+    <p><button type="submit" class="button">Send</button></p>
+  </form>
+  <h2>Office</h2>
+  <p>Northgate Advisory LLC<br>245 Fifth Avenue, Suite 1200<br>New York, NY 10016<br>United States</p>
+  <h2>Press</h2>
+  <p><a href="mailto:press@northgate-advisory.example">press@northgate-advisory.example</a></p>
+</main>
+<footer>
+<p><strong>Northgate Advisory LLC</strong><br>245 Fifth Avenue, Suite 1200, New York, NY 10016, United States<br>Phone: <a href="tel:+12125550142">+1 212 555 0142</a> · Email: <a href="mailto:hello@northgate-advisory.example">hello@northgate-advisory.example</a></p>
+  <p><a href="/about">About</a> · <a href="/team">Team</a> · <a href="/case-studies">Case studies</a> · <a href="/insights">Insights</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></p>
+  <p>Last updated <time datetime="{{DATE}}">{{DATE}}</time>. © {{YEAR}} Northgate Advisory LLC.</p>
+</footer>
+</body>
+</html>

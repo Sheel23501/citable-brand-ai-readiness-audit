@@ -1,0 +1,55 @@
+{
+  "name": "clean-consultancy",
+  "description": "A well-built New York operations consultancy site (Northgate Advisory), category professional_services. Exercises the professional-services key facts (services list, audience sentence, service area, contact), the professional-services trust rule (named team, case studies, credentials, address), the 'Book a consultation' CTA vocabulary, ProfessionalService JSON-LD graded under the LocalBusiness rule, and a US city-state-ZIP address. Must trigger zero fail findings.",
+  "base": null,
+  "category": "professional_services",
+  "routes": {},
+  "expected": {
+    "fail": [],
+    "info": [
+      "ef.entity.wikidata_unavailable",
+      "ef.corroboration.offsite_spotcheck"
+    ],
+    "pass_required": [
+      "fx.facts.key_fact_missing",
+      "fx.facts.image_only",
+      "fx.jsonld.missing",
+      "fx.jsonld.required_props_missing",
+      "fx.jsonld.no_organization",
+      "fx.identity.title_missing_or_generic",
+      "fx.identity.h1_missing_or_multiple",
+      "fx.identity.meta_description_missing",
+      "fx.identity.og_missing",
+      "fx.content.faq_absent",
+      "ef.entity.sameas_missing",
+      "ef.entity.sameas_no_authority",
+      "ef.entity.nap_missing_plain_text",
+      "ef.entity.name_inconsistent",
+      "ef.freshness.no_visible_dates",
+      "ef.freshness.stale_copyright_year",
+      "ef.freshness.date_modified_mismatch",
+      "ef.corroboration.press_page_missing",
+      "en.hero.value_prop_unclear",
+      "en.cta.missing",
+      "en.nav.landmark_missing",
+      "en.trust.signals_missing",
+      "en.continuity.h1_title_mismatch",
+      "en.interstitial.blocking",
+      "en.mobile.viewport_missing",
+      "en.lang.attribute_missing",
+      "en.links.broken_sampled",
+      "en.errors.soft_404",
+      "en.errors.unhelpful_404",
+      "cr.robots.blanket_disallow",
+      "cr.index.sitemap_missing",
+      "cr.render.js_gate",
+      "cr.render.csr_shell"
+    ],
+    "not_evaluated": {
+      "en.nav.breadcrumbs_missing": "not_applicable_for_category",
+      "en.nav.site_search_missing": "not_applicable_for_category",
+      "en.nav.related_links_missing": "not_applicable_for_category"
+    },
+    "notes": "Category professional_services at high confidence: ProfessionalService JSON-LD, nav labels Services / Case studies / Team, URL patterns /services/ and /case-studies. Roles: product=/services, about=/about (the nav lists About before Team, both match the about role), blog=/insights, contact=/contact; pricing missing. Key facts: services_offered from the four h2 headings on /services, who_it_serves from 'built for mid-market manufacturing companies' on home, location_or_service_area from the PostalAddress, contact_method from the mailto link. Trust passes on the 'Leadership' and 'Our team' headings, the Case studies link, the credentials sentence and the street address. The FAQ is both FAQPage JSON-LD and question headings on /services. The three not_evaluated entries are the professional-services applicability caps."
+  }
+}

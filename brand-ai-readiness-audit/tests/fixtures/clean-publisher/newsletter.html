@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The morning newsletter — Tidewater Gazette</title>
+<meta name="description" content="The Tidewater Gazette's free morning newsletter: the day's stories in five minutes, every weekday at 7am.">
+<link rel="canonical" href="{{BASE}}/newsletter">
+<meta property="og:title" content="The morning newsletter — Tidewater Gazette">
+<meta property="og:description" content="The Tidewater Gazette's free morning newsletter: the day's stories in five minutes, every weekday at 7am.">
+<meta property="og:site_name" content="Tidewater Gazette">
+<meta property="og:url" content="{{BASE}}/newsletter">
+<meta property="og:type" content="website">
+<style>body{font-family:system-ui,sans-serif;max-width:960px;margin:0 auto;padding:1rem;color:#222}header,footer{display:flex;flex-wrap:wrap;gap:1rem;align-items:center}nav ul{display:flex;gap:1rem;list-style:none;padding:0}.button{background:#264653;color:#fff;padding:.5rem 1rem;border-radius:4px;text-decoration:none}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:.4rem .8rem}</style>
+
+</head>
+<body>
+<header>
+  <a href="/" class="logo"><strong>Tidewater Gazette</strong></a>
+  <nav aria-label="Sections">
+    <ul><li><a href="/news">News</a></li><li><a href="/news/politics">Politics</a></li><li><a href="/news/business">Business</a></li><li><a href="/news/sport">Sport</a></li><li><a href="/news/culture">Culture</a></li><li><a href="/about">About</a></li><li><a href="/contact">Contact</a></li></ul>
+  </nav>
+  <form role="search" action="/search" method="get" class="site-search"><label for="q">Search</label><input type="search" id="q" name="q" placeholder="Search"><button type="submit">Search</button></form>
+  <a class="button" href="/subscribe">Subscribe</a>
+</header>
+<nav aria-label="Breadcrumb" class="breadcrumb"><ol><li><a href="/">Home</a></li><li aria-current="page">Newsletter</li></ol></nav>
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@type": "BreadcrumbList",
+ "itemListElement": [
+  {
+   "@type": "ListItem",
+   "position": 1,
+   "name": "Home",
+   "item": "{{BASE}}/"
+  },
+  {
+   "@type": "ListItem",
+   "position": 2,
+   "name": "Newsletter",
+   "item": "{{BASE}}/newsletter"
+  }
+ ]
+}
+</script>
+<main>
+<h1>The morning newsletter</h1>
+  <p>The day's stories in five minutes, every weekday at 7am. Free, no advertising.</p>
+  <form action="/newsletter" method="post">
+    <p><label for="nl-email">Email</label> <input type="email" id="nl-email" name="email" required></p>
+    <p><button type="submit" class="button">Sign up</button></p>
+  </form>
+</main>
+<footer>
+<p><strong>Tidewater Gazette</strong>, published by Tidewater Media Co-operative Limited<br>1741 Lower Water Street, Halifax, NS B3J 1S5, Canada<br>Phone: <a href="tel:+19025550199">+1 902 555 0199</a> · Email: <a href="mailto:newsroom@tidewater-gazette.example">newsroom@tidewater-gazette.example</a></p>
+  <p><a href="/about">About</a> · <a href="/contact">Contact</a> · <a href="/subscribe">Subscribe</a> · <a href="/newsletter">Newsletter</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></p>
+  <p>Last updated <time datetime="{{DATE}}">{{DATE}}</time>. © {{YEAR}} Tidewater Media Co-operative Limited.</p>
+</footer>
+</body>
+</html>

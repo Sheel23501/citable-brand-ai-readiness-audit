@@ -77,7 +77,9 @@ the check:
 - `h1_missing` / `h1_empty`: no `<h1>`, or the first `<h1>` holds no text (an
   image-only heading has no words a machine, or a screen reader, can use).
 - `h1_too_short` / `h1_too_long`: the first `<h1>` with text has fewer than 3
-  or more than 25 words.
+  or more than 25 words, counted with the shared tokenizer (`htmldoc.WORD_RE`),
+  which keeps combining marks so a seven-word Hindi heading is seven words, not
+  fifteen.
 - `lead_text_no_offer`: the 120 words of visible body text starting at that
   `<h1>` (from the top of the body when there is none) contain no category noun
   and no verb of offer. Nouns are the category's list in `CATEGORY_NOUNS`
@@ -129,8 +131,14 @@ selects which vocabulary is searched. English is always included; German,
 French, Spanish, Italian, Portuguese and Dutch add their own words
 (`CTA_VOCAB_BY_LANG` in `auditlib/categories.py`) so a German site's
 "Anmelden" or "Abonnement" is recognised as a call to action rather than
-missed because it is not in English. Measured: before this, spiegel.de failed
-this check purely because its buttons are German.
+missed because it is not in English. Each language's list carries the same
+families of verbs as the English category lists: sign up and subscribe, buy
+and order, contact, book a table and call and directions ("Réserver une
+table", "Tisch reservieren", "Anfahrt"), get a quote and make an appointment,
+read, apply, donate and join. Measured: before this, spiegel.de failed this
+check purely because its buttons are German, and a Paris bistro whose only
+button was "Réserver une table" had no call to action under the first,
+sign-up-only version of the French list.
 
 A declared language outside that set (`CTA_LANGS_SUPPORTED`) has no vocabulary
 to search, and the check does not guess: it reports `not_evaluated` with
@@ -195,8 +203,14 @@ matters on large sites (hence gated to ecommerce, publisher, corporate).
 that is neither missing nor generic (`GENERIC_TITLES`: home, welcome, untitled,
 index, …; `fx.identity.*` owns those cases, dedupe row 10): the `<h1>` shares
 no content word (four or more letters, not a stopword) with the `<title>` or
-the meta description. `not_evaluated` (`dependency_failed`) when no page could
-be graded.
+the meta description, **and** neither repeats the heading word for word. A
+title that carries the heading verbatim ("What we do — Meridian Industrial
+Group") matches whatever its words are; a heading made only of function words
+("What we do", "Get in touch") that is not repeated has nothing to compare and
+is not graded rather than failed. Words are taken with the shared tokenizer
+(`htmldoc.WORD_RE`), which keeps the combining marks of Devanagari, Thai or
+Arabic text, so a Hindi heading shares its whole words with its title.
+`not_evaluated` (`dependency_failed`) when no page could be graded.
 **Evidence.** Per failing page: `h1=…; title=…; shared_words=none`.
 **Why low, medium confidence.** The assistant or search result shows the title
 and description; a heading that says something else makes the visitor doubt
