@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Newsroom — Meridian Industrial Group</title>
+<meta name="description" content="Media releases and news from Meridian Industrial Group. Media contact: media@meridian-industrial.example.">
+<link rel="canonical" href="{{BASE}}/newsroom">
+<meta property="og:title" content="Newsroom — Meridian Industrial Group">
+<meta property="og:description" content="Media releases and news from Meridian Industrial Group. Media contact: media@meridian-industrial.example.">
+<meta property="og:site_name" content="Meridian Industrial Group">
+<meta property="og:url" content="{{BASE}}/newsroom">
+<meta property="og:type" content="website">
+<style>body{font-family:system-ui,sans-serif;max-width:960px;margin:0 auto;padding:1rem;color:#222}header,footer{display:flex;flex-wrap:wrap;gap:1rem;align-items:center}nav ul{display:flex;gap:1rem;list-style:none;padding:0}.button{background:#264653;color:#fff;padding:.5rem 1rem;border-radius:4px;text-decoration:none}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:.4rem .8rem}</style>
+
+</head>
+<body>
+<header>
+  <a href="/" class="logo"><strong>Meridian Industrial Group</strong></a>
+  <nav aria-label="Main">
+    <ul><li><a href="/what-we-do">What we do</a></li><li><a href="/newsroom">Newsroom</a></li><li><a href="/investors">Investors</a></li><li><a href="/sustainability">Sustainability</a></li><li><a href="/careers">Careers</a></li><li><a href="/about">About</a></li><li><a href="/contact">Contact</a></li></ul>
+  </nav>
+  <form role="search" action="/search" method="get" class="site-search"><label for="q">Search</label><input type="search" id="q" name="q" placeholder="Search"><button type="submit">Search</button></form>
+  <a class="button" href="/contact">Contact us</a>
+</header>
+<nav aria-label="Breadcrumb" class="breadcrumb"><ol><li><a href="/">Home</a></li><li aria-current="page">Newsroom</li></ol></nav>
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@type": "BreadcrumbList",
+ "itemListElement": [
+  {
+   "@type": "ListItem",
+   "position": 1,
+   "name": "Home",
+   "item": "{{BASE}}/"
+  },
+  {
+   "@type": "ListItem",
+   "position": 2,
+   "name": "Newsroom",
+   "item": "{{BASE}}/newsroom"
+  }
+ ]
+}
+</script>
+<main>
+<h1>Newsroom</h1>
+  <p>Media releases, results announcements and company news. Media enquiries: <a href="mailto:media@meridian-industrial.example">media@meridian-industrial.example</a>, +61 2 9000 0001.</p>
+  <article>
+    <h2><a href="/newsroom/meridian-opens-adelaide-plant">Meridian opens A$180 million pump plant in Adelaide</a></h2>
+    <p><time datetime="{{DATE}}">{{DATE}}</time> · Media release</p>
+    <p>The plant will build variable-speed pumps for water utilities and employ 320 people at full production.</p>
+  </article>
+  <article>
+    <h2>Meridian reports full-year revenue of A$3.1 billion</h2>
+    <p><time datetime="{{DATE_MINUS_10}}">{{DATE_MINUS_10}}</time> · Results announcement</p>
+    <p>Revenue rose 6 percent and service revenue passed a third of the group total for the first time.</p>
+  </article>
+</main>
+<footer>
+<p><strong>Meridian Industrial Group Limited</strong> · ABN 00 000 000 000<br>Level 12, 100 George Street, Sydney NSW 2000, Australia<br>Phone: <a href="tel:+61290000000">+61 2 9000 0000</a> · Email: <a href="mailto:enquiries@meridian-industrial.example">enquiries@meridian-industrial.example</a> · Media: <a href="mailto:media@meridian-industrial.example">media@meridian-industrial.example</a></p>
+  <p><a href="/about">About</a> · <a href="/newsroom">Newsroom</a> · <a href="/investors">Investors</a> · <a href="/sustainability">Sustainability</a> · <a href="/careers">Careers</a> · <a href="/terms">Terms of use</a> · <a href="/privacy">Privacy</a></p>
+  <p>Last updated <time datetime="{{DATE}}">{{DATE}}</time>. © {{YEAR}} Meridian Industrial Group Limited.</p>
+</footer>
+</body>
+</html>

@@ -1,0 +1,55 @@
+{
+  "name": "clean-restaurant-fr",
+  "description": "A well-built Paris bistro site (Bistrot Marguerite), lang=\"fr\" throughout, category local_business. The French-language local-business fixture: French address (12 rue des Archives, 75004 Paris), pair-grouped French phone (+33 1 42 72 00 00, Tél. cue), French opening hours (mardi - samedi 12h00 - 14h30), a Menu with MenuItem offers, French calls to action (Réserver une table), TripAdvisor and societe.com identity anchors. Must trigger zero fail findings.",
+  "base": null,
+  "category": "local_business",
+  "routes": {},
+  "expected": {
+    "fail": [],
+    "info": [
+      "ef.entity.wikidata_unavailable",
+      "ef.corroboration.offsite_spotcheck"
+    ],
+    "pass_required": [
+      "fx.facts.key_fact_missing",
+      "fx.facts.image_only",
+      "fx.jsonld.missing",
+      "fx.jsonld.required_props_missing",
+      "fx.jsonld.no_organization",
+      "fx.identity.title_missing_or_generic",
+      "fx.identity.h1_missing_or_multiple",
+      "fx.identity.meta_description_missing",
+      "fx.identity.og_missing",
+      "fx.content.faq_absent",
+      "ef.entity.sameas_missing",
+      "ef.entity.sameas_no_authority",
+      "ef.entity.nap_missing_plain_text",
+      "ef.entity.name_inconsistent",
+      "ef.freshness.no_visible_dates",
+      "ef.freshness.stale_copyright_year",
+      "ef.freshness.date_modified_mismatch",
+      "en.hero.value_prop_unclear",
+      "en.cta.missing",
+      "en.nav.landmark_missing",
+      "en.trust.signals_missing",
+      "en.continuity.h1_title_mismatch",
+      "en.interstitial.blocking",
+      "en.mobile.viewport_missing",
+      "en.lang.attribute_missing",
+      "en.links.broken_sampled",
+      "en.errors.soft_404",
+      "en.errors.unhelpful_404",
+      "cr.robots.blanket_disallow",
+      "cr.index.sitemap_missing",
+      "cr.render.js_gate",
+      "cr.render.csr_shell"
+    ],
+    "not_evaluated": {
+      "ef.corroboration.press_page_missing": "not_applicable_for_category",
+      "en.nav.breadcrumbs_missing": "not_applicable_for_category",
+      "en.nav.site_search_missing": "not_applicable_for_category",
+      "en.nav.related_links_missing": "not_applicable_for_category"
+    },
+    "notes": "Category local_business at high confidence: Restaurant JSON-LD, nav labels Menu and Horaires, URL /menu. Roles: product=/menu (nav 'Menu'), about=/a-propos ('À propos'), blog=/actualites ('Actualités'), contact=/contact; pricing is a missing role, which is normal for a restaurant. Everything in pass_required is language- or country-dependent somewhere: the address is read by the French street grammar ('12 rue des Archives', lowercase street word) and by postcode+city with the country adjacent; the phone by the pair-grouped international form and the 'Tél.' cue; the hours by the French day names and 'h' times; the call to action by the French vocabulary ('Réserver une table'); the FAQ by three question headings (no English FAQ word on the page); the identity anchors by TripAdvisor and societe.com (a review platform and a national company register, added alongside the Anglo registers). The four not_evaluated entries are the local-business applicability caps, asserted so a change to the caps table shows up here."
+  }
+}

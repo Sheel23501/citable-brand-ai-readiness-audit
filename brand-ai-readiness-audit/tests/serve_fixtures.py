@@ -50,6 +50,9 @@ FIXTURE_SCHEMA = {
         "scoped": ["check_id ... whose final finding must carry absence_scope: sample"],
         "max_severity": {"check_id": "the highest severity the final finding may carry"},
         "max_confidence": {"check_id": "the highest confidence the final finding may carry"},
+        "not_evaluated": {"check_id": "the reason a check must record for having no verdict on this fixture "
+                                      "(not_applicable_for_category, language_not_supported, listing_pages_only, ...); "
+                                      "asserted at probe level and in the composed report's coverage"},
         "notes": "free text",
     },
 }

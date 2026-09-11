@@ -1,0 +1,5 @@
+# Northgate Advisory - all crawlers welcome
+User-agent: *
+Allow: /
+
+Sitemap: {{BASE}}/sitemap.xml

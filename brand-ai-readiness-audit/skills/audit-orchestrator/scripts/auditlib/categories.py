@@ -130,19 +130,36 @@ CTA_VOCAB = {
 # whose buttons simply are not in English. Measured: spiegel.de leads with "Anmelden" (sign in)
 # and "Abonnement" (subscribe), and the English-only rule called that a missing CTA.
 # A language absent from this table is not guessed at: the check reports not_evaluated instead.
+# Each row carries the sign-up, buy and contact words the first version had, plus the local-business verbs
+# (book a table, call, directions), the professional-services verbs (get a quote, make an appointment), and the
+# publisher and nonprofit verbs (read, apply, join). A Paris bistro whose only button is "Réserver une table"
+# had no call to action under the first version of this table; the English "reserve" cannot see "réserver".
 CTA_VOCAB_BY_LANG = {
     "de": ["anmelden", "registrieren", "abonnieren", "abonnement", "kontakt", "jetzt", "kaufen",
-           "spenden", "mehr erfahren", "loslegen", "termin", "bestellen", "mitglied werden"],
+           "spenden", "mehr erfahren", "loslegen", "termin", "bestellen", "mitglied werden",
+           "reservieren", "tisch reservieren", "anrufen", "anfahrt", "angebot anfordern", "termin vereinbaren",
+           "mehr lesen", "bewerben", "entdecken", "mitmachen"],
     "fr": ["s'inscrire", "inscription", "s'abonner", "abonnement", "contact", "nous contacter",
-           "acheter", "commander", "en savoir plus", "commencer", "faire un don", "adherer"],
+           "acheter", "commander", "en savoir plus", "commencer", "faire un don", "adherer", "adhérer",
+           "réserver", "reserver", "réservez", "reservez", "réservation", "reservation", "appeler", "appelez",
+           "itinéraire", "itineraire", "nous trouver", "demander un devis", "devis", "prendre rendez-vous",
+           "rendez-vous", "découvrir", "lire", "postuler", "participer"],
     "es": ["suscribete", "suscribirse", "suscripcion", "iniciar sesion", "registrarse", "contacto",
-           "comprar", "empezar", "mas informacion", "donar", "unete", "reservar"],
+           "comprar", "empezar", "mas informacion", "donar", "unete", "reservar",
+           "reserva", "llamar", "llámanos", "llamanos", "cómo llegar", "como llegar", "pedir presupuesto",
+           "solicitar presupuesto", "presupuesto", "pedir cita", "cita", "descubrir", "leer más", "leer mas", "participar"],
     "it": ["iscriviti", "iscrizione", "abbonati", "accedi", "contatti", "acquista", "inizia",
-           "scopri di piu", "dona", "prenota"],
+           "scopri di piu", "dona", "prenota",
+           "prenotazione", "prenota un tavolo", "chiama", "chiamaci", "come raggiungerci", "richiedi un preventivo",
+           "preventivo", "leggi", "candidati", "scopri", "partecipa"],
     "pt": ["assine", "assinar", "entrar", "registrar", "contato", "contacto", "comprar",
-           "comecar", "saiba mais", "doar", "reservar"],
+           "comecar", "saiba mais", "doar", "reservar",
+           "reserva", "ligar", "ligue", "como chegar", "orçamento", "orcamento", "pedir orçamento", "marcar",
+           "agendar", "ler mais", "descobrir", "candidatar", "participar"],
     "nl": ["aanmelden", "abonneren", "abonnement", "contact", "kopen", "starten",
-           "meer informatie", "doneren", "bestellen"],
+           "meer informatie", "doneren", "bestellen",
+           "reserveren", "reserveer", "bel ons", "bellen", "route", "offerte", "offerte aanvragen",
+           "afspraak maken", "lees meer", "ontdek", "solliciteer", "doe mee"],
 }
 
 # Languages the CTA vocabulary covers. English is the table above.

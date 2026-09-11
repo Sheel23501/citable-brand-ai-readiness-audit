@@ -116,6 +116,10 @@ def stage_manifest(res):
             res.check(not unknown, "%s: expected.%s ids all in registry" % (n, key), ", ".join(unknown))
         overlap = set(exp.get("fail", [])) & set(exp.get("pass_required", []))
         res.check(not overlap, "%s: no id both expected to fail and required to pass" % n, ", ".join(sorted(overlap)))
+        ne = exp.get("not_evaluated") or {}
+        res.check(isinstance(ne, dict) and not (set(ne) - ids), "%s: expected.not_evaluated ids all in registry" % n, ", ".join(sorted(set(ne) - ids)))
+        clash = set(ne) & (set(exp.get("fail", [])) | set(exp.get("pass_required", [])))
+        res.check(not clash, "%s: a check with no verdict is neither expected to fail nor required to pass" % n, ", ".join(sorted(clash)))
         for path, route in meta.get("routes", {}).items():
             pass
     # every engagement check is exercised by at least one fixture that expects it to fail (or, for info checks, to emit a note)
@@ -488,6 +492,13 @@ def stage_htmldoc(res):
               "Document notes Microdata/RDFa attributes without parsing them")
     res.check(Document('<form><label>Search</label><input><button>Search</button></form><a href="/t">Start free trial</a>').body_text == "Search Search Start free trial",
               "adjacent inline elements are space-separated in body text")
+    # the shared tokenizer keeps combining marks, so Indic, Thai and Arabic words are whole words
+    from auditlib.htmldoc import words as _hw
+    res.check(_hw("दिल्ली के बच्चों के लिए निःशुल्क पढ़ाई") == ["दिल्ली", "के", "बच्चों", "के", "लिए", "निःशुल्क", "पढ़ाई"], "tokenizer: a seven-word Hindi heading is seven words")
+    res.check(_hw("Hello world, 12 rue des Archives; e-mail hello@x.example") == ["Hello", "world", "12", "rue", "des", "Archives", "e", "mail", "hello", "x", "example"],
+              "tokenizer: Latin text and digits tokenise as before")
+    res.check(len(_hw("เปิดทุกวัน")) == 1 and len(_hw("مرحبا بكم")) == 2, "tokenizer: Thai and Arabic words stay whole")
+    res.check(Document("<p>दिल्ली के बच्चों के लिए निःशुल्क पढ़ाई</p>").word_count == 7, "word_count uses the shared tokenizer")
     # role candidate discovery, incl. non-English
     de = Document('<nav><a href="/preise">Preise</a><a href="/ueber-uns">Über uns</a><a href="/kontakt">Kontakt</a><a href="/aktuelles">Aktuelles</a><a href="/produkte">Produkte</a></nav>', base_url="https://de.example/")
     c = find_role_candidates(de, [], "https://de.example/")
@@ -597,6 +608,23 @@ def stage_sample(res, farm):
                 res.check(m["site_category"]["confidence"] == "high", "%s: category confidence high" % name)
             if name in ("csr-shell", "js-gate", "non-html-seed", "challenge-page"):
                 res.check(all(roles[r]["source"] == "sitemap" for r in roles if r != "home"), "%s: no nav readable, role pages came from sitemap" % name)
+            # the category fixtures: every role the category has is found from the navigation, in the site's own
+            # language or (hindi-nonprofit) from English slugs under Hindi labels; pricing is missing because
+            # none of these sites sells plans, and that is recorded, not invented
+            if name in ("clean-restaurant-fr", "clean-consultancy", "clean-corporate", "hindi-nonprofit"):
+                res.check(set(roles) == {"home", "about", "contact", "product", "blog"} and m["missing_roles"] == ["pricing"],
+                          "%s: about, contact, product and blog found; only pricing missing" % name, "%s / %s" % (sorted(roles), m["missing_roles"]))
+                res.check(all(roles[r]["source"] == "nav" for r in roles if r != "home"), "%s: role pages came from nav" % name)
+            if name == "clean-publisher":
+                res.check(set(roles) == {"home", "about", "contact", "blog"} and sorted(m["missing_roles"]) == ["pricing", "product"],
+                          "clean-publisher: about, contact and blog found; product and pricing missing", "%s / %s" % (sorted(roles), m["missing_roles"]))
+            if name in ("clean-restaurant-fr", "clean-consultancy", "clean-publisher", "clean-corporate"):
+                res.check(m["site_category"]["confidence"] == "high", "%s: category confidence high" % name, str(m["site_category"]))
+            if name == "hindi-nonprofit":
+                res.check(m["site_category"]["confidence"] == "medium" and all(w.startswith(("jsonld:", "url:")) for w in m["site_category"]["signals"]),
+                          "hindi-nonprofit: category from JSON-LD and URL patterns only, Hindi labels score nothing", str(m["site_category"]["signals"]))
+                res.check(all((p.get("summary") or {}).get("lang") == "hi" and not (p.get("summary") or {}).get("lang_detected") for p in m["pages"]),
+                          "hindi-nonprofit: every page declares hi and the Latin stopword detector stays silent")
             if name == "one-page-portfolio":
                 res.check(list(roles) == ["home"] and len(m["missing_roles"]) == 5 and m["internal_pages_estimate"] == 1, "one-page-portfolio: only home, all roles missing")
             if name == "blanket-disallow":
@@ -648,6 +676,12 @@ def run_probe_on_fixtures(res, farm, prefix, probe_mod, label):
         res.check(infos == exp_info, "%s/%s: info set matches" % (label, name), "got %s expected %s" % (sorted(infos), sorted(exp_info)))
         bad = [c for c in exp["pass_required"] if c.startswith(prefix) and statuses.get(c) != "pass"]
         res.check(not bad, "%s/%s: pass_required all pass" % (label, name), "%s -> %s" % (bad, [statuses.get(c) for c in bad]))
+        # `not_evaluated`: a check that must have no verdict here, with the reason it must give
+        reasons = {c["check_id"]: c.get("reason") for c in out["checks"]}
+        for cid, reason in sorted((exp.get("not_evaluated") or {}).items()):
+            if cid.startswith(prefix):
+                res.check(statuses.get(cid) == "not_evaluated" and reasons.get(cid) == reason,
+                          "%s/%s: %s has no verdict (%s)" % (label, name, cid, reason), "%s/%s" % (statuses.get(cid), reasons.get(cid)))
         probs = validate_probe_output(out, reg)
         res.check(not probs, "%s/%s: probe output valid against schema" % (label, name), "; ".join(probs[:3]))
         res.check(out["error"] is None, "%s/%s: no probe error" % (label, name), str(out["error"]))
@@ -672,6 +706,20 @@ def _load_compose():
 
 PROBE_SCRIPTS = (("crawl-render-audit", "crawl_probe.py"), ("fact-extractability-audit", "facts_probe.py"),
                  ("entity-freshness-corroboration-audit", "entity_probe.py"), ("engagement-audit", "engagement_probe.py"))
+
+# The false-positive guards: one well-built site per category the fixtures cover, each of which must produce
+# zero defects, a populated recommendations list, and a simulation that can answer every real question.
+CLEAN_SITES = ("clean-site", "clean-restaurant-fr", "clean-consultancy", "clean-publisher", "clean-corporate")
+
+
+def _coverage_reasons(report):
+    """check_id -> reason for every check the composed report lists as having no verdict."""
+    cov = report.get("coverage") or {}
+    out = {}
+    for key in ("not_evaluated", "not_applicable_for_category"):
+        for e in cov.get(key) or []:
+            out[e["check_id"]] = e.get("reason")
+    return out
 
 
 def _build_workdir(base_url, workdir):
@@ -1001,6 +1049,9 @@ def stage_compose(res, farm):
         if gated:
             res.check(any(l.startswith("Not checked, because") or "navigation could not be read" in l for l in report["limitations"]),
                       "compose/%s: limitations explain the gated checks" % name)
+        cov_reasons = _coverage_reasons(report)
+        for cid, reason in sorted((exp.get("not_evaluated") or {}).items()):
+            res.check(cov_reasons.get(cid) == reason, "compose/%s: coverage records %s as having no verdict (%s)" % (name, cid, reason), str(cov_reasons.get(cid)))
         by_cid = {f["check_id"]: f for f in fnds}
         for cid in exp.get("scoped", []):
             f = by_cid.get(cid)
@@ -1058,18 +1109,24 @@ def stage_compose(res, farm):
         res.check(md.startswith("# AI-readiness audit: "), "compose/%s: Markdown title line" % name)
         for heading in ("## Summary", "## Coverage and limitations"):
             res.check(heading in md, "compose/%s: Markdown has %s" % (name, heading))
-        if name == "clean-site":
-            res.check(not [f for f in fnds if f["severity"] != "info"], "compose/clean-site: no defect is reported",
+        if name in CLEAN_SITES:
+            res.check(not [f for f in fnds if f["severity"] != "info"], "compose/%s: no defect is reported" % name,
                       str([f["check_id"] for f in fnds if f["severity"] != "info"]))
-            res.check(len(report["proactive_recommendations"]) >= 3, "compose/clean-site: proactive recommendations are populated")
-            res.check(all(r["title"] not in md.split("## Findings")[0] for r in []), "compose/clean-site: recommendations are not findings")
-            res.check(s["checks_passed"] >= 50, "compose/clean-site: nearly every check passes (%d)" % s["checks_passed"])
-            res.check(report["coverage"]["stages"]["engagement"] == "evaluated", "compose/clean-site: engagement stage evaluated")
-            res.check(report["coverage"]["handout_concepts"]["A"] == "covered", "compose/clean-site: concept A covered")
-            res.check("## Quick wins" not in md, "compose/clean-site: no quick-wins section on a clean site")
+            res.check(len(report["proactive_recommendations"]) >= 3, "compose/%s: proactive recommendations are populated" % name)
+            res.check(s["checks_passed"] >= 50, "compose/%s: nearly every check passes (%d)" % (name, s["checks_passed"]))
+            # an engagement check that honestly has no verdict here (a listing page cannot be graded for related
+            # links) makes the stage "partial", and the fixture's not_evaluated contract says which one
+            en_open = [c for c, r in (exp.get("not_evaluated") or {}).items() if c.startswith("en.") and r != "not_applicable_for_category"]
+            want_stage = "partial" if en_open else "evaluated"
+            res.check(report["coverage"]["stages"]["engagement"] == want_stage, "compose/%s: engagement stage %s" % (name, want_stage),
+                      str(report["coverage"]["stages"]["engagement"]))
+            res.check(report["coverage"]["handout_concepts"]["A"] == "covered", "compose/%s: concept A covered" % name)
+            res.check("## Quick wins" not in md, "compose/%s: no quick-wins section on a clean site" % name)
             res.check(not [q for q in report["ai_answer_simulation"]["questions"]
                            if not q["answerable"] and not q.get("informational")],
-                      "compose/clean-site: every real question is answerable from the facts file")
+                      "compose/%s: every real question is answerable from the facts file" % name)
+            res.check(report["site_category"]["value"] == farm.metas[name]["category"] and report["site_category"]["confidence"] in ("high", "medium"),
+                      "compose/%s: the report states the fixture's category (%s)" % (name, report["site_category"]["value"]))
         if name == "csr-shell":
             sim = [f for f in fnds if f["check_id"] == "or.simulation.question_unanswerable"]
             res.check(sim and sim[0]["severity"] == "info", "compose/csr-shell: unanswerable questions are reported as info")
@@ -1366,10 +1423,12 @@ def stage_run_audit(res, farm):
             seen = {f["check_id"] for f in report["findings"] + report["suppressed_findings"] if f["severity"] != "info"}
             res.check(seen == set(exp["fail"]), "run_audit/%s: the whole pipeline reproduces the fixture's fail set" % name,
                       "got %s expected %s" % (sorted(seen), sorted(exp["fail"])))
-            reasons = {e["check_id"]: e["reason"] for e in report["coverage"]["not_evaluated"]}
+            reasons = _coverage_reasons(report)
             for cid in exp.get("gated", []):
                 res.check(reasons.get(cid) in ("role_page_not_sampled", "navigation_not_readable"),
                           "run_audit/%s: %s has no verdict end to end" % (name, cid), str(reasons.get(cid)))
+            for cid, reason in sorted((exp.get("not_evaluated") or {}).items()):
+                res.check(reasons.get(cid) == reason, "run_audit/%s: %s has no verdict end to end (%s)" % (name, cid, reason), str(reasons.get(cid)))
             md = open(os.path.join(wd, "report.md"), encoding="utf-8").read()
             res.check(md.startswith("# AI-readiness audit: "), "run_audit/%s: the Markdown is rendered" % name)
 
@@ -1685,6 +1744,37 @@ def stage_extract(res):
                              ("Black Friday sale, save 20 percent", False, "Black Friday is not opening hours"),
                              ("So we do 10-15 projects a year", False, "prose that looks like a range")]:
         res.check((X.find_hours([mk("<p>%s</p>" % text)]) is not None) == want, "hours: %s" % what)
+
+    # Phone layouts beyond the Anglo one, and the cue words that make a domestic number count. The pair-grouped
+    # French form and the single-digit area codes of Australia and India were invisible to the first grammar.
+    for text, what in [("Tél. : +33 1 42 72 00 00 (du mardi au samedi)", "FR international, pairs"),
+                       ("Téléphone : 01 42 72 00 00", "FR domestic pairs with Téléphone cue"),
+                       ("Tél. : 01 42 72 00 00", "FR domestic pairs with Tél. cue"),
+                       ("Telefon: 030 5557 0199", "DE domestic with Telefon cue"),
+                       ("Teléfono: +34 91 123 45 67", "ES international"),
+                       ("Call us on +61 2 9000 0000, Monday to Friday", "AU single-digit area code"),
+                       ("+91 11 2690 7400 (Monday to Saturday)", "IN two-digit area code"),
+                       ("Phone: +44 117 496 0123.", "UK international"),
+                       ("Call +1 (212) 555-0142 today", "US with parentheses")]:
+        res.check(X.find_phone([mk("<p>%s</p>" % text)]) is not None, "phone: %s" % what)
+    for text, what in [("Updated 2026-09-12 at 12:00:00", "ISO timestamp"),
+                       ("ISBN 978 3 16 148410 0", "ISBN groups"),
+                       ("Founded in 1962, listed 1987, revenue 3.1 billion", "years and figures"),
+                       ("Order 12 34 56 shipped", "short digit pairs without a cue")]:
+        res.check(X.find_phone([mk("<p>%s</p>" % text)]) is None, "phone: not a phone, %s" % what)
+    # French street lines put the street word in lower case after the number
+    for text, want, what in [("12 rue des Archives, Paris", True, "FR lowercase rue"),
+                             ("3 boulevard Saint-Germain", True, "FR boulevard"),
+                             ("1 place de la Bourse", True, "FR place with article"),
+                             ("finished in 12 place mats", False, "place is not a street here"),
+                             ("12 square Feet of space", False, "square feet is not a street")]:
+        res.check((X.address_match(text) is not None) == want, "address: %s" % what)
+    # a numberOfEmployees written as a QuantitativeValue is a count, not an empty name
+    emp = mk('<script type="application/ld+json">{"@context":"https://schema.org","@type":"Corporation","name":"M","url":"https://x.example/","numberOfEmployees":{"@type":"QuantitativeValue","value":12400}}</script>', role="about")
+    f = X.find_leadership_or_size([emp])
+    res.check(f is not None and f["value"] == "12400 employees" and f["source"] == "jsonld:numberOfEmployees", "leadership_or_size: QuantitativeValue headcount is quotable", str(f))
+    fnd = mk('<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"M","url":"https://x.example/","founder":{"@type":"Person","name":"Ada Byron"}}</script>', role="about")
+    res.check((X.find_leadership_or_size([fnd]) or {}).get("value") == "Ada Byron", "leadership_or_size: founder Person name is quoted")
     ld = mk('<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","name":"Acme","url":"https://x.example/","logo":"l.png"},{"@type":"BlogPosting","headline":"Hi","publisher":{"@type":"Organization","name":"Acme"}},{"@type":"SoftwareApplication","applicationCategory":"BusinessApplication"}]}</script>')
     nodes = X.doc_top_nodes(ld.doc)
     res.check(len(nodes) == 3, "top_level_nodes: @graph members only, nested publisher excluded (%d)" % len(nodes))
@@ -1793,6 +1883,12 @@ def stage_probe_ef(res, farm):
               "ef: '© 2005-now' is the current year, not 2005")
     res.check([y for y, _ in ep.copyright_years(fake("© 2005–present Example"))] == [this_year], "ef: '© 2005–present' is current")
     res.check([y for y, _ in ep.copyright_years(fake("© 2019-2024 Example"))] == [2024], "ef: a closed range counts its later year")
+    # identity anchors are not only Anglo registers: a national register mirror or a place listing counts
+    auth = ep.authority_hosts("local_business")
+    res.check(any(a in "www.tripadvisor.fr" for a in auth) and any(a in "www.societe.com" for a in auth) and any(a in "www.northdata.de" for a in auth),
+              "ef: TripAdvisor, societe.com and North Data count as identity anchors")
+    res.check(not any(a in "www.instagram.com" for a in auth) and not any(a in "blog.pagerduty.com" for a in auth),
+              "ef: a social profile or an unrelated host is not an identity anchor")
     res.check([y for y, _ in ep.copyright_years(fake("© 2019 Example"))] == [2019], "ef: a single year is itself")
     res.check(list(ep.nap_requirement("unknown")) == ["name", "contact (address, phone or email)"], "ef: an unclassified site needs name plus any contact")
     res.check(list(ep.nap_requirement("local_business")) == ["name", "postal address", "phone number"], "ef: a local business still needs address and phone")
@@ -1909,6 +2005,14 @@ def stage_probe_ef(res, farm):
 def stage_probe_en(res, farm):
     print("\n== stage: engagement probe on every fixture")
     ep = _load_probe("engagement-audit", "engagement_probe.py")
+    # the per-language call-to-action vocabulary covers the local-business and services verbs, not only sign-up
+    rx_fr, _ = ep._cta_re("local_business", lang="fr")
+    res.check(rx_fr.search("Réserver une table") and rx_fr.search("Réservez") and rx_fr.search("Appelez-nous") and not rx_fr.search("Nos horaires"),
+              "cta vocabulary: French local-business verbs are calls to action, a heading is not")
+    rx_de, _ = ep._cta_re("local_business", lang="de")
+    res.check(rx_de.search("Tisch reservieren") and rx_de.search("Anfahrt"), "cta vocabulary: German reservieren/Anfahrt")
+    rx_en, _ = ep._cta_re("local_business", lang=None)
+    res.check(not rx_en.search("Réserver une table"), "cta vocabulary: no French words are searched on an English page")
     R = run_probe_on_fixtures(res, farm, "en.", ep, "en")
     sev = lambda name, cid: next((f["severity"] for f in R[name]["findings"] if f["check_id"] == cid), None)
     conf = lambda name, cid: next((f["confidence"] for f in R[name]["findings"] if f["check_id"] == cid), None)

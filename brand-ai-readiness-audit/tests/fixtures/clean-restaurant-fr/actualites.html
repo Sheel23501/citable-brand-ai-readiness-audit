@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Actualités — Bistrot Marguerite</title>
+<meta name="description" content="Les actualités du Bistrot Marguerite : nouvelle carte, soirées vigneronnes et fermetures exceptionnelles.">
+<link rel="canonical" href="{{BASE}}/actualites">
+<meta property="og:title" content="Actualités — Bistrot Marguerite">
+<meta property="og:description" content="Les actualités du Bistrot Marguerite : nouvelle carte, soirées vigneronnes et fermetures exceptionnelles.">
+<meta property="og:site_name" content="Bistrot Marguerite">
+<meta property="og:url" content="{{BASE}}/actualites">
+<meta property="og:type" content="website">
+<style>body{font-family:system-ui,sans-serif;max-width:960px;margin:0 auto;padding:1rem;color:#222}header,footer{display:flex;flex-wrap:wrap;gap:1rem;align-items:center}nav ul{display:flex;gap:1rem;list-style:none;padding:0}.button{background:#264653;color:#fff;padding:.5rem 1rem;border-radius:4px;text-decoration:none}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:.4rem .8rem}</style>
+
+</head>
+<body>
+<header>
+  <a href="/" class="logo"><strong>Bistrot Marguerite</strong></a>
+  <nav aria-label="Navigation principale">
+    <ul><li><a href="/">Accueil</a></li><li><a href="/menu">Menu</a></li><li><a href="/a-propos">À propos</a></li><li><a href="/actualites">Actualités</a></li><li><a href="/contact">Horaires & accès</a></li><li><a href="/contact">Contact</a></li></ul>
+  </nav>
+  
+  <a class="button" href="/reservation">Réserver une table</a>
+</header>
+<main>
+<h1>Actualités du bistrot</h1>
+  <p>Nouvelle carte, soirées vigneronnes, fermetures exceptionnelles : tout ce qui se passe rue des Archives.</p>
+  <article>
+    <h2><a href="/actualites/nouvelle-carte-automne">La nouvelle carte d'automne est arrivée</a></h2>
+    <p><time datetime="{{DATE}}">{{DATE}}</time> · Marguerite Lenoir</p>
+    <p>Courges, champignons des bois et gibier à plumes : la carte d'automne est en place depuis cette semaine.</p>
+  </article>
+  <article>
+    <h2>Soirée vigneronne avec le domaine des Roches</h2>
+    <p><time datetime="{{DATE_MINUS_10}}">{{DATE_MINUS_10}}</time> · Paul Aubert</p>
+    <p>Six vins de Loire servis avec un menu en cinq temps, sur réservation.</p>
+  </article>
+</main>
+<footer>
+<p><strong>Bistrot Marguerite</strong><br>12 rue des Archives, 75004 Paris, France<br>Tél. : <a href="tel:+33142720000">+33 1 42 72 00 00</a> · Courriel : <a href="mailto:bonjour@bistrot-marguerite.example">bonjour@bistrot-marguerite.example</a></p>
+  <p><a href="/a-propos">À propos</a> · <a href="/contact">Contact</a> · <a href="/mentions-legales">Mentions légales</a> · <a href="/confidentialite">Politique de confidentialité</a></p>
+  <p>Dernière mise à jour le <time datetime="{{DATE}}">{{DATE}}</time>. © {{YEAR}} Bistrot Marguerite SARL.</p>
+</footer>
+</body>
+</html>

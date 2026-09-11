@@ -375,7 +375,7 @@ def check_sameas(ctx, out, nodes, sameas, lookup, brand):
         return
     out.fail("ef.entity.sameas_no_authority",
              title="sameAs links only to social profiles, none to an authority that fixes the brand's identity",
-             evidence="sameAs lists %d URL%s (%s); none points to Wikidata, Wikipedia, LinkedIn, Crunchbase, or a company register." % (
+             evidence="sameAs lists %d URL%s (%s); none points to Wikidata, Wikipedia, LinkedIn, Crunchbase, a company register, or a review or place listing with a stable identifier." % (
                  len(sameas), "s" if len(sameas) != 1 else "", ", ".join(hosts[:6])),
              evidence_items=[evidence_item(pages[0], "jsonld_excerpt", u, note="sameAs") for u in sameas[:6]],
              why="Social profiles are created by anyone and prove little; a Wikidata item, Wikipedia article, LinkedIn company page, or register entry is what knowledge graphs and assistants use to pin a name to one entity.",

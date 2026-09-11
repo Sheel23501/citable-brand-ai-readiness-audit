@@ -313,7 +313,7 @@ skills/
   crawl-render-audit/     fact-extractability-audit/
   entity-freshness-corroboration-audit/     engagement-audit/
 tests/
-  run_tests.py            2947 assertions across 18 synthetic fixture sites
+  run_tests.py            4684 assertions across 29 synthetic fixture sites
   serve_fixtures.py       one local server per fixture
   fixtures/<name>/        static mini-sites + the check ids each must trigger
 ```
@@ -341,14 +341,24 @@ python3 tests/run_tests.py --live https://example.com   # add real-site fetches
 python3 tests/serve_fixtures.py                 # keep fixtures up for manual probing
 ```
 
-Fixtures include a **`clean-site`** false-positive guard that must produce zero
-findings, alongside `csr-shell`, `js-gate`, `challenge-page`,
-`bot-blocking-robots`, `blanket-disallow`, `edge-blocked-bots`,
-`edge-blocked-training-only`, `malformed-jsonld`, `image-only-pricing`,
-`non-html-seed`, `one-page-portfolio`, `blocked-links`, three `weak-*` sites, and three edge-policy
-cases (`edge-enforces-policy`, `edge-blocked-mixed`, `edge-refuses-auditor`) that pin the rule that a site
+Fixtures include five **false-positive guards**, one well-built site per
+category, each of which must produce zero defects: `clean-site` (SaaS, en),
+`clean-restaurant-fr` (a Paris bistro, **French** throughout),
+`clean-consultancy` (New York professional services), `clean-publisher` (a
+Nova Scotia news site) and `clean-corporate` (a Sydney industrial group). Two
+non-English fixtures pin the language rules: `german-site` and
+`hindi-nonprofit` (Devanagari; the checks whose phrase lists are English are
+gated to low confidence there, never asserted). Alongside them: `csr-shell`,
+`js-gate`, `challenge-page`, `bot-blocking-robots`, `blanket-disallow`,
+`edge-blocked-bots`, `edge-blocked-training-only`, `malformed-jsonld`,
+`image-only-pricing`, `non-html-seed`, `one-page-portfolio`, `blocked-links`,
+`js-nav-thin-sample` and `unsampled-contact-nonprofit` (the absence gate),
+three `weak-*` sites, and three edge-policy cases (`edge-enforces-policy`,
+`edge-blocked-mixed`, `edge-refuses-auditor`) that pin the rule that a site
 enforcing its own robots.txt at the edge is never reported as a defect.
-Each declares the check ids it must trigger, taken from the registry.
+Each declares the check ids it must trigger, taken from the registry, and the
+checks that must record no verdict on it and why. `CONTRIBUTING.md` has the
+full category and language matrix.
 
 ## Working on this
 

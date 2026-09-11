@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>{{BASE}}/</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/what-we-do</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/what-we-do/water</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/what-we-do/energy</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/what-we-do/infrastructure</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/newsroom</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/newsroom/meridian-opens-adelaide-plant</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/investors</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/sustainability</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/careers</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/about</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/contact</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/privacy</loc><lastmod>{{DATE}}</lastmod></url>
+  <url><loc>{{BASE}}/terms</loc><lastmod>{{DATE}}</lastmod></url>
+</urlset>

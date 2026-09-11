@@ -636,15 +636,17 @@ however much the sampler misses, a judge's own site never gets a wrong `high`. J
 
 ## 16. 2026-09-11/12 — current state and the ordered to-do list (read this first; everything above is history)
 
-**Repo:** `main` at `afb9fa1`, clean, pushed. Two people commit (Sheel's sessions, Deepak); always
-`git pull --ff-only origin main` first. **Suite: 3,944 checks, 0 failures**
-(`cd brand-ai-readiness-audit && python3 tests/run_tests.py`, ~11 min; `--stage <name>` while iterating;
-`--stage compose --stage validate` is the ~4-minute subset that covers the orchestrator). All five skills pass
-`~/.local/bin/agentskills validate`. **All 24 BUILD_PLAN steps are ticked; the work below is post-plan and is
-tracked only here.** The submission zip at `/Users/sheelgautam/adobe-hackathon/brand-ai-readiness-audit.zip`
-is **stale** (built 2026-09-10 05:10, before everything in this section); rebuild it last, from tracked files:
+**Repo:** `main` at the Phase A commit ("Generalization by construction", 2026-09-12), clean, pushed. Two
+people commit (Sheel's sessions, Deepak); always `git pull --ff-only origin main` first. **Suite: 4,684
+checks, 0 failures, 29 fixtures** (`cd brand-ai-readiness-audit && python3 tests/run_tests.py`, ~15 min on an
+idle machine; `--stage <name>` while iterating; the offline stages `manifest htmldoc extract robots` run in
+half a second). Run it **alone**: the phaseA scratch runs made a full run take 25 minutes and CONTRIBUTING's
+contention warning is real. All five skills pass `~/.local/bin/agentskills validate`. **All 24 BUILD_PLAN
+steps are ticked; the work below is post-plan and is tracked only here.** The submission zip at
+`/Users/sheelgautam/adobe-hackathon/brand-ai-readiness-audit.zip` is **stale** (built 2026-09-10 05:10,
+before everything in this section); rebuild it last, from tracked files:
 `git archive --format=zip -o brand-ai-readiness-audit.zip HEAD:brand-ai-readiness-audit`, then unzip it cold and
-run the suite from the copy, asserting **3,944 checks and 24 fixtures**, not merely green.
+run the suite from the copy, asserting **4,684 checks and 29 fixtures**, not merely green.
 
 **Two shell traps this session hit:** a multi-line commit message in a `$(cat <<'EOF' …)` heredoc breaks in this
 shell — write the message to a scratch file and `git commit -F file`. And `tests/serve_fixtures.py` binds ports
@@ -690,6 +692,45 @@ set** — lists qualifiers, or says none qualify and why and names `start_with`.
 `start_with`. Documented in `report_schema.md` §3b/§6, rubric §5 "Where to start", `simulation_rules.md` §7.4
 (the narrative's closing sentence defers to `start_with`), orchestrator SKILL.md.
 
+### Phase A (2026-09-12, Sheel) — generalization by construction
+
+The generalization plan (this session) has four phases: **A** fixtures that prove every category and a second
+language and script; **B** one language determination (URL tokens poison the stopword detector: ikea.com reads
+as Portuguese from 98 occurrences of "com"; non-Latin pages with no `lang` are invisible to the gate; the
+engagement probe uses the *declared* lang while compose uses the *detected* one; the gate note says "declare"
+even when detection overrode); **C** language-neutral formats (non-English month names and numeric dates,
+AU/CA/SG/BR postcodes, the NAP confidence cap); **D** reach in two surgical slices (token-based role slugs so
+`contact-ikea-submit-complaint` and `/products/x/contact-us.html` resolve; up to three sitemap-index children
+preferring `page` over `product`/`post`; record the locale edition from the hreflang list). **Adobe's 91
+index children are all per-locale product sitemaps, so D gains nothing on adobe.com**; it helps ikea-, nytimes-
+and WordPress-shaped sites. Sibling-subdomain role pages (help.nytimes.com) are optional in D.
+
+**Phase A landed.** Five fixtures, generated once from a scratch script and committed as static files:
+`clean-restaurant-fr` (Paris bistro, fr, local_business), `clean-consultancy` (New York, professional_services),
+`clean-publisher` (Halifax NS, publisher_media), `clean-corporate` (Sydney, corporate_enterprise),
+`hindi-nonprofit` (Delhi NGO in Devanagari, lang=hi, nonprofit_institution). `CLEAN_SITES` in `run_tests.py`
+holds the four clean ones plus `clean-site`: zero defects, recommendations populated, category stated, every
+real simulation question answerable. The Hindi fixture pins the language gate on a non-Latin script
+(`key_fact_missing` and `value_prop_unclear` fail at medium/low with `language_scope: hi`; `en.cta.missing`
+is `not_evaluated language_not_supported`; everything language-neutral passes). The fixture contract gained
+`expected.not_evaluated` (check → reason), asserted at probe level and in coverage, so category caps and
+language refusals are tested outcomes. Six defects the fixtures surfaced were fixed by rule with unit tests:
+phone layouts (international with the country's grouping, French domestic pairs) and cue words in six
+languages (`extract.PHONE_TEXT_RE/PHONE_CUE_RE`); French lower-case street grammar (`STREET_FR_RE`);
+`AUTHORITY_HOSTS` extended with national registers of ten countries and place listings (TripAdvisor, Yelp);
+`CTA_VOCAB_BY_LANG` carries booking/calling/quote/read/apply/join verbs; one script-aware tokenizer
+`htmldoc.WORD_RE` (keeps combining marks; the engagement probe imports it; the dead Latin-only regex is gone);
+`en.continuity` treats a title that repeats the heading verbatim as a match and does not grade a
+function-word-only heading; `numberOfEmployees` as a QuantitativeValue is quotable. Docs: CONTRIBUTING "What
+the fixtures cover" (category × language matrix and what is still uncovered), README guards paragraph,
+entity/engagement `checks.md`, `non_findings.md`, `extracted_facts.md`, `site_categories.md` §4.
+
+**Two live observations from re-grading the saved samples offline** (`run_audit.py --workdir <copy> --offline`
+on copies of `audit-example/` and `audit-iiitd/`): adobe unchanged apart from the offline-only differences;
+iiitd's "no call to action" still fires because its header nav (with "Admission") starts at **43%** of the
+content markup behind a long utility bar, just past the 40% first-viewport proxy. **Candidate rule:** a link
+in `header`/`nav` context is first-viewport whatever its markup position. Small, needs a fixture.
+
 ### Council verdicts (llm-council skill, 5 advisors + peer review + chair)
 
 Council 2 (pre-`ffb53ab`) scored **6.4/10**: the #1 finding false on 3/3 unseen sites, all of it absence claims
@@ -706,6 +747,28 @@ directions — verify before acting on any council claim):
 - Adobe's *served* HTML genuinely has zero `<nav>`, search inputs and `<time>` elements, so `en.nav.landmark_missing` / `site_search_missing` / `no_visible_dates` are mechanically right — but they are voiced as flat site facts in the same report that says the navigation could not be read. Element-level absences on a script-rendered page are not scoped the way site-level ones now are.
 
 ### The ordered to-do list (each item: inspect → implement → stage tests → full suite → commit with `-F` → push)
+
+**Generalization first (the user's priority; Phase A is done, see above):**
+
+- **Phase B — one language determination** (~2 h, low risk): strip URL/e-mail tokens and drop ambiguous
+  two/three-letter stopwords before counting in `htmldoc.language_from_text` (the ikea "com" case; a unit
+  test with an English page full of ".com" must stay `en`); a Latin-script-ratio guard returning an
+  unsupported marker for Devanagari/CJK/Arabic text with no `lang`; one `page_language(doc)` helper
+  (detected-then-declared) used by both `engagement_probe._page_lang` and `compose.sample_language`; fix the
+  gate note wording ("written in %s" not "declare"); related-links headings in de/fr/es/it/pt/nl and add
+  `en.nav.related_links_missing` to `LANG_DEPENDENT`; `TERMS_PRIVACY_RE` + Datenschutz/AGB/mentions
+  légales/confidentialité/privacidad/aviso legal. Fixture: a `hindi-nonprofit` variant with no `lang`.
+- **Phase C — language-neutral formats** (~1.5 h, low risk): month names in six languages and numeric
+  `dd.mm.yyyy` / `dd/mm/yyyy` with calendar validation in `entity_probe.parse_date` and `TEXT_DATE_RE`
+  (German publishers get a false `no_visible_dates` at medium today); AU/CA/SG/BR postcode grammars (the
+  publisher fixture's B3J 1S5 becomes a text-detectable address); NAP confidence cap at medium with the
+  grammars tried listed; `PRICE_RE` for "18 €" (currency after the number, the European convention).
+- **The header-nav CTA proxy** (~30 min): see the iiitd observation above.
+- **Phase D — reach, two slices, last** (~2.5 h, medium risk): token-based role slugs; three sitemap-index
+  children preferring `page`; locale recorded from `Document.hreflangs`. Fixtures with a sitemap index and
+  compound slugs first. Not adobe-specific; say so in the commit.
+
+**Then the judge-facing items (unchanged):**
 
 1. **A–F concept coverage as a Markdown table** (~20 min, zero risk). `coverage.handout_concepts` is already
    in the JSON; today it is one prose sentence in "Coverage and limitations". Also promote the
@@ -727,12 +790,12 @@ directions — verify before acting on any council claim):
    coverage statement. Do **not** also change role matching (exact path at `sampler.py` `find_role_candidates`)
    in the same commit; fixtures with a sitemap index are needed either way.
 5. Smaller, low risk: graceful `ImportError` in the four probes (lifting a sub-skill out prints valid JSON, not
-   a traceback); cap `ef.entity.nap_missing_plain_text` confidence at `medium` and list grammars tried (no grammar
-   for AU/CA/SG/BR); make `engagement_probe._page_lang` (declared only) and `compose.sample_language`
-   (detected-then-declared) agree; `STOPWORDS`/Latin-ratio fallback so a Hindi/Japanese page with no `lang` is
-   gated; `cr.access.non_html_seed` → `not_evaluated` when home was not 200; `FixtureFarm` port fallback.
+   a traceback); `cr.access.non_html_seed` → `not_evaluated` when home was not 200; `FixtureFarm` port
+   fallback. (The language-determination and NAP items that used to sit here are Phases B and C above; the
+   tokenizer item is done.)
 6. **Rebuild the zip last** (see the top of this section) and record the honest live number in the README
-   after a cold re-run on iiitd, adobe, one Indian mid-size brand and one more `.ac.in`.
+   after a cold re-run on iiitd, adobe, one Indian mid-size brand and one more `.ac.in`. README line 316
+   ("2947 assertions across 18 synthetic fixture sites") is updated by the Phase A commit; keep it in step.
 
 **Skip:** a consistency validator (item 3 makes it redundant), broad sampler rework, anything in the last 45
 minutes before submission other than zip-and-verify.

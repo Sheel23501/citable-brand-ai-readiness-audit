@@ -28,7 +28,22 @@ STOPWORDS = {
     "pt": ("dos", "das", "uma", "para", "com", "que", "por", "mais", "como", "sua", "seu", "não", "nao", "são"),
     "nl": ("het", "een", "van", "met", "voor", "zijn", "niet", "ook", "maar", "deze", "onze", "wordt", "aan", "bij"),
 }
-_WORD_RE = re.compile(r"[a-zà-ÿA-ZÀ-Ý]{2,}")
+
+# A word is a run of word characters *including* the combining marks that Devanagari, Bengali, Tamil, Thai,
+# Arabic, Hebrew and their neighbours write as separate code points. `\w` alone stops at every vowel sign, so a
+# seven-word Hindi heading counted as fifteen "words" and shared no whole word with its own <title>. Zero-width
+# joiners are kept for the same reason. Latin text and digits tokenise exactly as before. This is the one
+# tokenizer every word count in the marketplace uses; the engagement probe imports it.
+_COMBINING = ("\u0300-\u036f\u0483-\u0489\u0591-\u05bd\u05bf-\u05c7\u0610-\u061a\u064b-\u065f\u0670\u06d6-\u06dc\u06df-\u06e4\u06e7\u06e8"
+              "\u06ea-\u06ed\u0900-\u0903\u093a-\u094f\u0951-\u0957\u0962\u0963\u0981-\u0983\u09bc-\u09cd\u0a01-\u0a03\u0a3c-\u0a4d"
+              "\u0a81-\u0a83\u0abc-\u0acd\u0b01-\u0b03\u0b3c-\u0b57\u0b82\u0bbe-\u0bcd\u0c00-\u0c04\u0c3e-\u0c56\u0c81-\u0c83\u0cbc-\u0cd6"
+              "\u0d00-\u0d03\u0d3b-\u0d4d\u0d82\u0d83\u0dca-\u0ddf\u0e31\u0e34-\u0e3a\u0e47-\u0e4e\u0eb1\u0eb4-\u0ebc\u0ec8-\u0ecd\u200c\u200d")
+WORD_RE = re.compile(r"\w[\w%s]*" % _COMBINING, re.U)
+
+
+def words(text):
+    """The words of a text under the shared tokenizer."""
+    return WORD_RE.findall(text or "")
 
 
 def language_from_text(text, min_words=120, margin=1.6):
@@ -39,10 +54,10 @@ def language_from_text(text, min_words=120, margin=1.6):
     Returns None on short text or a close call -- an uncertain guess is worse than no guess here, because
     the caller uses it to decide whether a finding may be asserted at full strength.
     """
-    words = [w.lower() for w in _WORD_RE.findall(text or "")]
-    if len(words) < min_words:
+    toks = [w.lower() for w in words(text)]
+    if len(toks) < min_words:
         return None
-    counts = collections.Counter(words)
+    counts = collections.Counter(toks)
     scores = {lang: sum(counts[w] for w in ws) for lang, ws in STOPWORDS.items()}
     ranked = sorted(scores.items(), key=lambda kv: -kv[1])
     top, second = ranked[0], ranked[1]
@@ -60,7 +75,6 @@ _INLINE = {"b", "i", "em", "strong", "span", "u", "sup", "sub", "small", "mark",
 _CONTEXT_TAGS = ("nav", "header", "footer", "main", "aside", "article", "form")
 _HEAD_TAGS = {"html", "head", "meta", "link", "title", "script", "style", "base", "noscript", "template"}
 _ROOT_IDS = ("root", "app", "__next", "__nuxt", "___gatsby", "app-root", "svelte", "q-app", "main-app", "react-root", "ember-app")
-_WORD_RE = re.compile(r"\w+", re.U)
 _TAGS_RE_STR = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"\s+")
 PRICE_RE = re.compile(r"(?:(?<![\w.])[$£€¥₹]\s?\d[\d,]*(?:\.\d+)?)|(?:\b\d[\d,]*(?:\.\d+)?\s?(?:USD|EUR|GBP|INR|CAD|AUD|JPY|CHF)\b)")
@@ -121,7 +135,7 @@ class _Parser(HTMLParser):
             if len(self.stack) < stack_len:
                 text = "".join(self.body_text_parts[start:])
                 c = d.overlay_candidates[idx]
-                c["words"] = len(_WORD_RE.findall(text))
+                c["words"] = len(WORD_RE.findall(text))
                 c["text"] = _clean(text)[:160]
                 c["end_mpos"] = end_mpos
             else:
@@ -273,7 +287,7 @@ class _Parser(HTMLParser):
         if tag == "blockquote" and self.cur_quote is not None:
             parts, qm = self.cur_quote
             qt = _clean(" ".join(parts))
-            d.blockquotes.append({"text": qt[:300], "words": len(_WORD_RE.findall(qt)), "mpos": qm})
+            d.blockquotes.append({"text": qt[:300], "words": len(WORD_RE.findall(qt)), "mpos": qm})
             self.cur_quote = None
         if tag == "title" and self.cur_title is not None:
             d.title = _clean(" ".join(self.cur_title)) or None
@@ -465,7 +479,7 @@ class Document:
 
     @property
     def word_count(self):
-        return len(_WORD_RE.findall(self.body_text))
+        return len(WORD_RE.findall(self.body_text))
 
     @property
     def robots_meta(self):

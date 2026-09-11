@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Réserver une table — Bistrot Marguerite</title>
+<meta name="description" content="Réservez une table au Bistrot Marguerite en ligne ou au +33 1 42 72 00 00. Réponse par courriel dans la journée.">
+<link rel="canonical" href="{{BASE}}/reservation">
+<meta property="og:title" content="Réserver une table — Bistrot Marguerite">
+<meta property="og:description" content="Réservez une table au Bistrot Marguerite en ligne ou au +33 1 42 72 00 00. Réponse par courriel dans la journée.">
+<meta property="og:site_name" content="Bistrot Marguerite">
+<meta property="og:url" content="{{BASE}}/reservation">
+<meta property="og:type" content="website">
+<style>body{font-family:system-ui,sans-serif;max-width:960px;margin:0 auto;padding:1rem;color:#222}header,footer{display:flex;flex-wrap:wrap;gap:1rem;align-items:center}nav ul{display:flex;gap:1rem;list-style:none;padding:0}.button{background:#264653;color:#fff;padding:.5rem 1rem;border-radius:4px;text-decoration:none}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:.4rem .8rem}</style>
+
+</head>
+<body>
+<header>
+  <a href="/" class="logo"><strong>Bistrot Marguerite</strong></a>
+  <nav aria-label="Navigation principale">
+    <ul><li><a href="/">Accueil</a></li><li><a href="/menu">Menu</a></li><li><a href="/a-propos">À propos</a></li><li><a href="/actualites">Actualités</a></li><li><a href="/contact">Horaires & accès</a></li><li><a href="/contact">Contact</a></li></ul>
+  </nav>
+  
+  <a class="button" href="/reservation">Réserver une table</a>
+</header>
+<main>
+<h1>Réserver une table</h1>
+  <p>Indiquez la date, l'heure et le nombre de couverts ; nous confirmons par courriel dans la journée. Pour le jour même, appelez le <a href="tel:+33142720000">+33 1 42 72 00 00</a>.</p>
+  <form action="/reservation" method="post">
+    <p><label for="nom">Nom</label> <input type="text" id="nom" name="nom" required></p>
+    <p><label for="email">Courriel</label> <input type="email" id="email" name="email" required></p>
+    <p><label for="date">Date</label> <input type="date" id="date" name="date" required></p>
+    <p><label for="couverts">Nombre de couverts</label> <input type="number" id="couverts" name="couverts" min="1" max="8" required></p>
+    <p><button type="submit" class="button">Envoyer la demande</button></p>
+  </form>
+</main>
+<footer>
+<p><strong>Bistrot Marguerite</strong><br>12 rue des Archives, 75004 Paris, France<br>Tél. : <a href="tel:+33142720000">+33 1 42 72 00 00</a> · Courriel : <a href="mailto:bonjour@bistrot-marguerite.example">bonjour@bistrot-marguerite.example</a></p>
+  <p><a href="/a-propos">À propos</a> · <a href="/contact">Contact</a> · <a href="/mentions-legales">Mentions légales</a> · <a href="/confidentialite">Politique de confidentialité</a></p>
+  <p>Dernière mise à jour le <time datetime="{{DATE}}">{{DATE}}</time>. © {{YEAR}} Bistrot Marguerite SARL.</p>
+</footer>
+</body>
+</html>

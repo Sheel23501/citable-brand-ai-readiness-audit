@@ -46,8 +46,10 @@ that tells a business to change a legitimate choice.
   publish anchors; it does not judge the name.
 - **Phone and address recognition is pattern-based.** A bare number without
   `+` or a cue word ("0117 496 0123" on its own line) is not recognised as a
-  phone. An address is recognised in either word order -- number-then-street
-  ("12 Harbour Street", "12 Rue de Rivoli") and street-then-number
+  phone; with a cue in any of the covered languages ("Tél. : 01 42 72 00 00",
+  "Telefon: 030 5557 0199") or a country code ("+61 2 9000 0000", whatever the
+  grouping) it is. An address is recognised in either word order -- number-then-street
+  ("12 Harbour Street", "12 Rue de Rivoli", "12 rue des Archives") and street-then-number
   ("Hauptstrasse 12", "Via Montenapoleone 8") -- plus UK postcodes, US
   city/state/ZIP, Indian PINs qualified by a state or by "India", Japanese
   postal marks, and a European postcode-and-city line. That last shape is the
