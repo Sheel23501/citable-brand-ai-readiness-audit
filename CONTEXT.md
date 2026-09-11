@@ -537,7 +537,7 @@ sign-up button is what About pages look like. Both are rubric-and-registry chang
 fixture each. Also still open: `cr.access.non_html_seed` reports `pass` when the home page
 returned 403 (it never saw HTML) — should be `not_evaluated`.
 
-## 15. 2026-09-10 — current state and the plan (read this first; everything above is history)
+## 15. 2026-09-10 — state before the absence gate landed (history; section 16 supersedes it)
 
 **Repo:** `main` at `e9f6be7`, clean, pushed. **All 24 steps of `BUILD_PLAN.md` are ticked**;
 submitting is the user's action. Suite: **3,354 checks green**
@@ -633,3 +633,111 @@ history moved inside the zip) stay valid but rank below the absence gate.
 **Start here:** the absence gate in `compose.py`. It is vocabulary-independent and guarantees that
 however much the sampler misses, a judge's own site never gets a wrong `high`. Judges forgive
 "I could not see"; they do not forgive "it isn't there" about a site they know.
+
+## 16. 2026-09-11/12 — current state and the ordered to-do list (read this first; everything above is history)
+
+**Repo:** `main` at `afb9fa1`, clean, pushed. Two people commit (Sheel's sessions, Deepak); always
+`git pull --ff-only origin main` first. **Suite: 3,944 checks, 0 failures**
+(`cd brand-ai-readiness-audit && python3 tests/run_tests.py`, ~11 min; `--stage <name>` while iterating;
+`--stage compose --stage validate` is the ~4-minute subset that covers the orchestrator). All five skills pass
+`~/.local/bin/agentskills validate`. **All 24 BUILD_PLAN steps are ticked; the work below is post-plan and is
+tracked only here.** The submission zip at `/Users/sheelgautam/adobe-hackathon/brand-ai-readiness-audit.zip`
+is **stale** (built 2026-09-10 05:10, before everything in this section); rebuild it last, from tracked files:
+`git archive --format=zip -o brand-ai-readiness-audit.zip HEAD:brand-ai-readiness-audit`, then unzip it cold and
+run the suite from the copy, asserting **3,944 checks and 24 fixtures**, not merely green.
+
+**Two shell traps this session hit:** a multi-line commit message in a `$(cat <<'EOF' …)` heredoc breaks in this
+shell — write the message to a scratch file and `git commit -F file`. And `tests/serve_fixtures.py` binds ports
+8100–8123 with no fallback: a stray `serve_fixtures.py` or an aborted run leaves the next run dying on a raw
+`OSError` + `RUNNER ERROR`; check `pgrep -f serve_fixtures` before running the suite.
+
+### What landed (three commits)
+
+**`ffb53ab` (Deepak).** Absence gate v1 and a language gate in `compose.py`; non-Anglo address grammars in
+`extract.py` (street-then-number, Indian PIN qualified by state/country, guarded EU postcode+city, Japanese
+postal mark) behind one shared `address_match()`; opening hours and press words in six languages; Bristol
+address removed from the NAP suggested action; `admissions`/`enquire`/course words in the nonprofit CTA
+vocabulary; the `german-site` fixture; honest README paragraph on skill independence.
+
+**`241ad71` (Sheel) — absence gate, complete.** v1 had two defects found in review: it counted roles the
+category does not have as "unreached" (every nonprofit's key-fact finding was capped with a false "pricing and
+product pages were not reached"), and it scoped the whole key-fact finding on the union of roles. Now
+`compose.apply_absence_gate` intersects with `key_pages(category)`; `fx.facts.key_fact_missing` is scoped **one
+fact at a time** via `FACT_ROLES` (`categories.py`, mirrored in `site_categories.md` §1b), severity recomputed
+from the confirmed count; `press_page_missing` is withdrawn (`navigation_not_readable`) when the sample was too
+thin to show the navigation (≤3 home links or ≥4 of 5 roles unreached); fully-blind checks produce **no
+finding** — they go to `coverage.not_evaluated` plus a plain-English `limitations` line; `en.cta.missing`
+removed from the gate (per-page claim). Gate notes cut evidence at a sentence boundary (`_append_note`, also
+used by the language gate). Documented as rubric rules 6–7, `report_schema.md` fields
+`absence_scope`/`language_scope` and reasons `role_page_not_sampled`/`navigation_not_readable`, four registry
+rows, CONTRIBUTING item 7, two `non_findings.md`. Fixture contract gained `gated`/`scoped`/`max_severity`/
+`max_confidence` (documented in `serve_fixtures.py FIXTURE_SCHEMA`). New fixtures: `js-nav-thin-sample` (the
+adobe.com shape: script-rendered nav, sitemap index whose read child has no role URLs → home only, four
+absence checks withdrawn, zero false findings) and `unsampled-contact-nonprofit` (unlinked contact page holds
+the only address: "no mission" survives at medium, address/location scoped to the sample). Sampler learned
+`funktionen`/`fonctionnalités`/`funciones`/`funzionalità` as product-role words (Deepak had them in category
+signals only), which made `german-site` sample its product page and surface a genuine `related_links_missing`.
+
+**`afb9fa1` (Sheel) — the report always names where to start.** On adobe.com the report had no Quick wins
+section and every finding read "Priority low": the quick-win rule needs confidence above low, the only medium
+was low-confidence, the list was empty, and the Markdown rendered the section only when non-empty — the gate's
+demotions made this more likely. The rule is untouched (a low-confidence quick win is an overclaim). Compose
+now writes `summary.headline` (one deterministic sentence: severity counts on the pages *read*, the finding to
+start with, gated-check count, incomplete-run notice first) and `summary.start_with` (first quick win, else
+highest `suggested_action.priority` → lowest effort → highest confidence → rank; `null` only when nothing is
+above info). The Markdown opens Summary with the headline; **Quick wins is present whenever `start_with` is
+set** — lists qualifiers, or says none qualify and why and names `start_with`. Validator recomputes
+`start_with`. Documented in `report_schema.md` §3b/§6, rubric §5 "Where to start", `simulation_rules.md` §7.4
+(the narrative's closing sentence defers to `start_with`), orchestrator SKILL.md.
+
+### Council verdicts (llm-council skill, 5 advisors + peer review + chair)
+
+Council 2 (pre-`ffb53ab`) scored **6.4/10**: the #1 finding false on 3/3 unseen sites, all of it absence claims
+made in the same voice as presence claims. Council 3 (after `241ad71`, before `afb9fa1`) adjudicated
+**6.8/10 today, 7.8–8.0 achievable**: Detection 6.5 · Actions 7.0 · Output 7.0 · Hygiene 5.5 · Composition 8.5
+· Generalization 6.5. Its frame worth keeping: *detection accuracy = correctness × reach*; the gate fixed
+correctness, reach is untouched. Facts it disputed were checked and settled (advisors were wrong in both
+directions — verify before acting on any council claim):
+
+- `examples/python.org-report.{md,json}` **still contain the Bristol footer string** (lines 61 / 155).
+- `.gitignore` is at the **repo root** (not inside the marketplace) and already ignores `/brand-ai-readiness-audit/audit-*/` and `.DS_Store`; the stray `audit-*` workdirs never ship in a `git archive` build.
+- `htmldoc.py:31` `_WORD_RE` (Latin-only) is **dead code, shadowed** by line 63 `\w+`; `language_from_text` uses `\w+`. The non-Latin gap is real but its cause is `STOPWORDS` (Latin-script languages only), not the regex.
+- The false replay-parity claim ("all network access happens in the sampler") is in **both** `README.md:134` and `CONTRIBUTING.md:113`; engagement (≤15 link requests + 404 probe) and entity (Wikipedia/Wikidata) probes fetch at grade time. A per-probe parity test does exist (`run_tests.py`, "workdir mode reproduces url mode").
+- Adobe's *served* HTML genuinely has zero `<nav>`, search inputs and `<time>` elements, so `en.nav.landmark_missing` / `site_search_missing` / `no_visible_dates` are mechanically right — but they are voiced as flat site facts in the same report that says the navigation could not be read. Element-level absences on a script-rendered page are not scoped the way site-level ones now are.
+
+### The ordered to-do list (each item: inspect → implement → stage tests → full suite → commit with `-F` → push)
+
+1. **A–F concept coverage as a Markdown table** (~20 min, zero risk). `coverage.handout_concepts` is already
+   in the JSON; today it is one prose sentence in "Coverage and limitations". Also promote the
+   `cr.access.edge_block` result (crawlers stalled while the audit UA got 200) out of Informational into the
+   headline when it is the most informative thing in the report. `compose.render_markdown`; schema §6.
+2. **Judge-facing truth pass** (~1 hr, zero risk): regenerate `examples/` with current code (kills Bristol;
+   `run_audit.py https://www.python.org` then `finalize.py`); README numbers (says 2947 assertions / 18
+   fixtures, `skills-ref validate`, `audit-example.com/`; truth: 3,944 / 24, `agentskills validate`,
+   `audit-<host>-<timestamp>`); rewrite the replay-parity paragraph in README and CONTRIBUTING to what is true
+   (sampling fetches pages; two probes make bounded grade-time requests that `--offline` disables; parity is
+   asserted per probe per fixture); delete the dead `_WORD_RE` at `htmldoc.py:31` and fix its comment.
+3. **Element-level absences on script-rendered pages** (~45 min): when the home page's nav is unreadable
+   (`internal_links_seen` low or CSR/JS-gate signals), voice `en.nav.landmark_missing`, `en.nav.site_search_missing`,
+   `ef.freshness.no_visible_dates` as "in the HTML served without JavaScript, no … was present" — a wording
+   scope, not a new detector; consider `absence_scope` for them too. Pin with `js-nav-thin-sample`.
+4. **Sampler reach, one surgical slice** (~45 min, the only risky item): `sampler.py discover_sitemap` reads
+   `locs[0]` of a sitemap index (adobe has 91 children) — follow up to three children within a raised sitemap
+   budget; record "N children, read K" in `sample.json` and print "Pages sampled: N of M URLs seen" in the
+   coverage statement. Do **not** also change role matching (exact path at `sampler.py` `find_role_candidates`)
+   in the same commit; fixtures with a sitemap index are needed either way.
+5. Smaller, low risk: graceful `ImportError` in the four probes (lifting a sub-skill out prints valid JSON, not
+   a traceback); cap `ef.entity.nap_missing_plain_text` confidence at `medium` and list grammars tried (no grammar
+   for AU/CA/SG/BR); make `engagement_probe._page_lang` (declared only) and `compose.sample_language`
+   (detected-then-declared) agree; `STOPWORDS`/Latin-ratio fallback so a Hindi/Japanese page with no `lang` is
+   gated; `cr.access.non_html_seed` → `not_evaluated` when home was not 200; `FixtureFarm` port fallback.
+6. **Rebuild the zip last** (see the top of this section) and record the honest live number in the README
+   after a cold re-run on iiitd, adobe, one Indian mid-size brand and one more `.ac.in`.
+
+**Skip:** a consistency validator (item 3 makes it redundant), broad sampler rework, anything in the last 45
+minutes before submission other than zip-and-verify.
+
+**Real workdirs for before/after checks** (git-ignored, in the marketplace root): `audit-example/` is a live
+adobe.com sample (2 of 6 pages, 4 roles missing, 24 home links) and `audit-iiitd/` is iiitd.ac.in (all roles
+found; its probe outputs predate `ffb53ab`, so its CTA finding is stale). `compose.py --workdir <dir> --out
+<scratch>.json --md <scratch>.md` recomposes without touching them.
