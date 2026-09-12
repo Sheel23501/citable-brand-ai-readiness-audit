@@ -341,8 +341,37 @@ def _clip(s, n=200):
     return s if len(s) <= n else s[:n - 1] + "…"
 
 
-def _found(value, page, source):
-    return {"value": _clip(value), "page": page.final_url if hasattr(page, "final_url") else page, "source": source}
+# A page renders navigation, and it renders content. Text taken from the first is not the site saying
+# something about itself: a menu strip that happens to contain a cue word ("Donate", "Get Started") told the
+# audit a fact was present, which produced a false pass on fx.facts.key_fact_missing and a quoted answer of
+# pure chrome. Judged by the landmark the text came from and by menu punctuation -- never by word lists, so
+# it behaves the same in every language. <footer> is deliberately not here: a footer address is a real fact.
+CHROME_LANDMARKS = frozenset(["header", "nav", "aside"])
+_MENU_SEP_RE = re.compile(r"[|≡•·]")
+
+
+def from_chrome(context):
+    """True for text the page renders as navigation or a sidebar rather than as its content."""
+    return (context or "").strip().lower() in CHROME_LANDMARKS
+
+
+def usable_fact_value(value, context=None):
+    """Whether this text is the site stating something, and so may be recorded as a fact and quoted.
+
+    One predicate, shared by the fact layer here and by the answer simulation in compose.py, so the two
+    can never disagree about whether a fact is usable.
+    """
+    v = (value or "").strip()
+    if not v or from_chrome(context):
+        return False
+    return not _MENU_SEP_RE.search(v)
+
+
+def _found(value, page, source, context=None):
+    if not usable_fact_value(value, context):
+        return None
+    return {"value": _clip(value), "page": page.final_url if hasattr(page, "final_url") else page,
+            "source": source, "context": context}
 
 
 def _ctx(text, m, before=40, after=100):
@@ -650,8 +679,15 @@ def find_offer_list(pages, prefer=("product", "home", "blog"), min_items=3, json
                         names.append(str(nm))
         if len(names) >= min_items:
             return _found("; ".join(names[:5]), p, "jsonld")
+    # Headings are only an offer list on a page that exists to list offerings. On a home page the same
+    # shape is the layout: python.org's "Get Started; Download; Docs; Jobs" and lemonde.fr's promo strip
+    # were both recorded as what the site offers, then quoted back as the brand's own answer. Both sit in
+    # <main>, so no landmark test can separate them -- the page's role is what distinguishes them.
     for p in _ordered(pages, prefer):
-        hs = [h["text"] for h in _headings(p, 2, 3) if h["text"] and not any(g in h["text"].lower() for g in GENERIC_HEADINGS) and len(h["text"].split()) <= 8]
+        if getattr(p, "role", None) not in ("product", "pricing", "services"):
+            continue
+        hs = [h["text"] for h in _headings(p, 2, 3) if h["text"] and not from_chrome(h.get("context"))
+              and not any(g in h["text"].lower() for g in GENERIC_HEADINGS) and len(h["text"].split()) <= 8]
         if len(hs) >= min_items:
             return _found("; ".join(hs[:5]), p, "heading")
     for p in _ordered(pages, prefer):
@@ -798,9 +834,13 @@ def find_by_regex(pages, rx, prefer=("home", "about"), source="text", use_links=
             return _found(excerpt, p, source)
         if use_headings:
             for h in p.doc.headings:
-                if rx.search(h["text"] or ""):
-                    return _found(h["text"], p, "heading")
+                if rx.search(h["text"] or "") and not from_chrome(h.get("context")):
+                    return _found(h["text"], p, "heading", context=h.get("context"))
         if use_links:
+            # A link or button is an element the visitor can act on, so it counts wherever it sits: a
+            # nonprofit's "Donate" belongs in the nav, and refusing it there would lose a real fact. The
+            # landmark test below applies to headings and to free text, which is where chrome masqueraded
+            # as content.
             for text, l in _link_texts(p):
                 if rx.search(text):
                     return _found(text, p, "link")

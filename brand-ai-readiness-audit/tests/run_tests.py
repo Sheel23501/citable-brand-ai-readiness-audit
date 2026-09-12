@@ -1888,6 +1888,22 @@ def stage_extract(res):
     res.check(_C2._sentence_shaped("Nous publions « des analyses approfondies » chaque jour pour nos abonnés"),
               "simulation: French prose in guillemets is sentence-shaped")
 
+    # One predicate decides whether text is the site speaking, for the fact layer and the simulation alike.
+    res.check(not X.usable_fact_value("Donate", "nav") and X.usable_fact_value("Donate", "main"),
+              "facts: the same word is chrome in a nav and content in main")
+    res.check(not X.usable_fact_value("Get Started; Download; Docs; Jobs", "header"),
+              "facts: a header menu is not a statement about the site")
+    res.check(X.usable_fact_value("12 Harbour Street, Bristol BS1 4QA", "footer"),
+              "facts: a footer address is a real fact")
+    res.check(_C2._sentence_shaped("Donate", "nav") is False,
+              "simulation and facts share one predicate")
+    # Note: a cue appearing only as nav *text* (no link, no heading) can still reach the free-text window,
+    # which is taken from flattened page text and carries no landmark. _looks_like_prose is what guards that
+    # path; the landmark test below covers headings, offer lists and anything with a recorded context.
+    in_content = mk('<body><nav><a href="/x">Home</a></nav><main><p>You can donate to the fund at any time.</p></main></body>')
+    res.check(X.find_participation([in_content]) is not None,
+              "facts: the same cue in the page body is a fact")
+
     # Engagement: search boxes by markup, calls to action beyond the category list, contact methods.
     import importlib.util as _ilu
     _spec = _ilu.spec_from_file_location("_ep_t", os.path.join(ROOT, "skills", "engagement-audit", "scripts", "engagement_probe.py"))

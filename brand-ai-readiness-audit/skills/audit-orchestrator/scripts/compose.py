@@ -36,6 +36,7 @@ sys.path.insert(0, HERE)
 
 from auditlib import __version__  # noqa: E402
 from auditlib.fetch import language_edition as _language_edition  # noqa: E402
+from auditlib.extract import usable_fact_value  # noqa: E402
 from auditlib.categories import (AUDIENCE_FACT, AUDIENCE_PHRASE, CTA_LANGS_SUPPORTED, FACT_ROLES, KEY_FACTS,  # noqa: E402
                                  SIMULATION_QUESTIONS, category_label, key_pages)
 from auditlib.findings import (SEVERITIES, Registry, ProbeOutput, evidence_item,  # noqa: E402
@@ -755,26 +756,14 @@ def _fact(facts, fid):
 SIM_ATTRIBUTION = ("Every answer above quotes this site's own text, exactly as the facts file records it; nothing "
                    "was added from anywhere else. A question left unanswered means the fact is not on the pages read.")
 
-# Menu separators only. The guillemets « » and ‹ › are quotation marks in French, Spanish and Italian --
-# listing them here threw away genuine quoted prose and then reported the fact as absent from the site.
-_SIM_CHROME_SEP_RE = re.compile(r"[|≡•·]")
+def _sentence_shaped(value, context=None):
+    """Whether a fact's value may be quoted as an answer.
 
-
-def _sentence_shaped(value):
-    """Whether a fact's value is worth quoting as an answer, rather than a window of navigation chrome.
-
-    A fact extractor's context window can land on a strip of nav/accessibility controls that mentions a
-    cue word without saying anything about the site ("...The Python Network Donate ≡ Menu Search This
-    Site GO A A Smaller Larger Reset..."), and the underlying detector may still record it as `present`.
-    The simulation must never voice that as an answer, whichever detector produced it, so this check runs
-    here regardless of the fact's own status. The signal is a list-separator character, not sentence
-    grammar: a sentence never contains "≡" or "|", but a great many genuine facts are not sentences either
-    -- an email, a phone number, a "; "-joined list of services, a comma-joined address in French or
-    English -- and requiring one would reject those alongside chrome. Semicolons are deliberately excluded:
-    find_offer_list uses "; " as its own list separator for a legitimate fact.
+    Delegates to auditlib.extract.usable_fact_value, the same predicate the fact detectors use to decide
+    whether to record a value at all. Sharing it is the point: when the two had separate rules, one report
+    could list a fact as present under "What is working" while the simulation treated it as missing.
     """
-    v = (value or "").strip()
-    return bool(v) and not _SIM_CHROME_SEP_RE.search(v)
+    return usable_fact_value(value, context)
 
 
 def answer_from_facts(fact_ids, facts):
