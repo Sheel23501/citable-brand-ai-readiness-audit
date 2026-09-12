@@ -16,9 +16,11 @@ What it does, in the order the conventions require:
   8. emit or.simulation.question_unanswerable and or.run.probe_error (check_ids.md)
   9. render the Markdown, which contains nothing the JSON does not   (report_schema.md section 6)
 
-`narrative_summary`, each question's `answer_from_facts`, and `attribution_note` are left empty
-for the orchestrator agent (Step 17). Standard library only. Never raises: on an internal error it
-still writes a valid report whose only finding is `or.run.probe_error`.
+`narrative_summary`, each answerable question's `answer_from_facts` and `attribution_note` are written
+here from the run's own numbers and the facts file, so a plain run is a finished report; the orchestrator
+agent may replace them with better prose through `finalize.py`, under simulation_rules.md. Standard
+library only. Never raises: on an internal error it still writes a valid report whose only finding is
+`or.run.probe_error`.
 """
 import argparse
 import collections
@@ -755,9 +757,34 @@ def _fact(facts, fid):
     return ((facts or {}).get("facts") or {}).get(fid) or {}
 
 
+SIM_ATTRIBUTION = ("Every answer above quotes this site's own text, exactly as the facts file records it; nothing "
+                   "was added from anywhere else. A question left unanswered means the fact is not on the pages read.")
+
+
+def answer_from_facts(fact_ids, facts):
+    """A checkable answer to one question: framing plus each cited fact quoted verbatim, and nothing else.
+
+    simulation_rules.md section 2 allows framing words and requires a verbatim run of each fact named in
+    facts_used. Writing it here means a plain run_audit.py run ships a finished simulation instead of an
+    empty one; the orchestrator agent may still replace it with better prose through finalize.py.
+    """
+    quoted = []
+    for fid in fact_ids:
+        value = (_fact(facts, fid).get("value") or "").strip()
+        if not value:
+            return None
+        quoted.append('"%s"' % value)
+    if not quoted:
+        return None
+    answer = "According to the site, %s." % quoted[0]
+    if len(quoted) > 1:
+        answer += " It also states %s." % " and ".join(quoted[1:])
+    return answer
+
+
 def build_simulation(facts, category, site_host, facts_rel):
-    """Deterministic pre-fill: questions from site_categories.md section 6, `answerable` and
-    `missing_facts` computed from the facts file alone. The agent writes `answer_from_facts`."""
+    """Questions from site_categories.md section 6, with `answerable` and `missing_facts` computed from the
+    facts file alone, and an answer quoted from it for every answerable question."""
     brand = ((facts or {}).get("brand_name") or {}).get("value") or site_host or "this site"
     audience = AUDIENCE_PHRASE.get(category, AUDIENCE_PHRASE["unknown"])
     rows = list(SIMULATION_QUESTIONS.get(category) or SIMULATION_QUESTIONS["unknown"])
@@ -769,12 +796,16 @@ def build_simulation(facts, category, site_host, facts_rel):
         for fid in fact_ids:
             (present if _fact(facts, fid).get("status") == "present" else missing).append(fid)
         q = {"id": "q%d" % i, "question": template.format(brand=brand), "answerable": not missing,
-             "answer_from_facts": None, "facts_used": present, "missing_facts": missing}
+             "answer_from_facts": None if missing else answer_from_facts(present, facts),
+             "facts_used": present, "missing_facts": missing}
+        if q["answerable"] and not q["answer_from_facts"]:
+            q["facts_used"] = []          # nothing quotable: never claim a fact the answer does not carry
         if informational:
             q["informational"] = True
         questions.append(q)
+    answered = [q for q in questions if q.get("answer_from_facts")]
     sim = {"basis": "extracted_facts_only", "facts_file": facts_rel, "brand": brand,
-           "questions": questions, "attribution_note": None}
+           "questions": questions, "attribution_note": SIM_ATTRIBUTION if answered else None}
     if facts is None:
         sim["note"] = "No extracted-facts file was available, so no question could be answered."
     return sim
@@ -1054,6 +1085,38 @@ def build_limitations(sample, probes, checks, gated_lang=None, category=None, ch
     return out
 
 
+def build_narrative(kept, counts, checks, pages_sampled, start, passed, status_counts):
+    """Three to six sentences for a reader who will not open the findings, from the run's own numbers.
+
+    report_schema.md asks the orchestrator agent for this; a plain script run used to leave it empty, and
+    compose renders the "What this means" section only when it is set, so the section silently vanished
+    from every unfinalised report. The agent can still replace this through finalize.py.
+    """
+    n_pages, n_checks = len(pages_sampled or []), len(checks or {})
+    sentences = ["This audit read %d page%s of the site and ran %d checks against what a non-JavaScript "
+                 "fetcher receives." % (n_pages, "" if n_pages == 1 else "s", n_checks)]
+    graded = [(k, counts.get(k) or 0) for k in ("critical", "high", "medium", "low")]
+    named = ", ".join("%d %s" % (n, k) for k, n in graded if n)
+    if named:
+        sentences.append("It raised %s." % named)
+    else:
+        sentences.append("It raised nothing above informational: every graded check either passed or had no verdict.")
+    if start:
+        title = ""
+        for f in kept or []:
+            if f.get("id") == start:
+                title = (f.get("title") or "").rstrip(".")
+                break
+        sentences.append("Start with %s%s." % (start, ": %s" % title if title else ""))
+    sentences.append("%d check%s passed." % (len(passed or []), "" if len(passed or []) == 1 else "s"))
+    blind = (status_counts or {}).get("not_evaluated") or 0
+    if blind:
+        sentences.append("%d check%s had no verdict, because the pages that would answer them were not reached or "
+                         "could not be read; those are gaps in this sample, not faults found on the site."
+                         % (blind, "" if blind == 1 else "s"))
+    return " ".join(sentences[:6])
+
+
 # ---------------------------------------------------------------- orchestrator-level findings
 def orchestrator_findings(site, category, pages_examined, simulation, probes, load_errors, registry, facts=None):
     """or.simulation.question_unanswerable and or.run.probe_error, built through the shared builder."""
@@ -1212,7 +1275,7 @@ def compose(workdir, wall_clock=None, input_url=None, category_override=None):
         "coverage": build_coverage(checks, registry, sample),
         "proactive_recommendations": build_recommendations(category, facts, checks, kept, sample),
         "ai_answer_simulation": simulation,
-        "narrative_summary": "",
+        "narrative_summary": build_narrative(kept, counts, checks, pages_sampled, start, passed, status_counts),
         "limitations": build_limitations(sample, probes, checks, gated_lang, category, chrome_gated),
         "suppressed_findings": folded,
         "run": {"wall_clock_seconds": wall_clock, "requests_made": sample.get("requests_made"),
@@ -1257,6 +1320,9 @@ def render_markdown(report):
                 s.get("checks_inconclusive", 0), s.get("checks_not_evaluated", 0)))
     if report.get("narrative_summary"):
         L += ["", "## What this means", "", report["narrative_summary"]]
+    else:
+        L += ["", "## What this means", "",
+              "_This report has no narrative: the run did not complete far enough to write one._"]
     start = s.get("start_with")
     first = next((f for f in report.get("findings") or [] if f.get("id") == start), None) if start else None
     if report.get("quick_wins"):

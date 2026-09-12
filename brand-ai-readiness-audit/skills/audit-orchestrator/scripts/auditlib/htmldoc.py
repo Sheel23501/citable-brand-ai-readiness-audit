@@ -103,7 +103,7 @@ class _Parser(HTMLParser):
         self.ctx = []            # nav/header/footer/main... currently open
         self.skip_depth = 0      # inside script/style/etc
         self.cur_link = None     # [attrs, text_parts]
-        self.cur_heading = None  # [tag, text_parts]
+        self.cur_heading = None  # [tag, text_parts, mpos, hidden]
         self.cur_script = None   # [attrs, text_parts]
         self.cur_title = None
         self.in_body = False
@@ -118,6 +118,22 @@ class _Parser(HTMLParser):
         self._len = 1
 
     # -- helpers
+    # "visually-hidden", "sr-only" and friends put text in the markup for screen readers and keep it off the
+    # screen. adobe.com wraps <h1>Adobe homepage</h1> in one, and grading that h1 as the page's headline
+    # reported "heading too short to state what the site offers" while the visible hero said exactly that.
+    _HIDDEN_CLASS_RE = re.compile(r"visually-?hidden|visuallyhidden|sr-only|screen-?reader|assistive-?text|"
+                                  r"\ba11y-hidden\b|\bhidden-visually\b", re.I)
+
+    def _heading_hidden(self, a):
+        style = (a.get("style") or "").lower()
+        if "hidden" in a or (a.get("aria-hidden") or "").strip().lower() == "true":
+            return True
+        if re.search(r"display\s*:\s*none|visibility\s*:\s*hidden", style):
+            return True
+        if self._HIDDEN_CLASS_RE.search(a.get("class") or ""):
+            return True
+        return any(self._HIDDEN_CLASS_RE.search(cls or "") for _, cls, _ in self.div_stack)
+
     def _ctx(self):
         return self.ctx[-1] if self.ctx else ("body" if self.in_body else "head")
 
@@ -191,7 +207,7 @@ class _Parser(HTMLParser):
         elif tag == "a":
             self.cur_link = [a, [], mpos]
         elif tag in ("h1", "h2", "h3", "h4", "h5", "h6"):
-            self.cur_heading = [tag, [], mpos]
+            self.cur_heading = [tag, [], mpos, self._heading_hidden(a)]
         elif tag in ("ul", "ol"):
             self.list_depth += 1
         elif tag == "blockquote":
@@ -333,8 +349,9 @@ class _Parser(HTMLParser):
                                     mpos=lm, in_list=self.list_depth > 0))
             self.cur_link = None
         elif tag in ("h1", "h2", "h3", "h4", "h5", "h6") and self.cur_heading is not None:
-            t, parts, hm = self.cur_heading
-            d.headings.append({"tag": t, "text": _clean(" ".join(parts)), "context": self._ctx(), "pos": len(self.body_text_parts), "mpos": hm})
+            t, parts, hm, hid = self.cur_heading
+            d.headings.append({"tag": t, "text": _clean(" ".join(parts)), "context": self._ctx(),
+                               "pos": len(self.body_text_parts), "mpos": hm, "hidden": hid})
             if d.content_mpos is None and hm is not None:
                 d.content_mpos = hm
             self.cur_heading = None
@@ -511,6 +528,15 @@ class Document:
     @property
     def h1s(self):
         return [h["text"] for h in self.headings if h["tag"] == "h1"]
+
+    @property
+    def visible_h1s(self):
+        """The h1 text a sighted visitor actually reads. A screen-reader-only h1 is still real markup, so
+        h1s keeps it for the machine-readability checks; a check about what a visitor sees must not."""
+        return [h["text"] for h in self.headings if h["tag"] == "h1" and not h.get("hidden")]
+
+    def visible_headings(self, tags=("h1", "h2", "h3")):
+        return [h for h in self.headings if h["tag"] in tags and not h.get("hidden") and (h.get("text") or "").strip()]
 
     @property
     def jsonld(self):

@@ -25,12 +25,16 @@ simulation is that it is reproducible and checkable: anyone can open
 `work/extracted_facts.json`, find each quoted excerpt, and see that nothing
 else was used.
 
-`compose.py` pre-fills the block. For every question it has already decided
-`answerable` (every mapped fact has `status: present`), `facts_used` (the
-present facts) and `missing_facts` (the absent or partial ones), and it has
-pointed each unanswerable question at the finding that explains it
-(`see_finding`). The agent fills in `answer_from_facts` for answerable
-questions, and nothing else on a question.
+`compose.py` fills the block. For every question it decides `answerable`
+(every mapped fact has `status: present`), `facts_used` (the present facts)
+and `missing_facts` (the absent or partial ones), it points each unanswerable
+question at the finding that explains it (`see_finding`), and it writes a
+verbatim `answer_from_facts` for every answerable question plus the
+attribution note. A report is therefore finished as it leaves the script.
+The agent may rewrite `answer_from_facts` and the note into better prose
+through `finalize.py` — the rules below bind that rewrite exactly as they
+bind the script — but it may never leave them empty, and it changes nothing
+else on a question.
 
 ## 2. The facts-only rule
 

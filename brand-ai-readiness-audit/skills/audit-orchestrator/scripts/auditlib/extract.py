@@ -250,6 +250,42 @@ def doc_top_nodes(doc):
     return out
 
 
+# Keys whose value is the organisation behind a page rather than the page's subject. A CMS routinely puts
+# the site owner only here: elpais.com declares NewsMediaOrganization under copyrightHolder and creator and
+# nowhere at the top level, and a top-level-only scan reported "no Organization node" on a report whose own
+# evidence line listed that type. Deliberately a short list of ownership keys -- walking every nested dict
+# would count an article's quoted company as the site owner.
+ORG_LINK_KEYS = ("publisher", "copyrightHolder", "creator", "sourceOrganization", "provider",
+                 "parentOrganization", "author", "ownedBy", "brand")
+
+
+def _nested_org(node, allow_person, depth):
+    if depth <= 0 or not isinstance(node, dict):
+        return None
+    for key in ORG_LINK_KEYS:
+        value = node.get(key)
+        for candidate in (value if isinstance(value, list) else [value]):
+            if not isinstance(candidate, dict):
+                continue
+            if is_org_node(candidate, allow_person=allow_person):
+                return candidate
+            deeper = _nested_org(candidate, allow_person, depth - 1)
+            if deeper is not None:
+                return deeper
+    return None
+
+
+def find_org_node(doc, allow_person=False, max_depth=3):
+    """The Organization node describing the site owner, at the top of a block or hanging off a link key."""
+    for node, _ in doc_top_nodes(doc):
+        if is_org_node(node, allow_person=allow_person):
+            return node
+        nested = _nested_org(node, allow_person, max_depth)
+        if nested is not None:
+            return nested
+    return None
+
+
 def _present(v):
     if v is None:
         return False

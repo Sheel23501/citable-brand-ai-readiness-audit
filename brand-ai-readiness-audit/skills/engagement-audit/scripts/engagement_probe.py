@@ -238,7 +238,14 @@ def check_hero(ctx, out, usable, excluded, work):
         out.not_evaluated(cid, reason=page_reason(home, excluded)); return
     doc = home.doc
     signals = []
-    h1 = next((h for h in doc.h1s if h.strip()), None)   # an <h1> holding only an image has no text a machine can read
+    # what a visitor reads, not what the markup hides: a screen-reader-only h1 is not this page's headline
+    h1 = next((h for h in doc.visible_h1s if h.strip()), None)   # an <h1> holding only an image has no text a machine can read
+    hidden_h1_only = h1 is None and any(h.strip() for h in doc.h1s)
+    if hidden_h1_only:
+        visible = doc.visible_headings(("h2", "h3"))
+        if visible:
+            h1 = visible[0]["text"]
+            signals.append("h1_hidden_from_sight:read_%s_instead" % visible[0]["tag"])
     n = len(_words(h1)) if h1 else 0
     if h1 is None:
         signals.append("h1_missing" if not doc.h1s else "h1_empty")

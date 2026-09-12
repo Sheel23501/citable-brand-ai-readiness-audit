@@ -1093,9 +1093,16 @@ def stage_compose(res, farm):
         res.check(all(f.get("merged_into") for f in report["suppressed_findings"]),
                   "compose/%s: every folded finding names the finding it went into" % name)
         res.check(report["ai_answer_simulation"]["basis"] == "extracted_facts_only", "compose/%s: simulation basis is fixed" % name)
-        res.check(all(q["answer_from_facts"] is None for q in report["ai_answer_simulation"]["questions"]),
-                  "compose/%s: the agent's answers are left empty" % name)
-        res.check(report["narrative_summary"] == "", "compose/%s: the narrative is left for the agent" % name)
+        # A report leaves the script finished: every answerable question carries an answer that quotes the
+        # facts it cites, and the narrative is written. An unanswerable question still carries no answer.
+        sim_qs = report["ai_answer_simulation"]["questions"]
+        res.check(all(q["answer_from_facts"] is None for q in sim_qs if not q["answerable"]),
+                  "compose/%s: an unanswerable question carries no answer" % name)
+        res.check(all(q["answer_from_facts"] and q["facts_used"] for q in sim_qs if q["answerable"] and q["facts_used"]),
+                  "compose/%s: every answerable question is answered from the facts it names" % name)
+        narrative = report["narrative_summary"]
+        res.check(isinstance(narrative, str) and 3 <= len(re.findall(r"[.!?](?:\s|$)", narrative)) <= 6,
+                  "compose/%s: the narrative is written, in three to six sentences" % name, narrative[:120])
         res.check(len(report["passed_checks"]) == s["checks_passed"], "compose/%s: passed_checks matches the count" % name)
         res.check(s["checks_run"] == expected_checks, "compose/%s: every registered check has a verdict (%d of %d)" % (name, s["checks_run"], expected_checks))
         res.check(report["limitations"] and report["limitations"][0].startswith("This report reflects a single point-in-time"),
@@ -1193,7 +1200,13 @@ def stage_validate(res, farm):
         base = _read_json(os.path.join(td, "report.json"), encoding="utf-8")
         facts = _read_json(os.path.join(td, "work", "extracted_facts.json"), encoding="utf-8")
         res.check(V.main(["--workdir", td, "--quiet"]) == 0, "validate: CLI accepts a composed workdir")
-        res.check(V.main(["--workdir", td, "--final", "--quiet"]) == 1, "validate: CLI rejects an unfinished report with --final")
+        res.check(V.main(["--workdir", td, "--final", "--quiet"]) == 0,
+                  "validate: CLI accepts a freshly composed report with --final")
+        unfinished = dict(base, narrative_summary="")
+        _write_json(os.path.join(td, "unfinished.json"), unfinished)
+        res.check(V.main(["--report", os.path.join(td, "unfinished.json"), "--facts", os.path.join(td, "work", "extracted_facts.json"),
+                          "--final", "--quiet"]) == 1,
+                  "validate: CLI rejects a report whose narrative was emptied with --final")
         good = _finalise(base, facts)
         with open(os.path.join(td, "report.json"), "w", encoding="utf-8") as f:
             json.dump(good, f)
@@ -1449,7 +1462,9 @@ def stage_run_audit(res, farm):
         reasons = {e["check_id"]: e["reason"] for e in report["coverage"]["not_evaluated"]}
         res.check(reasons.get("en.links.broken_sampled") == "network_disabled",
                   "run_audit: --offline marks the network checks not_evaluated", str(reasons)[:160])
-        probs, _ = V.validate_report(report, None)
+        facts_path = os.path.join(wd, "work", "extracted_facts.json")
+        offline_facts = _read_json(facts_path, encoding="utf-8") if os.path.exists(facts_path) else None
+        probs, _ = V.validate_report(report, offline_facts)
         res.check(not probs, "run_audit: the offline report is still valid", "; ".join(probs[:3]))
         code, _ = _run_cli(["--workdir", wd, "--no-network", "--quiet"])
         report = _read_json(os.path.join(wd, "report.json"), encoding="utf-8")
@@ -1566,11 +1581,13 @@ def stage_scripts(res, farm):
             ("validate.py", [], (2,)), ("validate.py", ["--help"], (0,)),
             ("validate.py", ["--workdir", os.path.join(td, "never-written")], (1,)),
             ("validate.py", ["--report", nofile], (1,)), ("validate.py", ["--workdir", wd, "--quiet"], (0,)),
-            ("validate.py", ["--workdir", wd, "--final", "--quiet"], (1,)),
+            # a composed report is finished as it leaves compose.py, so --final accepts it
+            ("validate.py", ["--workdir", wd, "--final", "--quiet"], (0,)),
             ("finalize.py", [], (2,)), ("finalize.py", ["--help"], (0,)),
             ("finalize.py", ["--workdir", missing, "--answers", nofile], (1,)),
             ("finalize.py", ["--workdir", wd, "--answers", nofile], (1,)),
-            ("finalize.py", ["--workdir", wd, "--answers", os.path.join(wd, "sample.json")], (1,)),
+            # an answers file carrying no answers changes nothing, and the report was already valid
+            ("finalize.py", ["--workdir", wd, "--answers", os.path.join(wd, "sample.json")], (0,)),
             ("sample_site.py", [], (2,)), ("sample_site.py", ["--help"], (0,)),
             ("sample_site.py", [good, "--workdir", os.path.join(td, "s1"), "--quiet"], (0,)),
             ("sample_site.py", [good, "--category", "no_such_category"], (2,)),
@@ -1792,6 +1809,33 @@ def stage_extract(res):
     # Mission stated as "The mission of X is to", and near misses that are not a mission statement.
     res.check(bool(X.MISSION_RE.search("The mission of the Python Software Foundation is to promote, protect, and advance Python.")),
               "mission: 'The mission of X is to' is a mission statement")
+
+    # An organisation the CMS hangs off a link key is still the site owner (elpais.com: copyrightHolder only).
+    nested = mk('<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"P",'
+                '"copyrightHolder":{"@type":["NewsMediaOrganization","Organization"],"name":"El Diario"}}</script>')
+    res.check(X.find_org_node(nested.doc) is not None, "jsonld: an Organization under copyrightHolder is the site owner")
+    deep = mk('<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"h",'
+              '"publisher":{"@type":"Organization","name":"Acme"}}</script>')
+    res.check(X.find_org_node(deep.doc) is not None, "jsonld: an Organization under publisher counts")
+    none_there = mk('<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"x",'
+                    '"about":{"@type":"Organization","name":"Someone Else Ltd"}}</script>')
+    res.check(X.find_org_node(none_there.doc) is None,
+              "jsonld: an organisation the page merely writes about is not the site owner")
+    person = mk('<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article",'
+                '"author":{"@type":"Person","name":"Ada Byron"}}</script>')
+    res.check(X.find_org_node(person.doc) is None and X.find_org_node(person.doc, allow_person=True) is not None,
+              "jsonld: a Person author counts only where a person can be the brand")
+
+    # A screen-reader-only heading is markup, not what a visitor reads.
+    hidden = mk('<body><div class="visually-hidden"><h1>Adobe homepage</h1></div><h2>Create at the highest level.</h2></body>')
+    res.check(hidden.doc.h1s == ["Adobe homepage"] and hidden.doc.visible_h1s == [],
+              "htmldoc: a visually-hidden h1 stays in h1s but not in visible_h1s")
+    plain_h1 = mk('<body><h1>Invoicing for freelance designers</h1></body>')
+    res.check(plain_h1.doc.visible_h1s == ["Invoicing for freelance designers"],
+              "htmldoc: an ordinary h1 is visible")
+    sronly = mk('<body><h1 class="sr-only">Site name</h1><h2>Bookkeeping that files itself</h2></body>')
+    res.check(sronly.doc.visible_h1s == [] and [h["text"] for h in sronly.doc.visible_headings(("h2",))] == ["Bookkeeping that files itself"],
+              "htmldoc: sr-only h1 hidden, the visible h2 is offered instead")
     res.check(not X.MISSION_RE.search("Mission of Burma tour dates announced for the autumn."),
               "mission: a band name is not a mission statement")
 

@@ -434,7 +434,7 @@ def check_jsonld(ctx, out, pages):
         out.check("fx.jsonld.required_props_missing", "pass")
     anchor_pages = [p for p in pages if p.role in ("home", "about")] or pages[:1]
     allow_person = ctx.category == "portfolio_personal"
-    has_org = any(X.is_org_node(n, allow_person=allow_person) for p in anchor_pages for n, _ in X.doc_top_nodes(p.doc))
+    has_org = any(X.find_org_node(p.doc, allow_person=allow_person) is not None for p in anchor_pages)
     if has_org:
         out.check("fx.jsonld.no_organization", "pass")
     else:
