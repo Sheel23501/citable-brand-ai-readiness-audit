@@ -39,9 +39,10 @@ that tells a business to change a legitimate choice.
   This is the main reason `fx.facts.key_fact_missing` is `medium` confidence
   and why its evidence lists exactly which pages were searched. When the
   sampled pages declare a language this audit has no vocabulary for,
-  `compose.apply_language_gate` caps the finding at `medium` severity and
-  `low` confidence, stamps `language_scope` on it, and the orchestrator adds a
-  limitation line naming the English-only checks. Address, phone, email, dates
+  `compose.apply_language_gate` withdraws the finding entirely rather than
+  reporting it weakened: the check becomes `not_evaluated` (reason
+  `language_not_supported`), and the orchestrator adds a limitation line
+  naming every check withdrawn this way. Address, phone, email, dates
   and structured data are read the same way in every language and are not
   gated. `en.cta.missing` carries its own vocabulary for German, French,
   Spanish, Italian, Portuguese and Dutch and is only gated outside those.

@@ -208,7 +208,7 @@ Extra fields on each final Finding, added by compose:
 | `opportunity_type` | enum | `technical` or `content`, Adobe's own split for detected issues (`coverage_map.md` section 7). |
 | `merged_from` | string[] | `dedupe_key`s folded into this finding, if any. |
 | `absence_scope` | enum | Optional. `sample` when the orchestrator's absence gate (rubric rule 6) scoped a site-level absence claim to the pages read: confidence is `low`, severity at most `medium`, and the evidence names the pages not reached. Absent on every other finding. |
-| `language_scope` | string | Optional. The bare language subtag when the language gate (rubric rule 7) scoped an English-phrase-list check on a non-English site. Absent otherwise. |
+| `language_scope` | string | Never set on a finding: the language gate (rubric rule 7) withdraws an English-phrase-list check entirely on a non-English site rather than scoping the finding at low confidence. The withdrawal is recorded the same way every other gate records one -- the check's own entry in `checks` gets `status: not_evaluated`, `reason: language_not_supported` -- which is how `en.cta.missing` already worked before rule 7 existed. |
 
 `summary.headline` is one deterministic sentence for the reader who opens
 nothing else: how many findings at which severities on how many pages were
@@ -231,9 +231,10 @@ when only home was sampled; "Not checked, because the … pages were not reached
 "The home page exposed N internal links and led to K of 5 role pages …" when it
 withdrew the press check (`navigation_not_readable`); "N pages skipped: rate
 limited (429)" when any sampled page ended in 429; "challenge page served on N
-pages: those checks are inconclusive" when any page was challenged; the language
-line when the language gate fired; "this audit reads served HTML only and does
-not execute JavaScript or query live assistants" always.
+pages: those checks are inconclusive" when any page was challenged; the line
+naming every check the language gate withdrew (`language_not_supported`) when
+one did; "this audit reads served HTML only and does not execute JavaScript or
+query live assistants" always.
 
 `ai_answer_simulation.basis` must be exactly `extracted_facts_only`. The
 orchestrator agent may not use anything it knows or fetched itself; if a

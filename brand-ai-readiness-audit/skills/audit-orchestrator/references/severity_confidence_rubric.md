@@ -79,12 +79,17 @@ Apply in this order.
    not expect is never "unreached".
 7. **Language scope** (orchestrator only, `compose.apply_language_gate`). A finding whose verdict rests on
    English phrase lists (`compose.LANG_DEPENDENT`), on a site whose sampled pages are written in a language
-   that check has no vocabulary for, stands at `confidence: low`, severity at most `medium`,
-   `language_scope: <lang>`, and a `limitations` line names the checks.
+   that check has no vocabulary for, is withdrawn entirely: the check is `not_evaluated` with reason
+   `language_not_supported`, emits no finding, and a `limitations` line names every check withdrawn this
+   way. Unlike rule 6 there is no partial case -- the audit either has the vocabulary for the sampled
+   language or it does not -- so this always withdraws rather than demoting to low confidence.
+   `en.cta.missing` (`engagement_probe.check_cta`) already worked this way before this rule existed; every
+   other `LANG_DEPENDENT` check now matches it.
 
 A probe records which adjustments fired in a `computed` evidence item, e.g.
-`adjustments=blast_radius:+1,confidence_cap:medium`. Rules 6 and 7 run in compose, after the probes,
-and record theirs as `absence_scope=sample; ...` and `language_scope` on the finding.
+`adjustments=blast_radius:+1,confidence_cap:medium`. Rule 6 runs in compose, after the probes, and records
+`absence_scope=sample; ...` on a finding it only partially withdraws. Rule 7 also runs in compose, but
+never leaves a finding behind to annotate -- see `language_scope` in `report_schema.md`.
 
 ---
 

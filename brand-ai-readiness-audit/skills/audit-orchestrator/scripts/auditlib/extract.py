@@ -765,12 +765,37 @@ def find_profile_links(pages):
     return None
 
 
-def find_by_regex(pages, rx, prefer=("home", "about"), source="text", use_links=False, use_headings=False):
+_CHROME_SEP_RE = re.compile(r"[|≡•·›»]")   # | ≡ • · › » -- nav/breadcrumb separators
+_PROSE_GLUE_RE = re.compile(r"\b(?:the|a|an|is|are|was|were|to|of|and|in|on|for|with|by|as|that|this|our|we|you|your|"
+                            r"it|can|will|do|does|has|have)\b", re.I)
+
+
+def _looks_like_prose(text, min_words=4):
+    """A text excerpt worth quoting as a fact, not a window of navigation chrome.
+
+    A window grabbed around a bare word match can land on a strip of nav/accessibility controls
+    ("Donate | Menu Search This Site GO A A Smaller Larger Reset") that mentions the word without
+    saying anything. That reads as a run of capitalised single words with list separators and no
+    ordinary glue word; an actual sentence has both length and at least one glue word.
+    """
+    t = (text or "").strip()
+    if not t or _CHROME_SEP_RE.search(t):
+        return False
+    if len(t.split()) < min_words:
+        return False
+    return bool(_PROSE_GLUE_RE.search(t))
+
+
+def find_by_regex(pages, rx, prefer=("home", "about"), source="text", use_links=False, use_headings=False, prefer_clean=False):
+    """prefer_clean=True tries a matching link/heading before the free-text window, and accepts the
+    window only if it looks like prose -- for a detector whose cue words are also common nav labels
+    (find_participation), where a bare text match is as likely to be chrome as content."""
     for p in _ordered(pages, prefer):
         t = page_text(p)
         m = rx.search(t)
-        if m:
-            return _found(_ctx(t, m, 20, 60), p, source)
+        excerpt = _ctx(t, m, 20, 60) if m else None
+        if m and not prefer_clean:
+            return _found(excerpt, p, source)
         if use_headings:
             for h in p.doc.headings:
                 if rx.search(h["text"] or ""):
@@ -782,6 +807,8 @@ def find_by_regex(pages, rx, prefer=("home", "about"), source="text", use_links=
             for b in p.doc.buttons:
                 if rx.search(b.get("text") or ""):
                     return _found(b["text"], p, "button")
+        if m and prefer_clean and _looks_like_prose(excerpt):
+            return _found(excerpt, p, source)
     return None
 
 
@@ -797,7 +824,8 @@ def find_mission(pages):
 
 
 def find_participation(pages):
-    return find_by_regex(pages, PARTICIPATE_RE, prefer=("home", "product", "about"), use_links=True, use_headings=True)
+    return find_by_regex(pages, PARTICIPATE_RE, prefer=("home", "product", "about"), use_links=True, use_headings=True,
+                         prefer_clean=True)
 
 
 def _leadership_value(key, v):

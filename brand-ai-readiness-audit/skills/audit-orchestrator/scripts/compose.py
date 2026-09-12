@@ -635,32 +635,26 @@ def apply_render_gate(findings, checks, sample):
 
 
 def apply_language_gate(findings, checks, sample):
-    """Scope English-vocabulary claims to the language the audit can actually read. Mutates in place.
+    """Withdraw English-vocabulary claims the audit cannot actually read in the sampled language. Mutates in place.
 
     A page that says lang="de" and whose buttons read "Jetzt spenden" has a call to action. Searching it
-    with an English word list and reporting "no call to action" is not a weak finding, it is a false one.
-    Where no vocabulary exists for the declared language the finding survives as a low-confidence signal
-    with the reason stated, rather than being asserted at full strength or dropped silently.
+    with an English word list and reporting "no call to action" is not a weak finding, it is a false one --
+    and demoting it to low confidence still voices it as a claim about the site. `en.cta.missing` already
+    gets this right (`engagement_probe.check_cta`): it withdraws to `not_evaluated` rather than guess. Every
+    other `LANG_DEPENDENT` check now does the same: no vocabulary for the declared language means no
+    verdict, not a weakened one.
 
     Returns the language that was gated on, or None.
     """
     lang = sample_language(sample)
     if not lang or lang == "en":
         return None
-    gated = []
     for f in findings:
         supported = LANG_DEPENDENT.get(f.get("check_id"))
         if supported is None or f.get("status") != "fail" or lang in supported:
             continue
-        f["confidence"] = "low"
-        if f.get("severity") in ("critical", "high"):
-            f["severity"] = "medium"
-        _resync_action(f)
-        f["language_scope"] = lang
-        note = (" Pages declare lang=\"%s\"; the phrases this check searches for are English, so the site may "
-                "state this in its own language where the audit did not look." % lang)
-        f["evidence"] = _append_note(f.get("evidence", ""), note)
-        gated.append(f["check_id"])
+        _gate_not_evaluated(f, checks, "language_not_supported")
+    findings[:] = [f for f in findings if not f.get("_gated")]
     return lang
 
 
@@ -760,6 +754,25 @@ def _fact(facts, fid):
 SIM_ATTRIBUTION = ("Every answer above quotes this site's own text, exactly as the facts file records it; nothing "
                    "was added from anywhere else. A question left unanswered means the fact is not on the pages read.")
 
+_SIM_CHROME_SEP_RE = re.compile(r"[|≡•·›»]")
+
+
+def _sentence_shaped(value):
+    """Whether a fact's value is worth quoting as an answer, rather than a window of navigation chrome.
+
+    A fact extractor's context window can land on a strip of nav/accessibility controls that mentions a
+    cue word without saying anything about the site ("...The Python Network Donate ≡ Menu Search This
+    Site GO A A Smaller Larger Reset..."), and the underlying detector may still record it as `present`.
+    The simulation must never voice that as an answer, whichever detector produced it, so this check runs
+    here regardless of the fact's own status. The signal is a list-separator character, not sentence
+    grammar: a sentence never contains "≡" or "|", but a great many genuine facts are not sentences either
+    -- an email, a phone number, a "; "-joined list of services, a comma-joined address in French or
+    English -- and requiring one would reject those alongside chrome. Semicolons are deliberately excluded:
+    find_offer_list uses "; " as its own list separator for a legitimate fact.
+    """
+    v = (value or "").strip()
+    return bool(v) and not _SIM_CHROME_SEP_RE.search(v)
+
 
 def answer_from_facts(fact_ids, facts):
     """A checkable answer to one question: framing plus each cited fact quoted verbatim, and nothing else.
@@ -771,7 +784,7 @@ def answer_from_facts(fact_ids, facts):
     quoted = []
     for fid in fact_ids:
         value = (_fact(facts, fid).get("value") or "").strip()
-        if not value:
+        if not value or not _sentence_shaped(value):
             return None
         quoted.append('"%s"' % value)
     if not quoted:
@@ -794,7 +807,8 @@ def build_simulation(facts, category, site_host, facts_rel):
     for i, (template, fact_ids, informational) in enumerate(rows, start=1):
         present, missing = [], []
         for fid in fact_ids:
-            (present if _fact(facts, fid).get("status") == "present" else missing).append(fid)
+            f = _fact(facts, fid)
+            (present if f.get("status") == "present" and _sentence_shaped(f.get("value")) else missing).append(fid)
         q = {"id": "q%d" % i, "question": template.format(brand=brand), "answerable": not missing,
              "answer_from_facts": None if missing else answer_from_facts(present, facts),
              "facts_used": present, "missing_facts": missing}
@@ -1072,14 +1086,12 @@ def build_limitations(sample, probes, checks, gated_lang=None, category=None, ch
         if probe.get("error"):
             out.append("%s reported an internal error and its checks may be incomplete: %s"
                        % (probe.get("probe"), probe["error"]))
-    if gated_lang:
-        covered = sorted(c for c, langs in LANG_DEPENDENT.items() if gated_lang in langs)
-        out.append("The sampled pages declare lang=\"%s\". Address, phone, email, dates and structured data are read "
-                   "the same way in any language, but the phrase lists behind %s are English%s. Findings from those "
-                   "checks are reported at low confidence: the site may state the thing in its own words where this "
-                   "audit did not look."
-                   % (gated_lang, ", ".join(sorted(set(LANG_DEPENDENT) - set(covered))),
-                      " (the call-to-action check does cover %s)" % gated_lang if covered else ""))
+    by_lang = sorted(cid for cid, c in checks.items() if c.get("reason") == "language_not_supported")
+    if gated_lang and by_lang:
+        out.append("The sampled pages are written in \"%s\". Address, phone, email, dates and structured data are "
+                   "read the same way in any language, but the phrase lists behind these checks are English, so "
+                   "they have no verdict here rather than a guessed one: %s."
+                   % (gated_lang, ", ".join(by_lang)))
     out.append("This audit reads served HTML only and does not execute JavaScript or query live assistants.")
     out.extend(non_coverage_lines())
     return out

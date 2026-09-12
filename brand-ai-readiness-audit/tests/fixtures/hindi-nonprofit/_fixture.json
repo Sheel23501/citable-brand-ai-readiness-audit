@@ -1,26 +1,15 @@
 {
   "name": "hindi-nonprofit",
-  "description": "A well-built Delhi literacy NGO site (Sakshar Delhi Foundation) written entirely in Hindi (Devanagari), lang=\"hi\", category nonprofit_institution, with English URL slugs as most Indian sites have. The non-Latin coverage fixture: everything language-neutral must pass (structure, dates, phone, JSON-LD, identity, links, FAQ by question headings), and the checks that depend on English phrase lists must be gated to low confidence, never asserted at full strength.",
+  "description": "A well-built Delhi literacy NGO site (Sakshar Delhi Foundation) written entirely in Hindi (Devanagari), lang=\"hi\", category nonprofit_institution, with English URL slugs as most Indian sites have. The non-Latin coverage fixture: everything language-neutral must pass (structure, dates, phone, JSON-LD, identity, links, FAQ by question headings), and the checks that depend on English phrase lists must have no verdict rather than a false claim about a site written in Hindi.",
   "base": null,
   "category": "nonprofit_institution",
   "routes": {},
   "expected": {
-    "fail": [
-      "fx.facts.key_fact_missing",
-      "en.hero.value_prop_unclear"
-    ],
+    "fail": [],
     "info": [
       "ef.entity.wikidata_unavailable",
       "ef.corroboration.offsite_spotcheck"
     ],
-    "max_severity": {
-      "fx.facts.key_fact_missing": "medium",
-      "en.hero.value_prop_unclear": "medium"
-    },
-    "max_confidence": {
-      "fx.facts.key_fact_missing": "low",
-      "en.hero.value_prop_unclear": "low"
-    },
     "pass_required": [
       "fx.facts.image_only",
       "fx.jsonld.missing",
@@ -55,10 +44,14 @@
       "cr.render.js_gate",
       "cr.render.csr_shell"
     ],
+    "gated": [
+      "fx.facts.key_fact_missing",
+      "en.hero.value_prop_unclear"
+    ],
     "not_evaluated": {
       "en.cta.missing": "language_not_supported",
       "en.nav.related_links_missing": "not_applicable_for_category"
     },
-    "notes": "Category nonprofit_institution at medium confidence from NGO JSON-LD and the /donate and /programs URL patterns; the Hindi nav labels score nothing, which is the honest result. Roles are found from the English slugs (/about, /programs, /news, /contact), so the absence gate does not fire and every key fact is actually checked. Three of the four key facts are language-neutral and present: mission from the NGO description, programs_or_services from the four Hindi h2 headings on /programs, location from the PostalAddress. how_to_participate depends on the English participation vocabulary and is absent although the site says 'दान करें' on every page; key_fact_missing therefore fires at medium (one fact) and the language gate caps it at low confidence with language_scope hi. The hero check is the same: no English category noun in the lead, one signal, gated. en.cta.missing is not_evaluated (language_not_supported) rather than a false 'no call to action'. NAP passes on the phone (+91 11 2690 7400) because the Devanagari address has no grammar yet; the name component is not graded because the brand name has no Latin letters. The FAQ passes on three Devanagari question headings; continuity passes because Hindi words are tokenised as whole words (combining marks kept), which is what the tokenizer fix guards."
+    "notes": "Category nonprofit_institution at medium confidence from NGO JSON-LD and the /donate and /programs URL patterns; the Hindi nav labels score nothing, which is the honest result. Roles are found from the English slugs (/about, /programs, /news, /contact), so the absence gate does not fire and every key fact is actually checked. Three of the four key facts are language-neutral and present: mission from the NGO description, programs_or_services from the four Hindi h2 headings on /programs, location from the PostalAddress. how_to_participate depends on the English participation vocabulary and is absent although the site says 'दान करें' on every page -- but apply_language_gate withdraws fx.facts.key_fact_missing entirely (not_evaluated, reason language_not_supported) rather than reporting a weakened claim about a fact this audit cannot read in Hindi. en.hero.value_prop_unclear is the same case: no English category noun in the lead, but the check has no verdict rather than a false 'unclear value proposition'. en.cta.missing is not_evaluated (language_not_supported) for the same reason, from check_cta directly. NAP passes on the phone (+91 11 2690 7400) because the Devanagari address has no grammar yet; the name component is not graded because the brand name has no Latin letters. The FAQ passes on three Devanagari question headings; continuity passes because Hindi words are tokenised as whole words (combining marks kept), which is what the tokenizer fix guards."
   }
 }

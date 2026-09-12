@@ -963,6 +963,26 @@ def stage_compose_units(res, C):
     res.check(len(kept) == 2 and all("absence_scope" not in f for f in kept.values()),
               "gate: a portfolio with about and contact read is fully graded")
 
+    # the AI-answer simulation must never quote a window of navigation chrome as a fact (4.1): a fact
+    # extractor's context window can land on nav/accessibility controls that merely mention a cue word,
+    # and the underlying detector may still record it as present.
+    chrome_value = "The Python Network Donate ≡ Menu Search This Site GO A A Smaller Larger Reset"
+    prose_value = "You can donate online through our secure portal."
+    res.check(C._sentence_shaped(chrome_value) is False, "sentence-shaped: nav chrome is rejected")
+    res.check(C._sentence_shaped(prose_value) is True, "sentence-shaped: a real sentence passes")
+    chrome_facts = {"facts": {"how_to_participate": {"status": "present", "value": chrome_value}}}
+    res.check(C.answer_from_facts(["how_to_participate"], chrome_facts) is None,
+              "answer_from_facts: refuses to quote nav chrome even when the fact is marked present")
+    prose_facts = {"facts": {"how_to_participate": {"status": "present", "value": prose_value}}}
+    res.check(C.answer_from_facts(["how_to_participate"], prose_facts) is not None,
+              "answer_from_facts: still quotes a genuine sentence")
+    sim = C.build_simulation(chrome_facts, "nonprofit_institution", "example.org", "work/extracted_facts.json")
+    involved = [q for q in sim["questions"] if "how_to_participate" in q["facts_used"] or "how_to_participate" in q["missing_facts"]]
+    res.check(bool(involved) and all("how_to_participate" not in q["facts_used"] for q in involved),
+              "build_simulation: a chrome-shaped fact never lands in facts_used", str(involved))
+    res.check(all("how_to_participate" in q["missing_facts"] for q in involved),
+              "build_simulation: a chrome-shaped fact counts as missing instead", str(involved))
+
     # the tables compose owns must cover the registry exactly
     ids = set(reg.ids())
     res.check(set(C.POSITIVE_TITLES) == ids, "every registry check has a positive title",
@@ -1042,12 +1062,14 @@ def stage_compose(res, farm):
         from auditlib.findings import SEVERITIES as _SEV, CONFIDENCES as _CONF
         reasons = {e["check_id"]: e["reason"] for e in report["coverage"]["not_evaluated"]}
         gated = set(exp.get("gated", []))
+        withdrawal_reasons = C.GATE_REASONS + ("language_not_supported",)
         for cid in sorted(gated):
-            res.check(reasons.get(cid) in C.GATE_REASONS, "compose/%s: %s is withdrawn by the absence gate" % (name, cid), str(reasons.get(cid)))
+            res.check(reasons.get(cid) in withdrawal_reasons, "compose/%s: %s is withdrawn by a gate" % (name, cid), str(reasons.get(cid)))
         leaked = gated & {f["check_id"] for f in fnds + report["suppressed_findings"]}
         res.check(not leaked, "compose/%s: a gated check produces no finding" % name, str(sorted(leaked)))
         if gated:
-            res.check(any(l.startswith("Not checked, because") or "navigation could not be read" in l for l in report["limitations"]),
+            res.check(any(l.startswith("Not checked, because") or "navigation could not be read" in l
+                          or "phrase lists behind these checks are English" in l for l in report["limitations"]),
                       "compose/%s: limitations explain the gated checks" % name)
         cov_reasons = _coverage_reasons(report)
         for cid, reason in sorted((exp.get("not_evaluated") or {}).items()):
@@ -1405,6 +1427,7 @@ def stage_run_audit(res, farm):
     import tempfile
     import time as _time
     V = _load_validate()
+    C = _load_compose()
     R = _load_run_audit()
     for name, base in farm.urls.items():
         exp = farm.metas[name]["expected"]
@@ -1437,8 +1460,9 @@ def stage_run_audit(res, farm):
             res.check(seen == set(exp["fail"]), "run_audit/%s: the whole pipeline reproduces the fixture's fail set" % name,
                       "got %s expected %s" % (sorted(seen), sorted(exp["fail"])))
             reasons = _coverage_reasons(report)
+            withdrawal_reasons = C.GATE_REASONS + ("language_not_supported",)
             for cid in exp.get("gated", []):
-                res.check(reasons.get(cid) in ("role_page_not_sampled", "navigation_not_readable"),
+                res.check(reasons.get(cid) in withdrawal_reasons,
                           "run_audit/%s: %s has no verdict end to end" % (name, cid), str(reasons.get(cid)))
             for cid, reason in sorted((exp.get("not_evaluated") or {}).items()):
                 res.check(reasons.get(cid) == reason, "run_audit/%s: %s has no verdict end to end (%s)" % (name, cid, reason), str(reasons.get(cid)))
@@ -1722,6 +1746,21 @@ def stage_extract(res):
     res.check(X.find_free_trial([mk('<a href="/x">Start free trial</a>')]) is not None and X.find_free_tier([mk('<a href="/x">Start free trial</a>')]) is None, "free trial is not a free tier")
     res.check(X.find_audience([mk("<p>Ledgerly is built for freelance designers and small studios.</p>")]) is not None, "audience phrase found")
     res.check(X.find_audience([mk("<p>We ship on Tuesdays.</p>")]) is None, "audience: no false match")
+
+    # find_participation must prefer a real link over a text-window match that lands on nav chrome. This is
+    # the python.org defect: "Donate" inside a flattened nav strip quoted as an answer to "how do I donate?".
+    chrome_nav = mk('<nav><div>The Python Network</div><a href="/donate">Donate</a><span>≡</span>'
+                     '<div>Menu Search This Site</div><div>GO A A Smaller Larger Reset</div></nav>')
+    part = X.find_participation([chrome_nav])
+    res.check(part is not None and part["value"] == "Donate" and part["source"] == "link",
+              "participation: a real link wins over a chrome text window", str(part))
+    prose = mk("<p>Please donate today to help fund our programs.</p>")
+    part2 = X.find_participation([prose])
+    res.check(part2 is not None and "donate" in part2["value"].lower() and part2["source"] == "text",
+              "participation: a genuine sentence is still found in text", str(part2))
+    chrome_only = mk('<div>The Network Donate ≡ Menu Search This Site GO A A Smaller Larger Reset</div>')
+    res.check(X.find_participation([chrome_only]) is None,
+              "participation: a chrome-only window with no link or heading is absent, not quoted")
     us = mk("<p>Contact: 500 Market St, San Francisco, CA 94105</p>")
     res.check(X.find_address([us]) is not None, "address: US street/city/state/zip found")
 
@@ -1856,6 +1895,73 @@ def stage_extract(res):
     res.check(bool(_EP.cta_hits(Document("<body>" + "<p>text</p>" * 40 + '<a href="tel:+4921163553355">0211 - 63 55 33 55</a></body>', base_url=_u),
                                 _rx2, _vocab2, role="contact")),
               "engagement: a contact page's tel: link is its call to action")
+
+    # A header/nav link is first-viewport whatever its markup position (4.3): iiitd.ac.in's
+    # <a>Admission</a> sits at 17.9-42.8% of the markup behind a long utility bar, past the 40% proxy,
+    # though it is the first thing a visitor sees in the page's own header.
+    _rx3, _vocab3 = _EP._cta_re("nonprofit_institution")
+    late_header = Document("<body>" + "<p>filler text here to pad the markup well past the viewport proxy</p>" * 60
+                           + '<header><a href="/admission">Admission</a></header>'
+                           + "<p>more content after the header</p>" * 5 + "</body>", base_url=_u)
+    res.check(bool(_EP.cta_hits(late_header, _rx3, _vocab3)),
+              "engagement: a header link counts as first-viewport whatever its markup position")
+    # The position proxy still governs an ordinary body link: one buried at the same depth, outside
+    # header/nav, must not count -- this is the control that proves the fix did not just stop measuring.
+    late_body = Document("<body>" + "<p>filler text here to pad the markup well past the viewport proxy</p>" * 60
+                         + '<div><a href="/admission">Admission</a></div>'
+                         + "<p>more content after the link</p>" * 5 + "</body>", base_url=_u)
+    res.check(not _EP.cta_hits(late_body, _rx3, _vocab3),
+              "engagement: an ordinary body link past 40% still does not count")
+
+    # A transport error (DNS/TLS/timeout/refused) is not a broken link (4.2): the audit's own connection
+    # failing is not evidence the site is broken, and python.org's /downloads/ios/ (a real 200) was once
+    # reported as the site's own broken link because this audit's first attempt saw a tls_error.
+    res.check(_EP.classify_fetch({"error": "tls_error"}) == "transport_error", "classify_fetch: tls_error is a transport error, not broken")
+    res.check(_EP.classify_fetch({"error": "dns_failure"}) == "transport_error", "classify_fetch: dns_failure is a transport error, not broken")
+    res.check(_EP.classify_fetch({"status": 404}) == "broken", "classify_fetch: a real 404 is still broken")
+    res.check(_EP.classify_fetch({"status": 500}) == "broken", "classify_fetch: a 5xx is still broken")
+    res.check(_EP.classify_fetch({"status": 403}) == "blocked", "classify_fetch: 403 is blocked, not broken")
+
+    import types as _types
+    import time as _time2
+    from auditlib.findings import ProbeOutput as _PO
+
+    class _FlakyFetcher:
+        """Fails with a transport error on the first request to each URL, then serves 200: the retry case."""
+        def __init__(self):
+            self.seen = set()
+
+        def get(self, url, purpose=None, timeout=None):
+            if url not in self.seen:
+                self.seen.add(url)
+                return {"status": None, "error": "tls_error"}
+            return {"status": 200, "error": None}
+
+    class _DeadFetcher:
+        """Fails with a transport error on every request: the persists-after-retry case."""
+        def get(self, url, purpose=None, timeout=None):
+            return {"status": None, "error": "read_timeout"}
+
+    link_home = mk('<body><a href="https://x.example/retry-ok">Retry link</a></body>')
+    ctx_stub = _types.SimpleNamespace(pages=[], home=None)
+    out1 = _PO("engagement-audit", "https://x.example/", "saas_software", [])
+    work1 = {}
+    _EP.check_links(ctx_stub, out1, _FlakyFetcher(), [link_home], [], work1, _time2.monotonic() + 30)
+    res.check(work1["link_sample"][0]["verdict"] == "ok" and work1["link_summary"]["requested"] == 2,
+              "check_links: a transport error clears on one retry and is never reported as broken",
+              str(work1["link_summary"]))
+    res.check(out1.status_of("en.links.broken_sampled") == "pass", "check_links: the check passes once the retry succeeds")
+
+    out2 = _PO("engagement-audit", "https://x.example/", "saas_software", [])
+    work2 = {}
+    _EP.check_links(ctx_stub, out2, _DeadFetcher(), [link_home], [], work2, _time2.monotonic() + 30)
+    res.check(work2["link_sample"][0]["verdict"] == "transport_error", "check_links: a transport error that persists is never reclassified as broken")
+    res.check(out2.status_of("en.links.broken_sampled") == "inconclusive", "check_links: a persisting transport error is inconclusive, not a fail",
+              str([f for f in out2.findings if f["check_id"] == "en.links.broken_sampled"]))
+    reason2 = next(c.get("reason") for c in out2.checks if c["check_id"] == "en.links.broken_sampled")
+    res.check(reason2 == "fetcher_error", "check_links: the inconclusive reason is fetcher_error", reason2)
+    res.check(all(f["severity"] == "info" for f in out2.findings if f["check_id"] == "en.links.broken_sampled"),
+              "check_links: an inconclusive verdict is always info severity")
 
     # Header and footer served empty, and the gate that follows from it.
     res.check(Document("<body><header></header><main><p>Hello there, world.</p></main><footer></footer></body>", base_url=_u).empty_chrome

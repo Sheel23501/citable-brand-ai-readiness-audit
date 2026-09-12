@@ -100,9 +100,14 @@ page is not usable (reason: that page's exclusion reason, for example
 `non_html`).
 
 ### `en.cta.missing` · medium · medium · per-page (home and key pages)
-**Rule.** On the home page and the category's key pages, an element in the
-**first 40% of the body markup** (`Document.body_frac`) counts as a call to
-action when it is:
+**Rule.** On the home page and the category's key pages, an element counts as
+a call to action when it is either in the **first 40% of the body markup**
+(`Document.body_frac`) or, for a link only, inside the page's `<header>` or
+`<nav>` whatever its markup position -- iiitd.ac.in's `<a>Admission</a>` sits
+at 17.9-42.8% of the markup behind a long utility bar, past the 40% proxy,
+though it is the first thing a visitor sees in the page's own header; the
+markup-position proxy still governs buttons, forms and every other body link,
+where it is the only signal available. It must also be:
 
 - an `<a>` or `<button>` whose text matches the category vocabulary
   (`CTA_VOCAB`: `sign up`, `start`, `try`, `get started`, `book a demo`,
@@ -321,14 +326,21 @@ seconds of their own time (`not_checked`, reason `time_budget`).
 home first, ordered by context (nav, then header, main and body, aside,
 footer). Links to pages the sampler already fetched reuse that status without a
 request. Each other link is fetched with a 10-second cap. A link is **broken**
-when it returns 404 or 410, a 5xx, or a transport error (DNS failure, timeout,
-connection refused, TLS error, too many redirects). Links robots.txt disallows
+when it returns 404 or 410, or a 5xx. Links robots.txt disallows
 are `skipped`, never broken. 403 and 429 (and bot challenges) are `blocked`,
-never broken (next row). Fails when at least one link is broken;
-`not_evaluated` (`no_internal_links`) when the usable pages link nowhere.
-**Evidence.** One `http_status` item per broken link (`GET url -> status`,
-with the page and context it was found in) and a `computed` summary
-`sampled=; requested=; ok=; broken=; blocked=; skipped=; not_checked=`.
+never broken (next row). A transport error (DNS failure, timeout, connection
+refused, TLS error, too many redirects) is retried once before it counts for
+anything: this audit's own connection failing to complete is not the site's
+fault, and a page that answers a normal request with 200 must never be reported
+as the site's broken link (python.org's `/downloads/ios/` did exactly this).
+Fails when at least one link is broken; `inconclusive` (reason `fetcher_error`)
+when a transport error persists on both attempts and no link is actually
+broken; `not_evaluated` (`no_internal_links`) when the usable pages link
+nowhere.
+**Evidence.** One `http_status` item per broken (or, for the inconclusive case,
+transport-failing) link (`GET url -> status`, with the page and context it was
+found in) and a `computed` summary
+`sampled=; requested=; ok=; broken=; blocked=; transport_error=; skipped=; not_checked=`.
 **Why medium, high confidence.** Deterministic on the sample. A dead link is
 the fastest way to lose a visitor who followed the site's own suggestion, and a
 page the site links to but cannot serve is invisible to assistants too. The

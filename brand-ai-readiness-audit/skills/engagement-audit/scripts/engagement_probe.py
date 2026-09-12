@@ -56,7 +56,7 @@ HEAVY_IMAGES = 100
 RELATED_MIN_LINKS = 3
 LISTING_MIN_LINKS = 6               # a page listing this many internal links in lists is a listing page, not a detail page
 BLOCKED_CLUSTER_MIN = 3
-BROKEN_ERRORS = ("dns_failure", "connect_timeout", "read_timeout", "total_timeout", "connection_refused", "tls_error", "too_many_redirects")
+TRANSPORT_ERRORS = ("dns_failure", "connect_timeout", "read_timeout", "total_timeout", "connection_refused", "tls_error", "too_many_redirects")
 SEARCH_INPUT_NAMES = {"q", "s", "search", "query", "keyword", "keywords", "term"}
 STOPWORDS = {"this", "that", "with", "from", "your", "have", "will", "home", "page", "more", "what", "when", "where",
              "which", "their", "there", "they", "them", "then", "than", "into", "over", "also", "just", "only", "some", "such",
@@ -312,7 +312,11 @@ def cta_hits(doc, rx, vocab, role=None):
         if l.in_head:
             continue
         frac = doc.body_frac(l.mpos)
-        if frac is None or frac > FIRST_VIEWPORT_FRAC:
+        # A header or nav link is what a visitor sees first whatever its markup position: iiitd.ac.in's
+        # <a>Admission</a> sits at 17.9-42.8% of the markup behind a long utility bar, past the 40% proxy,
+        # and was reported as "no call to action" though it is the first thing in the page's own header.
+        # FIRST_VIEWPORT_FRAC still governs body links, where markup position is the only proxy available.
+        if l.context not in ("header", "nav") and (frac is None or frac > FIRST_VIEWPORT_FRAC):
             continue
         scheme = urlsplit(l.url).scheme
         if rx.search(l.text or ""):
@@ -864,13 +868,18 @@ def sample_links(ctx, usable):
 
 
 def classify_fetch(r):
+    """`transport_error` (DNS/TLS/timeout/refused) is deliberately distinct from `broken`: it says the
+    audit's own fetcher could not complete the request, not that the site answered with 404/410/5xx.
+    check_links retries a transport error once before accepting the verdict, and never counts a transport
+    error as a broken link -- a python.org page that returned 200 to a normal request was once reported
+    broken because this audit's own connection to it saw a TLS error."""
     if r.get("skipped"):
         return "skipped"
     if r.get("challenge"):
         return "blocked"
     err = r.get("error")
-    if err in BROKEN_ERRORS:
-        return "broken"
+    if err in TRANSPORT_ERRORS:
+        return "transport_error"
     if err:
         return "error"
     st = r.get("status")
@@ -910,17 +919,27 @@ def check_links(ctx, out, fetcher, usable, excluded, work, deadline):
         s["error"] = r.get("error")
         s["skipped"] = r.get("skipped")
         s["verdict"] = classify_fetch(r)
+        # A transport error (DNS/TLS/timeout/refused) says the audit's own request failed to complete, not
+        # that the site is broken -- python.org's /downloads/ios/ returned 200 to a normal request after
+        # this audit's first attempt saw a tls_error. One retry before the verdict stands.
+        if s["verdict"] == "transport_error" and s["source"] == "request" and time.monotonic() <= deadline:
+            r = fetcher.get(s["url"], purpose="link_sample_retry", timeout=LINK_TIMEOUT)
+            requested += 1
+            s["status"], s["error"], s["skipped"] = r.get("status"), r.get("error"), r.get("skipped")
+            s["verdict"] = classify_fetch(r)
     blocked = [s for s in sample if s.get("verdict") == "blocked"]
     by_host = {}
     for s in blocked:
         by_host.setdefault((urlsplit(s["url"]).hostname or "").lower(), []).append(s)
     cluster = [s for h, ss in by_host.items() if len(ss) >= BLOCKED_CLUSTER_MIN for s in ss]
     broken = [s for s in sample if s.get("verdict") == "broken"]
-    counts = {v: sum(1 for s in sample if s.get("verdict") == v) for v in ("ok", "broken", "blocked", "skipped", "error", "not_checked")}
+    transport = [s for s in sample if s.get("verdict") == "transport_error"]
+    counts = {v: sum(1 for s in sample if s.get("verdict") == v) for v in ("ok", "broken", "blocked", "skipped", "error", "transport_error", "not_checked")}
     work["link_sample"] = sample
     work["link_summary"] = {"sampled": len(sample), "requested": requested, "blocked_cluster": len(cluster), **counts}
-    summary = "sampled=%d; requested=%d; ok=%d; broken=%d; blocked=%d; skipped=%d; not_checked=%d" % (
-        len(sample), requested, counts["ok"], counts["broken"], counts["blocked"], counts["skipped"], counts["not_checked"] + counts["error"])
+    summary = "sampled=%d; requested=%d; ok=%d; broken=%d; blocked=%d; transport_error=%d; skipped=%d; not_checked=%d" % (
+        len(sample), requested, counts["ok"], counts["broken"], counts["blocked"], counts["transport_error"],
+        counts["skipped"], counts["not_checked"] + counts["error"])
     if cluster:
         host = (urlsplit(cluster[0]["url"]).hostname or "").lower()
         out.inconclusive("en.links.blocked_cluster", reason="fetcher_blocked",
@@ -937,7 +956,7 @@ def check_links(ctx, out, fetcher, usable, excluded, work, deadline):
     if broken:
         out.fail("en.links.broken_sampled",
                  title="%d of %d sampled internal links %s broken" % (len(broken), len(sample), "is" if len(broken) == 1 else "are"),
-                 evidence="Of %d internal links sampled (navigation first, then body and footer), %d returned 404/410, a server error, or a transport error: %s." % (
+                 evidence="Of %d internal links sampled (navigation first, then body and footer), %d returned 404/410 or a server error: %s." % (
                      len(sample), len(broken), "; ".join("%s -> %s" % (_short(s["url"], 50), s.get("status") or s.get("error")) for s in broken[:3])),
                  evidence_items=[evidence_item(s["linked_from"], "http_status", "GET %s -> %s" % (_short(s["url"]), s.get("status") or s.get("error")), note="%s link '%s'" % (s["context"], s["text"][:40])) for s in broken[:8]]
                                 + [evidence_item("site", "computed", summary)],
@@ -945,6 +964,16 @@ def check_links(ctx, out, fetcher, usable, excluded, work, deadline):
                  action="Fix or remove the %d broken link%s listed, starting with the ones in the navigation." % (len(broken), "s" if len(broken) != 1 else ""),
                  detail="Point each link at the current page, or redirect the old URL (301) to it. Re-run the audit; the sample is deterministic, so the same links are checked again.",
                  pages=[], page_roles=[])
+    elif transport:
+        out.inconclusive("en.links.broken_sampled", reason="fetcher_error",
+                         title="%d of %d sampled internal links did not answer this audit's fetcher, twice" % (len(transport), len(sample)),
+                         evidence="Of %d internal links sampled, %d failed at the transport level (DNS, TLS, timeout or connection refused) on both this audit's attempts, with no 404/410/5xx from the site itself: %s. A transport failure is not evidence the link is broken; it may be this fetcher, this network, or a momentary problem at the origin." % (
+                             len(sample), len(transport), "; ".join("%s -> %s" % (_short(s["url"], 50), s.get("error")) for s in transport[:3])),
+                         evidence_items=[evidence_item(s["linked_from"], "http_status", "GET %s -> %s" % (_short(s["url"]), s.get("error")), note="%s link '%s'" % (s["context"], s["text"][:40])) for s in transport[:8]]
+                                        + [evidence_item("site", "computed", summary)],
+                         why="Counting a transport failure as a broken link risks blaming the site for this audit's own connection; a person's browser or a search crawler with a different network path may see the page just fine.",
+                         action="Fetch each listed URL yourself (curl -I) to see whether it is actually reachable.",
+                         detail="If curl also fails, treat it as broken and fix or remove the link. If curl succeeds, this audit's network path to that host was the problem, not the site.")
     else:
         out.check("en.links.broken_sampled", "pass")
 
