@@ -1,50 +1,30 @@
 # AI-readiness audit: python.org
 
-https://www.python.org · category **nonprofit_institution** (medium confidence) · audited 2026-09-08T14:04:42Z · tool brand-ai-readiness-audit 0.1.0
+https://www.python.org · category **nonprofit_institution** (medium confidence) · audited 2026-09-12T14:33:02Z · tool brand-ai-readiness-audit 0.1.0
 
 ## Summary
 
-**10 findings** — 0 critical, 1 high, 2 medium, 5 low, 2 informational.
+No critical or high findings on the 4 pages read; 3 medium and 5 low. Start with F-001: Postal address or phone number is not visible as plain text on the home/about/contact….
+
+**10 findings** — 0 critical, 0 high, 3 medium, 5 low, 2 informational.
 
 61 checks run: 47 passed, 9 failed, 0 inconclusive, 5 not evaluated.
 
 ## What this means
 
-Invisible: an assistant can reach and read these pages, but two of the four key facts expected of a nonprofit or institutional site are not extractable as plain text (F-001), and no Organization node identifies the site owner (F-007). Stale or mistrusted: no postal address or phone number appears as plain text on the home page (F-002), and the off-site mention spot-check was not performed (F-009), so nothing in this run corroborates the brand beyond its own pages. The simulation answered three of five buyer questions from the extracted facts; the mission and location questions could not be answered at all (F-010). Bouncing: the home page heading is two words, too short to state what the site offers (F-003), and one page's heading does not match its title and description (F-006). Start with F-002, the one quick win: publish a postal address or phone number as plain text on the home page.
+This audit read 4 pages of the site and ran 61 checks against what a non-JavaScript fetcher receives. It raised 3 medium, 5 low. Start with F-001: Postal address or phone number is not visible as plain text on the home/about/contact…. 47 checks passed. 5 checks had no verdict, because the pages that would answer them were not reached or could not be read; those are gaps in this sample, not faults found on the site.
 
 ## Quick wins
 
 Low effort, real impact, high enough confidence to act on today.
 
-- **F-002** Postal address or phone number is not visible as plain text on the home/about/contact… — State the organisation name, postal address and phone number as visible text in the site footer or on the contact page.
+- **F-001** Postal address or phone number is not visible as plain text on the home/about/contact… — State the organisation name, postal address and phone number as visible text in the site footer or on the contact page.
 
 ## Findings
 
-### High (1)
+### Medium (3)
 
-#### F-001 2 of 4 key facts for a nonprofit or institutional site are not extractable as text
-
-`fx.facts.key_fact_missing` · severity **high** · confidence medium · effort medium · extract · site-wide
-
-Searched 4 sampled pages (home, about, contact, blog). Found 2 of 4 key facts as plain text or structured data; not found: mission (absent); location (absent).
-
-```
-computed: pages_searched=4 (home, about, contact, blog); key_facts=4; found=2; missing=mission,location
-text_excerpt: Get Started; Download; Docs; Jobs; Upcoming Events  (programs_or_services found via heading)
-text_excerpt: …The Python Network Donate ≡ Menu Search This Site GO A A Smaller Larger Reset…  (how_to_participate found via text)
-```
-
-*Why it matters.* An assistant answers from the text it can extract. A fact that is absent, or present only as a hint, is a question the brand cannot be quoted on, so the answer comes from a competitor or from nowhere. The brand is invisible for that question.
-
-*Do this.* Add the missing facts as plain text on the pages a visitor would expect them (mission, location). State the mission in one plain sentence on the home and about pages. State the location as text (city and country at minimum). Mirror each fact in the matching JSON-LD property (offers.price, address, telephone, openingHoursSpecification, description, audience) so both text and structured data agree.
-
-Priority **high** · impact high · effort medium
-
-Reference: https://developers.google.com/search/docs/appearance/structured-data/sd-policies
-
-### Medium (2)
-
-#### F-002 Postal address or phone number is not visible as plain text on the home/about/contact…
+#### F-001 Postal address or phone number is not visible as plain text on the home/about/contact…
 
 `ef.entity.nap_missing_plain_text` · severity **medium** · confidence high · effort low · entity · `/`, `/about/`, `/about/help/`
 
@@ -58,11 +38,33 @@ computed: pages_checked=home, about, contact; required=name|postal address or ph
 
 *Why it matters.* Name, address and phone are the three facts every directory, register and knowledge graph holds about a business. When the site itself does not state them as text, the assistant cannot confirm it has the right entity, and inconsistent copies elsewhere win.
 
-*Do this.* State the organisation name, postal address and phone number as visible text in the site footer or on the contact page. Use the same spelling and format everywhere (footer, contact page, JSON-LD PostalAddress and telephone, Google Business Profile, LinkedIn). A footer line is enough: 'Ledgerly Software Ltd · 12 Harbour Street, Bristol BS1 4QA · +44 117 496 0123'.
+*Do this.* State the organisation name, postal address and phone number as visible text in the site footer or on the contact page. Use the same spelling and format everywhere (footer, contact page, JSON-LD PostalAddress and telephone, Google Business Profile, LinkedIn). A footer line is enough: the registered name, the street address in the country's own postal format, and a phone number in international form (+<country code>).
 
 Priority **medium** · impact medium · effort low · quick win
 
 Reference: https://developers.google.com/search/docs/appearance/structured-data/organization
+
+#### F-002 1 of 4 key facts for a nonprofit or institutional site are not extractable as text
+
+`fx.facts.key_fact_missing` · severity **medium** · confidence medium · effort medium · extract · site-wide
+
+Searched 4 sampled pages (home, about, contact, blog). Found 3 of 4 key facts as plain text or structured data; not found: location (absent).
+
+```
+computed: pages_searched=4 (home, about, contact, blog); key_facts=4; found=3; missing=location
+text_excerpt: …Foundation The mission of the Python Software Foundation is to promote, protect, and advance the Python programming language, and to support and facilitate the growth of a diverse and international …  (mission found via text)
+text_excerpt: Get Started; Download; Docs; Jobs; Upcoming Events  (programs_or_services found via heading)
+text_excerpt: Donate  (how_to_participate found via link)
+computed: adjustments=single_missing_fact:medium
+```
+
+*Why it matters.* An assistant answers from the text it can extract. A fact that is absent, or present only as a hint, is a question the brand cannot be quoted on, so the answer comes from a competitor or from nowhere. The brand is invisible for that question.
+
+*Do this.* Add the missing facts as plain text on the pages a visitor would expect them (location). State the location as text (city and country at minimum). Mirror each fact in the matching JSON-LD property (offers.price, address, telephone, openingHoursSpecification, description, audience) so both text and structured data agree.
+
+Priority **medium** · impact medium · effort medium
+
+Reference: https://developers.google.com/search/docs/appearance/structured-data/sd-policies
 
 #### F-003 Home page heading is 2 words, too short to state what the site offers
 
@@ -73,7 +75,7 @@ Home page: <h1> 'Intuitive Interpretation' (2 words); the text below it does nam
 ```
 text_excerpt @ h1: Intuitive Interpretation
 text_excerpt: Intuitive Interpretation Calculations are simple with Python and expression syntax is straightforward the operators and work as expected parentheses can be used for grouping More about simple math fun  (first 120 words of the first viewport)
-computed: signals=h1_too_short:2_words; category_noun=none; offer_verb=work
+computed: signals=h1_too_short:2_words; notes=none; category_noun=none; offer_verb=work
 ```
 
 *Why it matters.* Most of a visit's attention lands in the first screen. A visitor who cannot tell within a few seconds what the site offers and for whom leaves, and the click an assistant sent is wasted: the bouncing mode.
@@ -157,24 +159,25 @@ Reference: https://developers.google.com/search/docs/appearance/structured-data/
 
 #### F-008 No FAQ-shaped content or FAQPage markup on the sampled pages
 
-`fx.content.faq_absent` · severity **low** · confidence medium · effort medium · extract · site-wide
+`fx.content.faq_absent` · severity **low** · confidence low · effort medium · extract · site-wide
 
-None of the 4 sampled pages has a FAQ heading, three or more question headings, or FAQPage JSON-LD.
+None of the 4 sampled pages has a FAQ heading, three or more question headings, or FAQPage JSON-LD. The product page was not reached in this sample, so this describes the 4 pages read, not the whole site.
 
 ```
 computed: faq_heading=false; question_headings=0; FAQPage=false
 computed: faq_heading=false; question_headings=0; FAQPage=false
 computed: faq_heading=false; question_headings=9; FAQPage=false
 computed: faq_heading=false; question_headings=0; FAQPage=false
+computed: absence_scope=sample; roles_not_sampled=product
 ```
 
-*Why it matters.* Assistants answer questions; content already shaped as question and answer is the easiest to quote verbatim. This is an opportunity rather than a defect.
+*Why it matters.* A page shaped as question and answer can help it match a question-shaped query, but a 23,745-citation measurement study across 602 prompts found Q&A-formatted content has lower influence on the generated answer once selected (-5.74%) than content built around concrete numbers, comparisons, or plain definitions (+41% to +62%). This is an opportunity, not a defect: add FAQ content for retrieval and clarity, and keep stating the same facts as ordinary prose too, not only as isolated Q&A pairs.
 
-*Do this.* Add a short FAQ (five real questions customers ask, answered in one or two sentences each) on the pricing or product page, with FAQPage JSON-LD. Use the questions your support inbox actually receives. Put each question in a heading and the answer directly under it, then mirror them in FAQPage mainEntity. Keep answers factual and specific.
+*Do this.* Add a short FAQ (five real questions customers ask, answered in one or two sentences each) on the pricing or product page, with FAQPage JSON-LD, and state the same facts once more in the page's main prose. Use the questions your support inbox actually receives. Put each question in a heading and the answer directly under it, then mirror them in FAQPage mainEntity. A stray Q&A pair is not a substitute for the fact being stated plainly elsewhere on the page.
 
 Priority **low** · impact low · effort medium
 
-Reference: https://schema.org/FAQPage
+Reference: https://schema.org/FAQPage, https://arxiv.org/abs/2604.25707
 
 ### Informational (2)
 
@@ -194,14 +197,13 @@ computed: suggested_queries="Python.org" | "Python.org" python.org | "Python.org
 
 Priority **low** · impact low · effort n/a
 
-#### F-010 2 of the questions a buyer would ask cannot be answered from this site's text
+#### F-010 1 of the questions a buyer would ask cannot be answered from this site's text
 
 `or.simulation.question_unanswerable` · severity **info** · confidence high · effort n/a · extract · site-wide
 
-Simulated from work/extracted_facts.json only: 2 of 4 questions unanswerable; facts absent: location, mission.
+Simulated from work/extracted_facts.json only: 1 of 4 questions unanswerable; facts absent: location.
 
 ```
-computed: question=What is Python.org's mission?; missing_facts=mission
 computed: question=What programs does Python.org run, and where?; missing_facts=location
 ```
 
@@ -292,7 +294,7 @@ What an assistant could answer using **only** the facts this site states in its 
 
 **What is Python.org's mission?**
 
-_Not answerable from the site's text. Absent: mission._
+According to the site, "…Foundation The mission of the Python Software Foundation is to promote, protect, and advance the Python programming language, and to support and facilitate the growth of a diverse and international …".
 
 **What programs does Python.org run, and where?**
 
@@ -300,24 +302,25 @@ _Not answerable from the site's text. Absent: location._
 
 **How do I donate, apply, or join?**
 
-According to the home page, the only text extracted about taking part is a navigation fragment: "The Python Network Donate ≡ Menu Search This Site GO A A Smaller Larger Reset".
+According to the site, "Donate".
 
 **Is Python.org a good fit for a supporter like me?**
 
-The home page describes what it offers only as "Get Started; Download; Docs; Jobs; Upcoming Events".
+According to the site, "Get Started; Download; Docs; Jobs; Upcoming Events".
 
 **What sets Python.org apart from alternatives?**
 
-The only differentiating text extracted from the home page is "has made it the most popular language for machine learning and artificial intelligence. Python's flexibility has allowed Anyscale to make ML/AI".
+_Not answerable from the site's text. Absent: differentiator._ Informational only.
 
-None of the three quoted values carry the name Python.org inside the text itself, so an assistant quoting these lines would hold the facts without the name attached to them. The name is used consistently across the sampled pages and a corroboration surface exists, but no Organization node describes the site owner (F-007).
+Every answer above quotes this site's own text, exactly as the facts file records it; nothing was added from anywhere else. A question left unanswered means the fact is not on the pages read.
 
 ## Proactive recommendations
 
 Opportunities, not defects: none of these is a restatement of a finding above.
 
 - **Add the recommended properties to the existing structured data** (extract, low effort, priority medium) — The structured data present is valid but thin. Missing recommended properties (WebSite: name, publisher; WebSite: name, publisher; WebSite: name, publisher) are the ones assistants use to distinguish one entity from another.
-- **Consider publishing a plain-text summary of the site at /llms.txt** (extract, low effort, priority low) — An optional, unproven convention: adoption by assistants is not confirmed by any operator's documentation, so it is not graded anywhere in this audit. It costs one file, and the exercise of writing it usually exposes facts the site never states plainly.
+- **State in one sentence what sets this brand apart** (extract, low effort, priority medium) — Assistants fan a query out into comparison questions. Nothing on the sampled pages claims a difference, so a comparison answer has nothing of this site's own wording to quote. This is an opportunity, not a defect: it is never reported as a finding.
+- **Consider publishing a plain-text summary of the site at /llms.txt** (extract, low effort, priority low) — Not a confirmed ranking or citation signal for any major search or answer engine, so it is not graded anywhere in this audit. Early academic evidence on structured, agent-navigable pages suggests explicit machine-readable summaries can help agentic systems that autonomously fetch and follow links, distinct from ranking. It costs one file, and the exercise of writing it usually exposes facts the site never states plainly.
 - **Publish datable milestones on the news surface others can cite** (corroboration, medium effort, priority low) — The site already has a place to publish. Dated, factual announcements are what other sites quote, and repeated facts across independent sources are what make an entity trusted.
 
 ## Coverage and limitations
@@ -331,16 +334,4 @@ Not applicable to a nonprofit or institutional site: `en.nav.related_links_missi
 - This report reflects a single point-in-time fetch of 4 sampled pages; personalised or A/B-tested pages may differ between runs.
 - Off-site mention spot-check skipped: tool unavailable.
 - This audit reads served HTML only and does not execute JavaScript or query live assistants.
-- Not covered: Whether a specific assistant actually cites or misrepresents the brand today. Simulate strictly from the extracted-facts file (`or.simulation.*`) and state that it is a simulation.
-- Not covered: Inclusion in any model's training data. Grade training-only bot blocks as `info` policy notes.
-- Not covered: Off-site agreement at scale: how many independent sources repeat each fact. Check the site's own anchors and corroboration surface; bounded spot-check when a search tool exists.
-- Not covered: Personalization: what a particular user sees. Report the site-side levers (location, language, audience facts) as present/absent.
-- Not covered: Email summarization behaviour. Cover the web analogue: substance in readable text, not buried.
-- Not covered: Cloaking beyond the home URL and the three tokens probed. Compare the home URL across three tokens; report challenge pages as `inconclusive` and tell the owner how to verify with the vendor's tools.
-- Not covered: Rendering with a headless browser. Two-signal CSR detection; recommend verifying with `curl`.
-- Not covered: `llms.txt` and similar proposed conventions. Not graded. Mentioned in proactive recommendations only as optional.
-- Not covered: Search ranking, domain authority, backlink volume. Not claimed.
-- Not covered: Accessibility conformance (WCAG). Only `alt` and `lang` where they also serve extraction.
-- Not covered: Real performance (Core Web Vitals). Page-weight proxy at `low` confidence.
-- Not covered: Content quality, accuracy, or brand voice. Facts are reported as present/absent, never as correct/incorrect.
-- Not covered: Pages beyond the ≤ 6 sampled. Sample by role; state the sample in every finding's evidence.
+- Outside this audit's scope: Whether a specific assistant actually cites or misrepresents the brand today; Inclusion in any model's training data; Off-site agreement at scale: how many independent sources repeat each fact; Personalization: what a particular user sees; Email summarization behaviour; Cloaking beyond the home URL and the three tokens probed; Rendering with a headless browser; `llms.txt` and similar proposed conventions; Search ranking, domain authority, backlink volume; Accessibility conformance (WCAG); Real performance (Core Web Vitals); Content quality, accuracy, or brand voice; Pages beyond the ≤ 6 sampled. Each is explained in report.json under limitations.

@@ -1,19 +1,18 @@
 {
   "site": "python.org",
   "site_url": "https://www.python.org",
-  "audited_at": "2026-09-08T14:04:42Z",
+  "audited_at": "2026-09-12T14:33:02Z",
   "tool": {
     "name": "brand-ai-readiness-audit",
     "version": "0.1.0"
   },
-  "input_url": "https://www.python.org",
+  "input_url": "https://www.python.org/",
   "site_category": {
     "value": "nonprofit_institution",
     "confidence": "medium",
     "signals": [
       "nav:donate",
       "nav:get involved",
-      "url:/donate",
       "url:/get-involved",
       "tld:.org"
     ]
@@ -51,71 +50,19 @@
   "summary": {
     "total_findings": 10,
     "critical": 0,
-    "high": 1,
-    "medium": 2,
+    "high": 0,
+    "medium": 3,
     "low": 5,
     "info": 2,
     "checks_run": 61,
     "checks_passed": 47,
     "checks_failed": 9,
     "checks_inconclusive": 0,
-    "checks_not_evaluated": 5
+    "checks_not_evaluated": 5,
+    "headline": "No critical or high findings on the 4 pages read; 3 medium and 5 low. Start with F-001: Postal address or phone number is not visible as plain text on the home/about/contact….",
+    "start_with": "F-001"
   },
   "findings": [
-    {
-      "check_id": "fx.facts.key_fact_missing",
-      "title": "2 of 4 key facts for a nonprofit or institutional site are not extractable as text",
-      "status": "fail",
-      "severity": "high",
-      "confidence": "medium",
-      "effort": "medium",
-      "mechanism": "extract",
-      "affected_pages": [],
-      "evidence": "Searched 4 sampled pages (home, about, contact, blog). Found 2 of 4 key facts as plain text or structured data; not found: mission (absent); location (absent).",
-      "evidence_items": [
-        {
-          "page": "site",
-          "kind": "computed",
-          "value": "pages_searched=4 (home, about, contact, blog); key_facts=4; found=2; missing=mission,location"
-        },
-        {
-          "page": "https://www.python.org/",
-          "kind": "text_excerpt",
-          "value": "Get Started; Download; Docs; Jobs; Upcoming Events",
-          "note": "programs_or_services found via heading"
-        },
-        {
-          "page": "https://www.python.org/",
-          "kind": "text_excerpt",
-          "value": "…The Python Network Donate ≡ Menu Search This Site GO A A Smaller Larger Reset…",
-          "note": "how_to_participate found via text"
-        }
-      ],
-      "why_it_matters": "An assistant answers from the text it can extract. A fact that is absent, or present only as a hint, is a question the brand cannot be quoted on, so the answer comes from a competitor or from nowhere. The brand is invisible for that question.",
-      "suggested_action": {
-        "summary": "Add the missing facts as plain text on the pages a visitor would expect them (mission, location).",
-        "detail": "State the mission in one plain sentence on the home and about pages. State the location as text (city and country at minimum). Mirror each fact in the matching JSON-LD property (offers.price, address, telephone, openingHoursSpecification, description, audience) so both text and structured data agree.",
-        "impact": "high",
-        "effort": "medium",
-        "priority": "high"
-      },
-      "references": [
-        "https://developers.google.com/search/docs/appearance/structured-data/sd-policies"
-      ],
-      "dedupe_key": "fx.facts.key_fact_missing|",
-      "source_skill": "fact-extractability-audit",
-      "id": "F-001",
-      "rank": 1,
-      "round2_mode": "invisible",
-      "handout_concepts": [
-        "A",
-        "B",
-        "C"
-      ],
-      "pipeline_stage": "ranking",
-      "opportunity_type": "content",
-      "quick_win": false
-    },
     {
       "check_id": "ef.entity.nap_missing_plain_text",
       "title": "Postal address or phone number is not visible as plain text on the home/about/contact…",
@@ -152,7 +99,7 @@
       "why_it_matters": "Name, address and phone are the three facts every directory, register and knowledge graph holds about a business. When the site itself does not state them as text, the assistant cannot confirm it has the right entity, and inconsistent copies elsewhere win.",
       "suggested_action": {
         "summary": "State the organisation name, postal address and phone number as visible text in the site footer or on the contact page.",
-        "detail": "Use the same spelling and format everywhere (footer, contact page, JSON-LD PostalAddress and telephone, Google Business Profile, LinkedIn). A footer line is enough: 'Ledgerly Software Ltd · 12 Harbour Street, Bristol BS1 4QA · +44 117 496 0123'.",
+        "detail": "Use the same spelling and format everywhere (footer, contact page, JSON-LD PostalAddress and telephone, Google Business Profile, LinkedIn). A footer line is enough: the registered name, the street address in the country's own postal format, and a phone number in international form (+<country code>).",
         "impact": "medium",
         "effort": "low",
         "priority": "medium"
@@ -162,8 +109,8 @@
       ],
       "dedupe_key": "ef.entity.nap_missing_plain_text|https://www.python.org/,https://www.python.org/about/,https://www.python.org/about/help/",
       "source_skill": "entity-freshness-corroboration-audit",
-      "id": "F-002",
-      "rank": 2,
+      "id": "F-001",
+      "rank": 1,
       "round2_mode": "stale",
       "handout_concepts": [
         "D"
@@ -171,6 +118,71 @@
       "pipeline_stage": "ranking",
       "opportunity_type": "content",
       "quick_win": true
+    },
+    {
+      "check_id": "fx.facts.key_fact_missing",
+      "title": "1 of 4 key facts for a nonprofit or institutional site are not extractable as text",
+      "status": "fail",
+      "severity": "medium",
+      "confidence": "medium",
+      "effort": "medium",
+      "mechanism": "extract",
+      "affected_pages": [],
+      "evidence": "Searched 4 sampled pages (home, about, contact, blog). Found 3 of 4 key facts as plain text or structured data; not found: location (absent).",
+      "evidence_items": [
+        {
+          "page": "site",
+          "kind": "computed",
+          "value": "pages_searched=4 (home, about, contact, blog); key_facts=4; found=3; missing=location"
+        },
+        {
+          "page": "https://www.python.org/about/",
+          "kind": "text_excerpt",
+          "value": "…Foundation The mission of the Python Software Foundation is to promote, protect, and advance the Python programming language, and to support and facilitate the growth of a diverse and international …",
+          "note": "mission found via text"
+        },
+        {
+          "page": "https://www.python.org/",
+          "kind": "text_excerpt",
+          "value": "Get Started; Download; Docs; Jobs; Upcoming Events",
+          "note": "programs_or_services found via heading"
+        },
+        {
+          "page": "https://www.python.org/",
+          "kind": "text_excerpt",
+          "value": "Donate",
+          "note": "how_to_participate found via link"
+        },
+        {
+          "page": "site",
+          "kind": "computed",
+          "value": "adjustments=single_missing_fact:medium"
+        }
+      ],
+      "why_it_matters": "An assistant answers from the text it can extract. A fact that is absent, or present only as a hint, is a question the brand cannot be quoted on, so the answer comes from a competitor or from nowhere. The brand is invisible for that question.",
+      "suggested_action": {
+        "summary": "Add the missing facts as plain text on the pages a visitor would expect them (location).",
+        "detail": "State the location as text (city and country at minimum). Mirror each fact in the matching JSON-LD property (offers.price, address, telephone, openingHoursSpecification, description, audience) so both text and structured data agree.",
+        "impact": "medium",
+        "effort": "medium",
+        "priority": "medium"
+      },
+      "references": [
+        "https://developers.google.com/search/docs/appearance/structured-data/sd-policies"
+      ],
+      "dedupe_key": "fx.facts.key_fact_missing|",
+      "source_skill": "fact-extractability-audit",
+      "id": "F-002",
+      "rank": 2,
+      "round2_mode": "invisible",
+      "handout_concepts": [
+        "A",
+        "B",
+        "C"
+      ],
+      "pipeline_stage": "ranking",
+      "opportunity_type": "content",
+      "quick_win": false
     },
     {
       "check_id": "en.hero.value_prop_unclear",
@@ -200,7 +212,7 @@
         {
           "page": "https://www.python.org/",
           "kind": "computed",
-          "value": "signals=h1_too_short:2_words; category_noun=none; offer_verb=work"
+          "value": "signals=h1_too_short:2_words; notes=none; category_noun=none; offer_verb=work"
         }
       ],
       "why_it_matters": "Most of a visit's attention lands in the first screen. A visitor who cannot tell within a few seconds what the site offers and for whom leaves, and the click an assistant sent is wasted: the bouncing mode.",
@@ -412,11 +424,11 @@
       "title": "No FAQ-shaped content or FAQPage markup on the sampled pages",
       "status": "fail",
       "severity": "low",
-      "confidence": "medium",
+      "confidence": "low",
       "effort": "medium",
       "mechanism": "extract",
       "affected_pages": [],
-      "evidence": "None of the 4 sampled pages has a FAQ heading, three or more question headings, or FAQPage JSON-LD.",
+      "evidence": "None of the 4 sampled pages has a FAQ heading, three or more question headings, or FAQPage JSON-LD. The product page was not reached in this sample, so this describes the 4 pages read, not the whole site.",
       "evidence_items": [
         {
           "page": "https://www.python.org/",
@@ -437,21 +449,28 @@
           "page": "https://www.python.org/blogs/",
           "kind": "computed",
           "value": "faq_heading=false; question_headings=0; FAQPage=false"
+        },
+        {
+          "page": "site",
+          "kind": "computed",
+          "value": "absence_scope=sample; roles_not_sampled=product"
         }
       ],
-      "why_it_matters": "Assistants answer questions; content already shaped as question and answer is the easiest to quote verbatim. This is an opportunity rather than a defect.",
+      "why_it_matters": "A page shaped as question and answer can help it match a question-shaped query, but a 23,745-citation measurement study across 602 prompts found Q&A-formatted content has lower influence on the generated answer once selected (-5.74%) than content built around concrete numbers, comparisons, or plain definitions (+41% to +62%). This is an opportunity, not a defect: add FAQ content for retrieval and clarity, and keep stating the same facts as ordinary prose too, not only as isolated Q&A pairs.",
       "suggested_action": {
-        "summary": "Add a short FAQ (five real questions customers ask, answered in one or two sentences each) on the pricing or product page, with FAQPage JSON-LD.",
-        "detail": "Use the questions your support inbox actually receives. Put each question in a heading and the answer directly under it, then mirror them in FAQPage mainEntity. Keep answers factual and specific.",
+        "summary": "Add a short FAQ (five real questions customers ask, answered in one or two sentences each) on the pricing or product page, with FAQPage JSON-LD, and state the same facts once more in the page's main prose.",
+        "detail": "Use the questions your support inbox actually receives. Put each question in a heading and the answer directly under it, then mirror them in FAQPage mainEntity. A stray Q&A pair is not a substitute for the fact being stated plainly elsewhere on the page.",
         "impact": "low",
         "effort": "medium",
         "priority": "low"
       },
       "references": [
-        "https://schema.org/FAQPage"
+        "https://schema.org/FAQPage",
+        "https://arxiv.org/abs/2604.25707"
       ],
       "dedupe_key": "fx.content.faq_absent|",
       "source_skill": "fact-extractability-audit",
+      "absence_scope": "sample",
       "id": "F-008",
       "rank": 8,
       "round2_mode": "invisible",
@@ -505,20 +524,15 @@
     },
     {
       "check_id": "or.simulation.question_unanswerable",
-      "title": "2 of the questions a buyer would ask cannot be answered from this site's text",
+      "title": "1 of the questions a buyer would ask cannot be answered from this site's text",
       "status": "fail",
       "severity": "info",
       "confidence": "high",
       "effort": "n/a",
       "mechanism": "extract",
       "affected_pages": [],
-      "evidence": "Simulated from work/extracted_facts.json only: 2 of 4 questions unanswerable; facts absent: location, mission.",
+      "evidence": "Simulated from work/extracted_facts.json only: 1 of 4 questions unanswerable; facts absent: location.",
       "evidence_items": [
-        {
-          "page": "site",
-          "kind": "computed",
-          "value": "question=What is Python.org's mission?; missing_facts=mission"
-        },
         {
           "page": "site",
           "kind": "computed",
@@ -548,7 +562,7 @@
     }
   ],
   "quick_wins": [
-    "F-002"
+    "F-001"
   ],
   "passed_checks": [
     {
@@ -887,8 +901,15 @@
       "priority": "medium"
     },
     {
+      "title": "State in one sentence what sets this brand apart",
+      "rationale": "Assistants fan a query out into comparison questions. Nothing on the sampled pages claims a difference, so a comparison answer has nothing of this site's own wording to quote. This is an opportunity, not a defect: it is never reported as a finding.",
+      "mechanism": "extract",
+      "effort": "low",
+      "priority": "medium"
+    },
+    {
       "title": "Consider publishing a plain-text summary of the site at /llms.txt",
-      "rationale": "An optional, unproven convention: adoption by assistants is not confirmed by any operator's documentation, so it is not graded anywhere in this audit. It costs one file, and the exercise of writing it usually exposes facts the site never states plainly.",
+      "rationale": "Not a confirmed ranking or citation signal for any major search or answer engine, so it is not graded anywhere in this audit. Early academic evidence on structured, agent-navigable pages suggests explicit machine-readable summaries can help agentic systems that autonomously fetch and follow links, distinct from ranking. It costs one file, and the exercise of writing it usually exposes facts the site never states plainly.",
       "mechanism": "extract",
       "effort": "low",
       "priority": "low"
@@ -909,13 +930,12 @@
       {
         "id": "q1",
         "question": "What is Python.org's mission?",
-        "answerable": false,
-        "answer_from_facts": null,
-        "facts_used": [],
-        "missing_facts": [
+        "answerable": true,
+        "answer_from_facts": "According to the site, \"…Foundation The mission of the Python Software Foundation is to promote, protect, and advance the Python programming language, and to support and facilitate the growth of a diverse and international …\".",
+        "facts_used": [
           "mission"
         ],
-        "see_finding": "F-001"
+        "missing_facts": []
       },
       {
         "id": "q2",
@@ -928,13 +948,13 @@
         "missing_facts": [
           "location"
         ],
-        "see_finding": "F-001"
+        "see_finding": "F-002"
       },
       {
         "id": "q3",
         "question": "How do I donate, apply, or join?",
         "answerable": true,
-        "answer_from_facts": "According to the home page, the only text extracted about taking part is a navigation fragment: \"The Python Network Donate ≡ Menu Search This Site GO A A Smaller Larger Reset\".",
+        "answer_from_facts": "According to the site, \"Donate\".",
         "facts_used": [
           "how_to_participate"
         ],
@@ -944,7 +964,7 @@
         "id": "q4",
         "question": "Is Python.org a good fit for a supporter like me?",
         "answerable": true,
-        "answer_from_facts": "The home page describes what it offers only as \"Get Started; Download; Docs; Jobs; Upcoming Events\".",
+        "answer_from_facts": "According to the site, \"Get Started; Download; Docs; Jobs; Upcoming Events\".",
         "facts_used": [
           "programs_or_services"
         ],
@@ -953,18 +973,18 @@
       {
         "id": "q5",
         "question": "What sets Python.org apart from alternatives?",
-        "answerable": true,
-        "answer_from_facts": "The only differentiating text extracted from the home page is \"has made it the most popular language for machine learning and artificial intelligence. Python's flexibility has allowed Anyscale to make ML/AI\".",
-        "facts_used": [
+        "answerable": false,
+        "answer_from_facts": null,
+        "facts_used": [],
+        "missing_facts": [
           "differentiator"
         ],
-        "missing_facts": [],
         "informational": true
       }
     ],
-    "attribution_note": "None of the three quoted values carry the name Python.org inside the text itself, so an assistant quoting these lines would hold the facts without the name attached to them. The name is used consistently across the sampled pages and a corroboration surface exists, but no Organization node describes the site owner (F-007)."
+    "attribution_note": "Every answer above quotes this site's own text, exactly as the facts file records it; nothing was added from anywhere else. A question left unanswered means the fact is not on the pages read."
   },
-  "narrative_summary": "Invisible: an assistant can reach and read these pages, but two of the four key facts expected of a nonprofit or institutional site are not extractable as plain text (F-001), and no Organization node identifies the site owner (F-007). Stale or mistrusted: no postal address or phone number appears as plain text on the home page (F-002), and the off-site mention spot-check was not performed (F-009), so nothing in this run corroborates the brand beyond its own pages. The simulation answered three of five buyer questions from the extracted facts; the mission and location questions could not be answered at all (F-010). Bouncing: the home page heading is two words, too short to state what the site offers (F-003), and one page's heading does not match its title and description (F-006). Start with F-002, the one quick win: publish a postal address or phone number as plain text on the home page.",
+  "narrative_summary": "This audit read 4 pages of the site and ran 61 checks against what a non-JavaScript fetcher receives. It raised 3 medium, 5 low. Start with F-001: Postal address or phone number is not visible as plain text on the home/about/contact…. 47 checks passed. 5 checks had no verdict, because the pages that would answer them were not reached or could not be read; those are gaps in this sample, not faults found on the site.",
   "limitations": [
     "This report reflects a single point-in-time fetch of 4 sampled pages; personalised or A/B-tested pages may differ between runs.",
     "Off-site mention spot-check skipped: tool unavailable.",
@@ -985,29 +1005,29 @@
   ],
   "suppressed_findings": [],
   "run": {
-    "wall_clock_seconds": 16.7,
+    "wall_clock_seconds": 15.3,
     "requests_made": 10,
     "probe_errors": [],
     "time_budget_seconds": 300.0,
     "probes": [
       {
         "probe": "crawl-render-audit",
-        "seconds": 0.41,
+        "seconds": 0.17,
         "error": null
       },
       {
         "probe": "fact-extractability-audit",
-        "seconds": 0.33,
+        "seconds": 0.19,
         "error": null
       },
       {
         "probe": "entity-freshness-corroboration-audit",
-        "seconds": 1.7,
+        "seconds": 1.47,
         "error": null
       },
       {
         "probe": "engagement-audit",
-        "seconds": 8.75,
+        "seconds": 8.28,
         "error": null
       }
     ]

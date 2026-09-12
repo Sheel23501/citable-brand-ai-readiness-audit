@@ -1,7 +1,7 @@
 {
   "site": "https://www.python.org",
   "site_category": "nonprofit_institution",
-  "extracted_at": "2026-09-08T14:04:32Z",
+  "extracted_at": "2026-09-12T14:32:52Z",
   "basis": "served_html_only",
   "brand_name": {
     "value": "Python.org",
@@ -10,11 +10,11 @@
   },
   "facts": {
     "mission": {
-      "status": "absent",
-      "kind": null,
-      "value": null,
-      "page": null,
-      "source": null,
+      "status": "present",
+      "kind": "mission",
+      "value": "…Foundation The mission of the Python Software Foundation is to promote, protect, and advance the Python programming language, and to support and facilitate the growth of a diverse and international …",
+      "page": "https://www.python.org/about/",
+      "source": "text",
       "required": true
     },
     "programs_or_services": {
@@ -36,9 +36,9 @@
     "how_to_participate": {
       "status": "present",
       "kind": "call_to_action",
-      "value": "…The Python Network Donate ≡ Menu Search This Site GO A A Smaller Larger Reset…",
+      "value": "Donate",
       "page": "https://www.python.org/",
-      "source": "text",
+      "source": "link",
       "required": true
     },
     "audience": {
@@ -51,11 +51,11 @@
       "note": "from programs_or_services"
     },
     "differentiator": {
-      "status": "present",
-      "kind": "claim",
-      "value": "…has made it the most popular language for machine learning and artificial intelligence. Python's flexibility has allowed Anyscale to make ML/AI…",
-      "page": "https://www.python.org/",
-      "source": "text",
+      "status": "absent",
+      "kind": null,
+      "value": null,
+      "page": null,
+      "source": null,
       "required": false
     }
   },
@@ -69,7 +69,7 @@
     {
       "role": "home",
       "url": "https://www.python.org/",
-      "words": 980,
+      "words": 987,
       "jsonld_types": [
         "WebSite",
         "SearchAction"
@@ -78,7 +78,7 @@
     {
       "role": "about",
       "url": "https://www.python.org/about/",
-      "words": 688,
+      "words": 692,
       "jsonld_types": [
         "WebSite",
         "SearchAction"

@@ -5,7 +5,6 @@ the finished shape of a report can be read without running anything.
 
 ```bash
 python3 skills/audit-orchestrator/scripts/run_audit.py https://www.python.org
-python3 skills/audit-orchestrator/scripts/finalize.py --workdir audit-python.org --answers answers.json
 ```
 
 | File | What it is |
@@ -14,8 +13,10 @@ python3 skills/audit-orchestrator/scripts/finalize.py --workdir audit-python.org
 | `python.org-report.json` | The same report as structured data |
 | `python.org-extracted_facts.json` | The facts file the simulation is allowed to quote from — included so every quoted excerpt can be checked |
 
-**Result:** 10 findings (0 critical, 1 high, 2 medium, 5 low, 2 informational)
-from 61 checks in **16.7 seconds**. Validated with `validate.py --final`.
+**Result:** 10 findings (0 critical, 0 high, 3 medium, 5 low, 2 informational)
+from 61 checks in **15.3 seconds**. Validated with `validate.py --final`, which
+passes on the report as the script writes it: the narrative, the attribution note
+and every answer are written by `compose.py`, not added by hand afterwards.
 
 ## Why this site
 
@@ -23,21 +24,25 @@ from 61 checks in **16.7 seconds**. Validated with `validate.py --final`.
 robots.txt welcomes ordinary crawlers, and it belongs to no one's brand
 portfolio. Auditing it is read-only and recommends nothing to anybody: it is
 here to show the report's shape, not to grade the Python Software Foundation.
-Nothing about it was used to design or tune any check — the fixtures in
-`tests/fixtures/` are all synthetic.
+The checks were designed against the synthetic fixtures in `tests/fixtures/`,
+but two rules were widened after live runs on this site exposed them: the
+mission phrase now matches "The mission of X is to", and a transport failure on
+a sampled link is no longer reported as the site's broken link.
 
 ## What this example demonstrates
 
-**The causal bridge.** The report does not stop at "2 of 4 key facts are not
-extractable" (F-001). The simulation shows what that costs: asked *"What is
-Python.org's mission?"*, an assistant with only this site's served HTML has
-nothing to answer with. The finding and the consequence sit in the same report.
+**The causal bridge.** The report does not stop at a list of missing facts. The
+simulation shows what each one costs: asked *"What sets Python.org apart from
+alternatives?"* and *"What programs does Python.org run, and where?"*, an
+assistant holding only this site's served HTML has nothing to answer with, and
+the report says so instead of inventing an answer. The finding and the
+consequence sit in the same report.
 
 **Quoting, not paraphrasing.** Every simulated answer quotes the facts file
-verbatim, and the facts file ships alongside so the quotes can be verified. The
-answer to *"How do I donate, apply, or join?"* quotes a navigation fragment,
-because that is genuinely all the extractor found — the report does not tidy it
-into something more flattering.
+verbatim, and the facts file ships alongside so each quote can be checked. The
+mission answer quotes the sentence python.org actually publishes; the
+participation answer quotes the single word the extractor found, *"Donate"*,
+rather than padding it into a sentence the site never wrote.
 
 **Confidence separated from severity.** F-002 is `medium` severity at `high`
 confidence (a plain-text absence, deterministic). F-003 is `medium` at `low`

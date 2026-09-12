@@ -578,6 +578,7 @@ LANG_DEPENDENT = {
     "ef.corroboration.press_page_missing": frozenset(["en"]),
     "en.hero.value_prop_unclear": frozenset(["en"]),
     "en.trust.signals_missing": frozenset(["en"]),
+    "en.nav.related_links_missing": frozenset(["en"]),   # RELATED_HEADING_RE is English-only
     "en.cta.missing": CTA_LANGS_SUPPORTED,
 }
 
@@ -754,7 +755,9 @@ def _fact(facts, fid):
 SIM_ATTRIBUTION = ("Every answer above quotes this site's own text, exactly as the facts file records it; nothing "
                    "was added from anywhere else. A question left unanswered means the fact is not on the pages read.")
 
-_SIM_CHROME_SEP_RE = re.compile(r"[|≡•·›»]")
+# Menu separators only. The guillemets « » and ‹ › are quotation marks in French, Spanish and Italian --
+# listing them here threw away genuine quoted prose and then reported the fact as absent from the site.
+_SIM_CHROME_SEP_RE = re.compile(r"[|≡•·]")
 
 
 def _sentence_shaped(value):

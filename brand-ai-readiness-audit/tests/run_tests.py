@@ -1878,6 +1878,16 @@ def stage_extract(res):
     res.check(not X.MISSION_RE.search("Mission of Burma tour dates announced for the autumn."),
               "mission: a band name is not a mission statement")
 
+    # Menu chrome must not be quoted as an answer, but guillemets are quotation marks in French,
+    # Spanish and Italian -- treating them as separators threw away genuine prose and called the fact absent.
+    _C2 = _load_compose()
+    res.check(not _C2._sentence_shaped("Home | About | Contact | Shop"),
+              "simulation: a pipe-separated menu is not sentence-shaped")
+    res.check(not _C2._sentence_shaped("Inicio · Blog · Tienda · Contacto"),
+              "simulation: a middot-separated menu is not sentence-shaped")
+    res.check(_C2._sentence_shaped("Nous publions « des analyses approfondies » chaque jour pour nos abonnés"),
+              "simulation: French prose in guillemets is sentence-shaped")
+
     # Engagement: search boxes by markup, calls to action beyond the category list, contact methods.
     import importlib.util as _ilu
     _spec = _ilu.spec_from_file_location("_ep_t", os.path.join(ROOT, "skills", "engagement-audit", "scripts", "engagement_probe.py"))

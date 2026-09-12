@@ -371,7 +371,7 @@ def check_cta(ctx, out, usable, work):
     roles = [p.role for p in failing]
     _fail(out, cid, cap,
           title="No primary call to action in the first viewport of the %s page%s" % ("/".join(roles), "s" if len(roles) != 1 else ""),
-          evidence="On %d of %d key pages (%s) no link, button or form in the first %d%% of the page matches the %s vocabulary (%s) and no non-search form appears there." % (
+          evidence="On %d of %d key pages (%s) no link, button or form in the first %d%% of the page, and none anywhere in the header or nav, matches the %s vocabulary (%s); no non-search form appears there either." % (
               len(failing), len(pages), ", ".join(roles), int(FIRST_VIEWPORT_FRAC * 100), ctx.category.replace("_", " "), ", ".join(vocab[:5])),
           evidence_items=items[:6],
           why="A visitor who has just arrived needs one obvious next step. With nothing actionable in view, attention has nowhere to go and the visit ends on the first screen.",

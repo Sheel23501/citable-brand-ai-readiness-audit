@@ -7,16 +7,16 @@
   "expected": {
     "fail": [
       "en.nav.breadcrumbs_missing",
-      "en.nav.site_search_missing",
-      "en.nav.related_links_missing"
+      "en.nav.site_search_missing"
     ],
     "info": [
       "ef.entity.wikidata_unavailable",
       "ef.corroboration.offsite_spotcheck"
     ],
     "gated": [
-      "fx.facts.key_fact_missing",
-      "fx.content.faq_absent"
+      "en.nav.related_links_missing",
+      "fx.content.faq_absent",
+      "fx.facts.key_fact_missing"
     ],
     "pass_required": [
       "en.cta.missing",
