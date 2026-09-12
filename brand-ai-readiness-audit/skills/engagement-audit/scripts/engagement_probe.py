@@ -237,17 +237,22 @@ def check_hero(ctx, out, usable, excluded, work):
     if home is None or home not in usable:
         out.not_evaluated(cid, reason=page_reason(home, excluded)); return
     doc = home.doc
-    signals = []
+    signals, notes = [], []     # signals fail the check; notes only explain what was read
     # what a visitor reads, not what the markup hides: a screen-reader-only h1 is not this page's headline
     h1 = next((h for h in doc.visible_h1s if h.strip()), None)   # an <h1> holding only an image has no text a machine can read
+    h1_tag = "h1"
     hidden_h1_only = h1 is None and any(h.strip() for h in doc.h1s)
     if hidden_h1_only:
         visible = doc.visible_headings(("h2", "h3"))
         if visible:
-            h1 = visible[0]["text"]
-            signals.append("h1_hidden_from_sight:read_%s_instead" % visible[0]["tag"])
+            # reading the visible heading instead is a fact about where the text came from, not a defect:
+            # putting it in signals made a page whose visible heading is perfectly good fail the check
+            h1, h1_tag = visible[0]["text"], visible[0]["tag"]
+            notes.append("h1_hidden_from_sight:read_%s_instead" % h1_tag)
+        else:
+            signals.append("h1_hidden_only")     # nothing a sighted visitor can read announces the page
     n = len(_words(h1)) if h1 else 0
-    if h1 is None:
+    if h1 is None and not hidden_h1_only:
         signals.append("h1_missing" if not doc.h1s else "h1_empty")
     elif n < H1_MIN_WORDS:
         signals.append("h1_too_short:%d_words" % n)
@@ -258,26 +263,36 @@ def check_hero(ctx, out, usable, excluded, work):
     verb = _VERB_RE.search(lead)
     if not noun and not verb:
         signals.append("lead_text_no_offer")
-    work["hero"] = {"page": home.final_url, "h1": h1, "h1_words": n, "lead_excerpt": lead[:240], "category_noun": noun.group(0) if noun else None,
-                    "offer_verb": verb.group(0) if verb else None, "signals": signals}
+    work["hero"] = {"page": home.final_url, "h1": h1, "h1_tag": h1_tag, "h1_words": n, "lead_excerpt": lead[:240],
+                    "category_noun": noun.group(0) if noun else None,
+                    "offer_verb": verb.group(0) if verb else None, "signals": signals, "notes": notes}
     if not signals:
         out.check(cid, "pass", pages=[home.final_url]); return
     conf = "medium" if len(signals) >= 2 else "low"
-    if "h1_missing" in signals or "h1_empty" in signals:
-        title = "Home page has no main heading to say what the site offers" if "h1_missing" in signals else "Home page's main heading holds no text, only an image"
-        first = "no <h1>" if "h1_missing" in signals else "an <h1> with no text (image only)"
+    if "h1_missing" in signals or "h1_empty" in signals or "h1_hidden_only" in signals:
+        title = {"h1_missing": "Home page has no main heading to say what the site offers",
+                 "h1_empty": "Home page's main heading holds no text, only an image",
+                 "h1_hidden_only": "Home page's only heading is hidden from sighted visitors"}[
+            next(k for k in ("h1_missing", "h1_empty", "h1_hidden_only") if k in signals)]
+        first = {"h1_missing": "no <h1>", "h1_empty": "an <h1> with no text (image only)",
+                 "h1_hidden_only": "an <h1> a sighted visitor never sees, and no visible heading below it"}[
+            next(k for k in ("h1_missing", "h1_empty", "h1_hidden_only") if k in signals)]
+    elif any(sig.startswith("h1_too_") for sig in signals):
+        title = "Home page heading is %d words, too %s to state what the site offers" % (n, "short" if n < H1_MIN_WORDS else "long")
+        first = "<%s> '%s' (%d words)" % (h1_tag, h1[:80], n)
     else:
-        title = ("Home page heading is %d words and the text below it does not say what is offered" % n if "lead_text_no_offer" in signals
-                 else "Home page heading is %d words, too %s to state what the site offers" % (n, "short" if n < H1_MIN_WORDS else "long"))
-        first = "<h1> '%s' (%d words)" % (h1[:80], n)
+        # the heading's length is fine; what failed is the text under it
+        title = "Home page heading is %d words and the text below it does not say what is offered" % n
+        first = "<%s> '%s' (%d words)" % (h1_tag, h1[:80], n)
     lead_note = ("the first %d words from the heading contain no %s noun and no verb of offer" % (LEAD_WORDS, ctx.category.replace("_", " "))
                  if "lead_text_no_offer" in signals else "the text below it does name the offer (%s)" % (noun.group(0) if noun else verb.group(0)))
     _fail(out, cid, cap, title=title,
           evidence="Home page: %s; %s." % (first, lead_note),
-          evidence_items=[evidence_item(home.final_url, "text_excerpt", h1 or "(no h1)", location="h1"),
+          evidence_items=[evidence_item(home.final_url, "text_excerpt", h1 or "(no h1)", location=h1_tag),
                           evidence_item(home.final_url, "text_excerpt", lead[:200], note="first %d words of the first viewport" % LEAD_WORDS),
-                          evidence_item(home.final_url, "computed", "signals=%s; category_noun=%s; offer_verb=%s" % (
-                              ",".join(signals), noun.group(0) if noun else "none", verb.group(0) if verb else "none"))],
+                          evidence_item(home.final_url, "computed", "signals=%s; notes=%s; category_noun=%s; offer_verb=%s" % (
+                              ",".join(signals), ",".join(notes) or "none",
+                              noun.group(0) if noun else "none", verb.group(0) if verb else "none"))],
           why="Most of a visit's attention lands in the first screen. A visitor who cannot tell within a few seconds what the site offers and for whom leaves, and the click an assistant sent is wasted: the bouncing mode.",
           action="Rewrite the home page's first viewport as a headline that names the offer and the customer, a one-sentence subhead, and a primary call to action.",
           detail="Use a 5-12 word <h1> that states what the site provides (the product or service noun) for whom, followed by one plain sentence. Check with a stranger: shown only the first screen, can they say what you sell?",

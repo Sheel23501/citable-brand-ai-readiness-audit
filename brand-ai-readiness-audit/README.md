@@ -132,9 +132,12 @@ Two properties this buys, both load-bearing:
 - **One fetch, four probes.** The sampler fetches each page once and every probe
   reads the same snapshots, so a four-skill audit costs about the same number of
   HTTP requests as a one-skill audit. That is politeness, not just speed.
-- **Replay parity.** Because sampling is the only stage that touches the network,
-  `--workdir` mode reproduces `--url` mode exactly. The test suite asserts this
-  for every fixture. Any check that fetched at grade time would break it.
+- **Replay parity.** Every page the checks grade is fetched once, by the sampler,
+  and recorded; `--workdir` mode then reproduces `--url` mode exactly, and the
+  test suite asserts that for every fixture. Two probes make their own requests
+  and record them the same way: the engagement probe's link sample and 404
+  check, and the entity probe's single optional Wikipedia or Wikidata lookup.
+  A check that fetched a *graded page* at grade time would break parity.
 
 ---
 
@@ -314,7 +317,7 @@ skills/
   crawl-render-audit/     fact-extractability-audit/
   entity-freshness-corroboration-audit/     engagement-audit/
 tests/
-  run_tests.py            4715 assertions across 29 synthetic fixture sites
+  run_tests.py            4752 assertions across 29 synthetic fixture sites
   serve_fixtures.py       one local server per fixture
   fixtures/<name>/        static mini-sites + the check ids each must trigger
 ```
@@ -371,7 +374,7 @@ traps that have already cost time.
 ## Validation
 
 ```bash
-skills-ref validate skills/<skill-name>
+agentskills validate skills/<skill-name>
 ```
 
 ## Licence
