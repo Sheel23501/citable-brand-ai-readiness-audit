@@ -1,7 +1,7 @@
 {
   "site": "python.org",
   "site_url": "https://www.python.org",
-  "audited_at": "2026-09-12T14:33:02Z",
+  "audited_at": "2026-09-13T11:00:12Z",
   "tool": {
     "name": "brand-ai-readiness-audit",
     "version": "0.1.0"
@@ -121,19 +121,19 @@
     },
     {
       "check_id": "fx.facts.key_fact_missing",
-      "title": "1 of 4 key facts for a nonprofit or institutional site are not extractable as text",
+      "title": "1 of 4 key facts are not extractable as text; 1 not checked (product unreached)",
       "status": "fail",
       "severity": "medium",
       "confidence": "medium",
       "effort": "medium",
       "mechanism": "extract",
       "affected_pages": [],
-      "evidence": "Searched 4 sampled pages (home, about, contact, blog). Found 3 of 4 key facts as plain text or structured data; not found: location (absent).",
+      "evidence": "Searched 4 sampled pages (home, about, contact, blog). Confirmed missing: location. Not checked: programs_or_services (product page not reached).",
       "evidence_items": [
         {
           "page": "site",
           "kind": "computed",
-          "value": "pages_searched=4 (home, about, contact, blog); key_facts=4; found=3; missing=location"
+          "value": "pages_searched=4 (home, about, contact, blog); key_facts=4; found=2; missing=programs_or_services,location"
         },
         {
           "page": "https://www.python.org/about/",
@@ -144,25 +144,19 @@
         {
           "page": "https://www.python.org/",
           "kind": "text_excerpt",
-          "value": "Get Started; Download; Docs; Jobs; Upcoming Events",
-          "note": "programs_or_services found via heading"
-        },
-        {
-          "page": "https://www.python.org/",
-          "kind": "text_excerpt",
           "value": "Donate",
           "note": "how_to_participate found via link"
         },
         {
           "page": "site",
           "kind": "computed",
-          "value": "adjustments=single_missing_fact:medium"
+          "value": "absence_scope=sample; confirmed_missing=location; not_checked=programs_or_services; roles_not_sampled=product"
         }
       ],
       "why_it_matters": "An assistant answers from the text it can extract. A fact that is absent, or present only as a hint, is a question the brand cannot be quoted on, so the answer comes from a competitor or from nowhere. The brand is invisible for that question.",
       "suggested_action": {
         "summary": "Add the missing facts as plain text on the pages a visitor would expect them (location).",
-        "detail": "State the location as text (city and country at minimum). Mirror each fact in the matching JSON-LD property (offers.price, address, telephone, openingHoursSpecification, description, audience) so both text and structured data agree.",
+        "detail": "List programs or services as text headings on a programs page. State the location as text (city and country at minimum). Mirror each fact in the matching JSON-LD property (offers.price, address, telephone, openingHoursSpecification, description, audience) so both text and structured data agree.",
         "impact": "medium",
         "effort": "medium",
         "priority": "medium"
@@ -172,6 +166,7 @@
       ],
       "dedupe_key": "fx.facts.key_fact_missing|",
       "source_skill": "fact-extractability-audit",
+      "absence_scope": "sample",
       "id": "F-002",
       "rank": 2,
       "round2_mode": "invisible",
@@ -524,19 +519,24 @@
     },
     {
       "check_id": "or.simulation.question_unanswerable",
-      "title": "1 of the questions a buyer would ask cannot be answered from this site's text",
+      "title": "2 of the questions a buyer would ask cannot be answered from this site's text",
       "status": "fail",
       "severity": "info",
       "confidence": "high",
       "effort": "n/a",
       "mechanism": "extract",
       "affected_pages": [],
-      "evidence": "Simulated from work/extracted_facts.json only: 1 of 4 questions unanswerable; facts absent: location.",
+      "evidence": "Simulated from work/extracted_facts.json only: 2 of 4 questions unanswerable; facts absent: location, programs_or_services.",
       "evidence_items": [
         {
           "page": "site",
           "kind": "computed",
-          "value": "question=What programs does Python.org run, and where?; missing_facts=location"
+          "value": "question=What programs does Python.org run, and where?; missing_facts=programs_or_services,location"
+        },
+        {
+          "page": "site",
+          "kind": "computed",
+          "value": "question=Is Python.org a good fit for a supporter like me?; missing_facts=programs_or_services"
         }
       ],
       "why_it_matters": "An assistant answering at fetch time has only what the pages say. Where the site is silent it either declines to answer or uses someone else's page, and the brand is invisible for that question.",
@@ -942,10 +942,9 @@
         "question": "What programs does Python.org run, and where?",
         "answerable": false,
         "answer_from_facts": null,
-        "facts_used": [
-          "programs_or_services"
-        ],
+        "facts_used": [],
         "missing_facts": [
+          "programs_or_services",
           "location"
         ],
         "see_finding": "F-002"
@@ -963,12 +962,13 @@
       {
         "id": "q4",
         "question": "Is Python.org a good fit for a supporter like me?",
-        "answerable": true,
-        "answer_from_facts": "According to the site, \"Get Started; Download; Docs; Jobs; Upcoming Events\".",
-        "facts_used": [
+        "answerable": false,
+        "answer_from_facts": null,
+        "facts_used": [],
+        "missing_facts": [
           "programs_or_services"
         ],
-        "missing_facts": []
+        "see_finding": "F-002"
       },
       {
         "id": "q5",
@@ -1005,29 +1005,29 @@
   ],
   "suppressed_findings": [],
   "run": {
-    "wall_clock_seconds": 15.3,
+    "wall_clock_seconds": 16.2,
     "requests_made": 10,
     "probe_errors": [],
     "time_budget_seconds": 300.0,
     "probes": [
       {
         "probe": "crawl-render-audit",
-        "seconds": 0.17,
+        "seconds": 0.34,
         "error": null
       },
       {
         "probe": "fact-extractability-audit",
-        "seconds": 0.19,
+        "seconds": 0.34,
         "error": null
       },
       {
         "probe": "entity-freshness-corroboration-audit",
-        "seconds": 1.47,
+        "seconds": 2.05,
         "error": null
       },
       {
         "probe": "engagement-audit",
-        "seconds": 8.28,
+        "seconds": 8.11,
         "error": null
       }
     ]

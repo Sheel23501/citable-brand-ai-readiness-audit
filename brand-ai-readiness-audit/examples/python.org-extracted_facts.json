@@ -1,12 +1,13 @@
 {
   "site": "https://www.python.org",
   "site_category": "nonprofit_institution",
-  "extracted_at": "2026-09-12T14:32:52Z",
+  "extracted_at": "2026-09-13T11:00:02Z",
   "basis": "served_html_only",
   "brand_name": {
     "value": "Python.org",
     "page": "https://www.python.org/",
-    "source": "meta:og:site_name"
+    "source": "meta:og:site_name",
+    "context": null
   },
   "facts": {
     "mission": {
@@ -18,11 +19,11 @@
       "required": true
     },
     "programs_or_services": {
-      "status": "present",
-      "kind": "list",
-      "value": "Get Started; Download; Docs; Jobs; Upcoming Events",
-      "page": "https://www.python.org/",
-      "source": "heading",
+      "status": "absent",
+      "kind": null,
+      "value": null,
+      "page": null,
+      "source": null,
       "required": true
     },
     "location": {
@@ -43,12 +44,11 @@
     },
     "audience": {
       "status": "present",
-      "kind": "list",
-      "value": "Get Started; Download; Docs; Jobs; Upcoming Events",
+      "kind": "audience",
+      "value": "…location data for users for testing or modeling…",
       "page": "https://www.python.org/",
-      "source": "heading",
-      "required": false,
-      "note": "from programs_or_services"
+      "source": "text",
+      "required": false
     },
     "differentiator": {
       "status": "absent",
@@ -69,7 +69,7 @@
     {
       "role": "home",
       "url": "https://www.python.org/",
-      "words": 987,
+      "words": 1017,
       "jsonld_types": [
         "WebSite",
         "SearchAction"

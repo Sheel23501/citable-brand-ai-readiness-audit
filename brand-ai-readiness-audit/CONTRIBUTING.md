@@ -116,10 +116,13 @@ minutes because they start the fixture servers.
 ## Invariants you must not break
 
 **Replay parity.** `--workdir` mode must reproduce `--url` mode exactly, and a
-test asserts it per fixture. This is why **all network access happens in the
-sampler**, never in a probe's check. If your check needs a request, add it to
-`auditlib/sampler.py` and record the result in `sample.json`; the probe then
-grades what was recorded. A check that fetches at grade time will fail parity.
+test asserts it per fixture. Every page a check grades is fetched once, by the
+sampler, and recorded in `sample.json`; probes grade that recording. Two probes
+make bounded requests of their own and record them the same way: the engagement
+probe's link sample and 404 check, and the entity probe's single optional
+Wikipedia or Wikidata lookup. If a new check needs a page, add it to
+`auditlib/sampler.py`; a check that fetches a graded page at grade time will fail
+parity.
 
 **Never crash.** Every probe emits valid JSON on every input — DNS failure, 403,
 a PDF at the home URL, an empty site. The `scripts` stage runs every script with

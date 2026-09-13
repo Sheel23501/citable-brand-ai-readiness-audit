@@ -80,25 +80,27 @@ reorder steps 3 and 4, and never edit `report.json` by hand: step 7 does that.
    `tool_unavailable` is the correct result and already carries the queries.
    This step comes before step 4 because compose rewrites `report.json`.
 
-4. **Write the simulated answers**, following
-   `references/simulation_rules.md` sections 2 to 4 without exception. Open
-   `audit-example/work/extracted_facts.json` with `Read`. For each question
-   with `answerable: true`, write one to three sentences whose substance is
-   only the verbatim `value` strings of the facts in `facts_used`, in double
-   quotes, framed by words that carry no facts ("According to the site, …").
-   For each question with `answerable: false`, write nothing. Do not use
-   anything you know about the brand, anything in the page snapshots, or
-   anything fetched: the validator will reject an answer that does not quote
-   its facts verbatim, and the reader can check every quotation against the
-   facts file.
+4. **Review the simulated answers.** `run_audit.py` has already written a
+   verbatim answer for every question with `answerable: true`, an attribution
+   note and a narrative, so the report passes `validate.py --final` as it
+   leaves the script. Steps 4 to 6 are an optional improvement: rewrite any of
+   the three into clearer prose where that helps the reader, under the same
+   rules. An answer is one to three sentences whose substance is only the
+   verbatim `value` strings of the facts in `facts_used`
+   (`audit-example/work/extracted_facts.json`), in double quotes, framed by
+   words that carry no facts ("According to the site, …"), following
+   `references/simulation_rules.md` sections 2 to 4 without exception. A
+   question with `answerable: false` gets no answer. Never use anything you
+   know about the brand, anything in the page snapshots, or anything fetched:
+   the validator rejects an answer that does not quote its facts verbatim.
 
-5. **Write the attribution note** (`references/simulation_rules.md` section
+5. **Review the attribution note** (`references/simulation_rules.md` section
    5): one or two sentences on whether an assistant using these facts would
    have the brand's name in hand, based only on whether the quoted values
    carry the name and on the `ef.entity.*` and `ef.corroboration.*` results in
    the report.
 
-6. **Write the narrative** (`references/simulation_rules.md` section 7):
+6. **Review the narrative** (`references/simulation_rules.md` section 7):
    three to six sentences, grouped invisible → stale → bouncing, naming the
    worst finding of each group by id, stating how many simulation questions
    were answerable, and closing with what to do first (the `quick_wins` ids
@@ -106,8 +108,8 @@ reorder steps 3 and 4, and never edit `report.json` by hand: step 7 does that.
    check, a coverage line or the simulation. If any probe did not finish, the
    first sentence says the run was incomplete.
 
-7. **Finalize.** Put steps 4 to 6 in one small file and let the script merge,
-   re-render and validate:
+7. **Finalize, only if you changed something in steps 4 to 6.** Put the
+   changes in one small file and let the script merge, re-render and validate:
 
    ```
    cat > audit-example/answers.json <<'EOF'

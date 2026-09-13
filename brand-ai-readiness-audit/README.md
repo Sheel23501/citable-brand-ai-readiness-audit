@@ -14,6 +14,25 @@ python3 skills/audit-orchestrator/scripts/run_audit.py https://example.com
 # -> audit-example.com/report.json  and  report.md
 ```
 
+## At a glance
+
+| Skill | What it does |
+|---|---|
+| **`audit-orchestrator`** (entrypoint) | Samples the site once, runs the four probes, removes duplicate findings, applies the accuracy gates, and writes the single report |
+| `crawl-render-audit` | Can a crawler get in and read the page: robots.txt per AI-crawler tier, edge blocks, JavaScript gates, sitemap, noindex, canonical |
+| `fact-extractability-audit` | Can a machine pick out the facts: key facts in plain text, facts locked in images, JSON-LD validity, page identity |
+| `entity-freshness-corroboration-audit` | Is the brand unambiguous, current and corroborated: entity anchors, name consistency, dates, off-site corroboration |
+| `engagement-audit` | Does a visitor who arrives stay: first-screen clarity, calls to action, navigation, trust signals, mobile, broken links |
+
+**How they compose:** one sampler fetches each page once; every probe grades that
+same recording and writes its findings; `compose.py` merges them, folds findings
+that share a root cause, withdraws any claim about pages it could not read, and
+renders `report.json` and `report.md`. `validate.py` checks the result against
+the brief's required schema.
+
+61 checks, **4,765 test assertions over 29 fixture sites**, live runs of 6–66
+seconds, and a complete real report in `examples/`.
+
 ---
 
 ## The two halves
@@ -259,6 +278,30 @@ rules in robots.txt for years. Four things are:
 library, which is also what the brief's self-containment rule asks for.
 
 ---
+
+## How it was built
+
+The work ran in a loop, and every rule in this marketplace came out of it.
+
+1. **Research the failure, not the fix.** Live sites that assistants cite well
+   were compared with ones they ignore or misrepresent, to find the repeatable
+   root causes behind each Round-2 failure mode.
+2. **Write each cause down as a rule before writing code.** Every check has a
+   written rule, the evidence it records, a reasoned severity, and a list of the
+   near-misses that must *not* fire (`references/non_findings.md`).
+3. **Build the test first.** Each failure mode has a synthetic fixture site that
+   triggers it, and clean sites in several categories, countries and scripts must
+   produce no defect at all — the guard against false positives.
+4. **Run it on sites it has never seen, and trace every wrong answer to its
+   cause.** A false positive is fixed as a general rule that holds in any
+   language, never as an exception for one site, and a test is added so it
+   cannot return.
+5. **Prefer saying "not checked" to guessing.** Wherever the audit could not
+   read something — a page it did not reach, a language it has no vocabulary
+   for, navigation built by JavaScript — it withdraws the claim and says why.
+
+The result is a marketplace that is conservative about what it asserts and
+specific about what to do.
 
 ## Field research
 

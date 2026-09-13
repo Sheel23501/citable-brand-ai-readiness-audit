@@ -1,6 +1,6 @@
 # AI-readiness audit: python.org
 
-https://www.python.org · category **nonprofit_institution** (medium confidence) · audited 2026-09-12T14:33:02Z · tool brand-ai-readiness-audit 0.1.0
+https://www.python.org · category **nonprofit_institution** (medium confidence) · audited 2026-09-13T11:00:12Z · tool brand-ai-readiness-audit 0.1.0
 
 ## Summary
 
@@ -44,23 +44,22 @@ Priority **medium** · impact medium · effort low · quick win
 
 Reference: https://developers.google.com/search/docs/appearance/structured-data/organization
 
-#### F-002 1 of 4 key facts for a nonprofit or institutional site are not extractable as text
+#### F-002 1 of 4 key facts are not extractable as text; 1 not checked (product unreached)
 
 `fx.facts.key_fact_missing` · severity **medium** · confidence medium · effort medium · extract · site-wide
 
-Searched 4 sampled pages (home, about, contact, blog). Found 3 of 4 key facts as plain text or structured data; not found: location (absent).
+Searched 4 sampled pages (home, about, contact, blog). Confirmed missing: location. Not checked: programs_or_services (product page not reached).
 
 ```
-computed: pages_searched=4 (home, about, contact, blog); key_facts=4; found=3; missing=location
+computed: pages_searched=4 (home, about, contact, blog); key_facts=4; found=2; missing=programs_or_services,location
 text_excerpt: …Foundation The mission of the Python Software Foundation is to promote, protect, and advance the Python programming language, and to support and facilitate the growth of a diverse and international …  (mission found via text)
-text_excerpt: Get Started; Download; Docs; Jobs; Upcoming Events  (programs_or_services found via heading)
 text_excerpt: Donate  (how_to_participate found via link)
-computed: adjustments=single_missing_fact:medium
+computed: absence_scope=sample; confirmed_missing=location; not_checked=programs_or_services; roles_not_sampled=product
 ```
 
 *Why it matters.* An assistant answers from the text it can extract. A fact that is absent, or present only as a hint, is a question the brand cannot be quoted on, so the answer comes from a competitor or from nowhere. The brand is invisible for that question.
 
-*Do this.* Add the missing facts as plain text on the pages a visitor would expect them (location). State the location as text (city and country at minimum). Mirror each fact in the matching JSON-LD property (offers.price, address, telephone, openingHoursSpecification, description, audience) so both text and structured data agree.
+*Do this.* Add the missing facts as plain text on the pages a visitor would expect them (location). List programs or services as text headings on a programs page. State the location as text (city and country at minimum). Mirror each fact in the matching JSON-LD property (offers.price, address, telephone, openingHoursSpecification, description, audience) so both text and structured data agree.
 
 Priority **medium** · impact medium · effort medium
 
@@ -197,14 +196,15 @@ computed: suggested_queries="Python.org" | "Python.org" python.org | "Python.org
 
 Priority **low** · impact low · effort n/a
 
-#### F-010 1 of the questions a buyer would ask cannot be answered from this site's text
+#### F-010 2 of the questions a buyer would ask cannot be answered from this site's text
 
 `or.simulation.question_unanswerable` · severity **info** · confidence high · effort n/a · extract · site-wide
 
-Simulated from work/extracted_facts.json only: 1 of 4 questions unanswerable; facts absent: location.
+Simulated from work/extracted_facts.json only: 2 of 4 questions unanswerable; facts absent: location, programs_or_services.
 
 ```
-computed: question=What programs does Python.org run, and where?; missing_facts=location
+computed: question=What programs does Python.org run, and where?; missing_facts=programs_or_services,location
+computed: question=Is Python.org a good fit for a supporter like me?; missing_facts=programs_or_services
 ```
 
 *Why it matters.* An assistant answering at fetch time has only what the pages say. Where the site is silent it either declines to answer or uses someone else's page, and the brand is invisible for that question.
@@ -298,7 +298,7 @@ According to the site, "…Foundation The mission of the Python Software Foundat
 
 **What programs does Python.org run, and where?**
 
-_Not answerable from the site's text. Absent: location._
+_Not answerable from the site's text. Absent: programs_or_services, location._
 
 **How do I donate, apply, or join?**
 
@@ -306,7 +306,7 @@ According to the site, "Donate".
 
 **Is Python.org a good fit for a supporter like me?**
 
-According to the site, "Get Started; Download; Docs; Jobs; Upcoming Events".
+_Not answerable from the site's text. Absent: programs_or_services._
 
 **What sets Python.org apart from alternatives?**
 

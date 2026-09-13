@@ -14,7 +14,7 @@ python3 skills/audit-orchestrator/scripts/run_audit.py https://www.python.org
 | `python.org-extracted_facts.json` | The facts file the simulation is allowed to quote from — included so every quoted excerpt can be checked |
 
 **Result:** 10 findings (0 critical, 0 high, 3 medium, 5 low, 2 informational)
-from 61 checks in **15.3 seconds**. Validated with `validate.py --final`, which
+from 61 checks in **16.2 seconds**. Validated with `validate.py --final`, which
 passes on the report as the script writes it: the narrative, the attribution note
 and every answer are written by `compose.py`, not added by hand afterwards.
 
