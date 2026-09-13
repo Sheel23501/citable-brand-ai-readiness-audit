@@ -373,8 +373,17 @@ traps that have already cost time.
 
 ## Validation
 
+Each skill folder is a standalone agentskills.io skill. The brief's suggested checker:
+
 ```bash
-agentskills validate skills/<skill-name>
+skills-ref validate skills/<skill-name>        # the agentskills.io reference validator
+```
+
+The report a run produces is checked against the brief's required floor (and this
+marketplace's superset) by the bundled validator:
+
+```bash
+python3 skills/audit-orchestrator/scripts/validate.py --workdir <audit-workdir> --final
 ```
 
 ## Licence
