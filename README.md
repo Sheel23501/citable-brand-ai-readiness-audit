@@ -1,4 +1,4 @@
-# Citable — Brand AI-Readiness Audit
+# Citable — Brand AI-Readiness Audit 
 
 An Agent Skill Marketplace that audits any website for the problems that keep it
 out of AI assistants' answers, and the problems that lose the visitor who does
